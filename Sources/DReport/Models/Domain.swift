@@ -71,6 +71,9 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var startedAt: Date?
     var completedAt: Date?
     var loggedAt: Date?
+
+    var createdByUserID: UUID?
+    var updatedByUserID: UUID?
 }
 
 enum EntityKind: String, Codable, CaseIterable, Identifiable {
@@ -176,4 +179,6 @@ struct HistoryEvent: Identifiable, Codable, Hashable {
     var text: String?
     var previousValue: String?
     var newValue: String?
+
+    var actorUserID: UUID?
 }

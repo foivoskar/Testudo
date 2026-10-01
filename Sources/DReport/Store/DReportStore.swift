@@ -5,6 +5,10 @@ import Combine
 final class DReportStore: ObservableObject {
     @Published private(set) var data: DReportData
 
+    @Published
+    private(set)
+    var currentUserID: UUID?
+
     let fileURL: URL
 
     init() {
@@ -49,6 +53,9 @@ final class DReportStore: ObservableObject {
         } else {
             data = DReportData()
         }
+
+        migrateUsersToPeopleIfNeeded()
+        restorePersistentSessionIfPossible()
     }
 
     private static func decode(
@@ -256,7 +263,11 @@ final class DReportStore: ObservableObject {
                 loggedAt:
                     kind == .activity
                     ? now
-                    : nil
+                    : nil,
+                createdByUserID:
+                    currentUserID,
+                updatedByUserID:
+                    currentUserID
             )
 
         data.workItems.append(item)
@@ -267,7 +278,9 @@ final class DReportStore: ObservableObject {
                 kind: .created,
                 timestamp: now,
                 text:
-                    "Created \(kind.displayName.lowercased())"
+                    "Created \(kind.displayName.lowercased())",
+                actorUserID:
+                    currentUserID
             )
         )
 
@@ -361,6 +374,9 @@ final class DReportStore: ObservableObject {
         data.workItems[index].updatedAt =
             now
 
+        data.workItems[index].updatedByUserID =
+            currentUserID
+
         if
             status == .inProgress,
             data.workItems[index].startedAt
@@ -388,7 +404,9 @@ final class DReportStore: ObservableObject {
                 previousValue:
                     previous?.rawValue,
                 newValue:
-                    status.rawValue
+                    status.rawValue,
+                actorUserID:
+                    currentUserID
             )
         )
 
@@ -663,5 +681,522 @@ final class DReportStore: ObservableObject {
                     $1.name
                 ) == .orderedAscending
             }
+    }
+}
+
+
+extension DReportStore {
+    func personProfile(
+        for entityID: UUID
+    ) -> PersonProfile? {
+        data.personProfiles.first {
+            $0.entityID == entityID
+        }
+    }
+
+    func personEntity(
+        for user: DReportUser
+    ) -> Entity? {
+        guard
+            let personID =
+                user.personEntityID
+        else {
+            return nil
+        }
+
+        return data.entities.first {
+            $0.id == personID
+            && $0.kind == .person
+        }
+    }
+
+    func user(
+        linkedToPerson entityID: UUID
+    ) -> DReportUser? {
+        data.users.first {
+            $0.personEntityID == entityID
+        }
+    }
+
+    var peopleWithoutUserAccounts:
+        [Entity]
+    {
+        data.entities
+            .filter {
+                $0.kind == .person
+            }
+            .filter { person in
+                !data.users.contains {
+                    $0.personEntityID
+                        == person.id
+                }
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    @discardableResult
+    private func createPersonForUser(
+        firstName: String,
+        lastName: String,
+        avatarData: Data?
+    ) -> UUID {
+        let cleanedFirst =
+            firstName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanedLast =
+            lastName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let name =
+            [cleanedFirst, cleanedLast]
+                .filter {
+                    !$0.isEmpty
+                }
+                .joined(separator: " ")
+
+        let entity =
+            Entity(
+                kind: .person,
+                name:
+                    name.isEmpty
+                    ? "Unnamed Person"
+                    : name
+            )
+
+        data.entities.append(entity)
+
+        data.personProfiles.append(
+            PersonProfile(
+                entityID: entity.id,
+                firstName:
+                    cleanedFirst,
+                lastName:
+                    cleanedLast,
+                avatarData:
+                    avatarData
+            )
+        )
+
+        return entity.id
+    }
+
+    private func migrateUsersToPeopleIfNeeded() {
+        var changed = false
+
+        for index in data.users.indices {
+            if
+                let personID =
+                    data.users[index]
+                        .personEntityID,
+                data.entities.contains(
+                    where: {
+                        $0.id == personID
+                        && $0.kind == .person
+                    }
+                )
+            {
+                if !data.personProfiles.contains(
+                    where: {
+                        $0.entityID
+                            == personID
+                    }
+                ) {
+                    data.personProfiles.append(
+                        PersonProfile(
+                            entityID:
+                                personID,
+                            firstName:
+                                data.users[index]
+                                    .firstName,
+                            lastName:
+                                data.users[index]
+                                    .lastName,
+                            avatarData:
+                                data.users[index]
+                                    .avatarData
+                        )
+                    )
+
+                    changed = true
+                }
+
+                continue
+            }
+
+            let personID =
+                createPersonForUser(
+                    firstName:
+                        data.users[index]
+                            .firstName,
+                    lastName:
+                        data.users[index]
+                            .lastName,
+                    avatarData:
+                        data.users[index]
+                            .avatarData
+                )
+
+            data.users[index]
+                .personEntityID =
+                personID
+
+            changed = true
+        }
+
+        if changed {
+            data.schemaVersion =
+                max(
+                    data.schemaVersion,
+                    3
+                )
+
+            save()
+        }
+    }
+}
+
+
+extension DReportStore {
+    var users: [DReportUser] {
+        data.users.sorted {
+            $0.displayName
+                .localizedCaseInsensitiveCompare(
+                    $1.displayName
+                )
+                == .orderedAscending
+        }
+    }
+
+    var currentUser: DReportUser? {
+        guard
+            let currentUserID
+        else {
+            return nil
+        }
+
+        return data.users.first {
+            $0.id == currentUserID
+        }
+    }
+
+    var hasUsers: Bool {
+        !data.users.isEmpty
+    }
+
+    var currentUserIsAdministrator:
+        Bool
+    {
+        currentUser?.role
+            == .administrator
+    }
+
+    func createInitialAdministrator(
+        username: String,
+        firstName: String,
+        lastName: String,
+        password: String,
+        avatarData: Data?,
+        staySignedIn: Bool
+    ) -> String? {
+        guard data.users.isEmpty else {
+            return
+                "An administrator account already exists."
+        }
+
+        return createUser(
+            username: username,
+            firstName: firstName,
+            lastName: lastName,
+            password: password,
+            avatarData: avatarData,
+            role: .administrator,
+            signInAfterCreation: true,
+            staySignedIn:
+                staySignedIn
+        )
+    }
+
+    func addMember(
+        username: String,
+        firstName: String,
+        lastName: String,
+        password: String,
+        avatarData: Data?
+    ) -> String? {
+        guard
+            currentUserIsAdministrator
+        else {
+            return
+                "Administrator rights are required."
+        }
+
+        return createUser(
+            username: username,
+            firstName: firstName,
+            lastName: lastName,
+            password: password,
+            avatarData: avatarData,
+            role: .member,
+            signInAfterCreation: false,
+            staySignedIn: false
+        )
+    }
+
+    func login(
+        username: String,
+        password: String,
+        staySignedIn: Bool
+    ) -> String? {
+        let cleanedUsername =
+            username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard
+            let index =
+                data.users.firstIndex(
+                    where: {
+                        $0.username
+                            .caseInsensitiveCompare(
+                                cleanedUsername
+                            )
+                            == .orderedSame
+                    }
+                )
+        else {
+            return
+                "Incorrect username or password."
+        }
+
+        let user =
+            data.users[index]
+
+        guard user.isActive else {
+            return
+                "This account is disabled."
+        }
+
+        guard
+            PasswordHasher.verify(
+                password: password,
+                saltBase64:
+                    user.passwordSaltBase64,
+                expectedHashBase64:
+                    user.passwordHashBase64,
+                iterations:
+                    user.passwordIterations
+            )
+        else {
+            return
+                "Incorrect username or password."
+        }
+
+        currentUserID =
+            user.id
+
+        data.users[index].lastLoginAt =
+            Date()
+
+        data.schemaVersion =
+            max(
+                data.schemaVersion,
+                3
+            )
+
+        if staySignedIn {
+            PersistentSession.save(
+                userID: user.id
+            )
+        } else {
+            PersistentSession.clear()
+        }
+
+        save()
+
+        return nil
+    }
+
+    func signOut() {
+        PersistentSession.clear()
+        currentUserID = nil
+    }
+
+    private func createUser(
+        username: String,
+        firstName: String,
+        lastName: String,
+        password: String,
+        avatarData: Data?,
+        role: UserRole,
+        signInAfterCreation: Bool,
+        staySignedIn: Bool
+    ) -> String? {
+        let cleanedUsername =
+            username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanedFirstName =
+            firstName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanedLastName =
+            lastName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanedUsername.isEmpty else {
+            return "Username is required."
+        }
+
+        guard
+            cleanedUsername.rangeOfCharacter(
+                from: .whitespacesAndNewlines
+            ) == nil
+        else {
+            return
+                "Username cannot contain spaces."
+        }
+
+        guard !cleanedFirstName.isEmpty else {
+            return
+                "First name is required."
+        }
+
+        guard password.count >= 8 else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+        let usernameExists =
+            data.users.contains {
+                $0.username
+                    .caseInsensitiveCompare(
+                        cleanedUsername
+                    )
+                    == .orderedSame
+            }
+
+        guard !usernameExists else {
+            return
+                "That username already exists."
+        }
+
+        let hash:
+            (
+                saltBase64: String,
+                hashBase64: String,
+                iterations: Int
+            )
+
+        do {
+            hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            password
+                    )
+        } catch {
+            return
+                "The password could not be secured."
+        }
+
+        let now = Date()
+
+        let personEntityID =
+            createPersonForUser(
+                firstName:
+                    cleanedFirstName,
+                lastName:
+                    cleanedLastName,
+                avatarData:
+                    avatarData
+            )
+
+        let user =
+            DReportUser(
+                personEntityID:
+                    personEntityID,
+                username:
+                    cleanedUsername,
+                firstName:
+                    cleanedFirstName,
+                lastName:
+                    cleanedLastName,
+                role:
+                    role,
+                passwordSaltBase64:
+                    hash.saltBase64,
+                passwordHashBase64:
+                    hash.hashBase64,
+                passwordIterations:
+                    hash.iterations,
+                avatarData:
+                    avatarData,
+                createdAt:
+                    now,
+                lastLoginAt:
+                    signInAfterCreation
+                    ? now
+                    : nil
+            )
+
+        data.users.append(user)
+
+        data.schemaVersion =
+            max(
+                data.schemaVersion,
+                3
+            )
+
+        if signInAfterCreation {
+            currentUserID =
+                user.id
+
+            if staySignedIn {
+                PersistentSession.save(
+                    userID:
+                        user.id
+                )
+            } else {
+                PersistentSession.clear()
+            }
+        }
+
+        save()
+
+        return nil
+    }
+
+    private func restorePersistentSessionIfPossible() {
+        guard
+            let storedID =
+                PersistentSession
+                    .loadUserID(),
+            let user =
+                data.users.first(
+                    where: {
+                        $0.id == storedID
+                    }
+                ),
+            user.isActive
+        else {
+            PersistentSession.clear()
+            currentUserID = nil
+            return
+        }
+
+        currentUserID =
+            storedID
     }
 }

@@ -78,51 +78,56 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selection) {
-                Section("Work") {
-                    ForEach(
-                        SidebarSection.allCases.filter {
-                            ![
-                                "themes",
-                                "organizations",
-                                "groups",
-                                "people"
-                            ].contains($0.rawValue)
+            VStack(spacing: 0) {
+                List(selection: $selection) {
+                    Section("Work") {
+                        ForEach(
+                            SidebarSection.allCases.filter {
+                                ![
+                                    "themes",
+                                    "organizations",
+                                    "groups",
+                                    "people"
+                                ].contains($0.rawValue)
+                            }
+                        ) { item in
+                            Label(
+                                item.title,
+                                systemImage: item.icon
+                            )
+                            .tag(item)
+                            .padding(.vertical, 1)
                         }
-                    ) { item in
-                        Label(
-                            item.title,
-                            systemImage: item.icon
-                        )
-                        .tag(item)
-                        .padding(.vertical, 1)
                     }
-                }
 
-                Section("Structure") {
-                    ForEach(
-                        SidebarSection.allCases.filter {
-                            [
-                                "themes",
-                                "organizations",
-                                "groups",
-                                "people"
-                            ].contains($0.rawValue)
+                    Section("Structure") {
+                        ForEach(
+                            SidebarSection.allCases.filter {
+                                [
+                                    "themes",
+                                    "organizations",
+                                    "groups",
+                                    "people"
+                                ].contains($0.rawValue)
+                            }
+                        ) { item in
+                            Label(
+                                item.title,
+                                systemImage: item.icon
+                            )
+                            .tag(item)
+                            .padding(.vertical, 1)
                         }
-                    ) { item in
-                        Label(
-                            item.title,
-                            systemImage: item.icon
-                        )
-                        .tag(item)
-                        .padding(.vertical, 1)
                     }
                 }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+                .background(.regularMaterial)
+
+                SidebarUserFooter()
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
             .background(.regularMaterial)
-                        .navigationSplitViewColumnWidth(
+            .navigationSplitViewColumnWidth(
                 min: 190,
                 ideal: 220,
                 max: 280

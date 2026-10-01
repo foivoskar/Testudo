@@ -7,7 +7,7 @@ struct DReportApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AccountGateView()
                 .environmentObject(store)
         }
         .defaultSize(
