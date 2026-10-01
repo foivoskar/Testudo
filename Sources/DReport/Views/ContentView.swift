@@ -139,10 +139,6 @@ private struct DetailTrackpadNavigationCapture:
 
         private var gestureTriggered =
             false
-
-        private var lastTimestamp:
-            TimeInterval = 0
-
         init(
             onBack: @escaping () -> Void,
             onForward: @escaping () -> Void
@@ -195,8 +191,7 @@ private struct DetailTrackpadNavigationCapture:
             _ event: NSEvent
         ) {
             guard
-                event
-                    .hasPreciseScrollingDeltas,
+                event.hasPreciseScrollingDeltas,
                 let hostView,
                 let window =
                     hostView.window,
@@ -213,26 +208,35 @@ private struct DetailTrackpadNavigationCapture:
 
             guard
                 hostView.bounds
-                    .contains(
-                        point
-                    )
+                    .contains(point)
             else {
                 return
             }
 
-            if
-                event.timestamp
-                    - lastTimestamp
-                    > 0.30
-            {
+            /*
+             One physical gesture = one navigation step.
+
+             Momentum events are deliberately ignored. The latch is
+             reset ONLY when macOS reports the beginning of a genuinely
+             new two-finger gesture.
+
+             This prevents a long swipe or its momentum from moving
+             through several history entries.
+            */
+            if event.phase == .began {
                 resetGesture()
             }
 
-            lastTimestamp =
-                event.timestamp
+            guard
+                event.phase == .began
+                    || event.phase == .changed
+            else {
+                return
+            }
 
-            if event.phase == .began {
-                resetGesture()
+            guard !gestureTriggered
+            else {
+                return
             }
 
             var dx =
@@ -241,9 +245,6 @@ private struct DetailTrackpadNavigationCapture:
             let dy =
                 event.scrollingDeltaY
 
-            // Convert to physical finger direction so the gesture
-            // behaves like browser navigation independently of the
-            // macOS "Natural scrolling" preference.
             if
                 event
                     .isDirectionInvertedFromDevice
@@ -251,22 +252,11 @@ private struct DetailTrackpadNavigationCapture:
                 dx = -dx
             }
 
-            // Ignore ordinary vertical scrolling with tiny
-            // horizontal noise.
             guard
                 abs(dx) > 0.8,
                 abs(dx)
                     > abs(dy) * 1.35
             else {
-                if
-                    event.phase == .ended
-                    || event.phase == .cancelled
-                    || event.momentumPhase
-                        == .ended
-                {
-                    resetGesture()
-                }
-
                 return
             }
 
@@ -275,32 +265,20 @@ private struct DetailTrackpadNavigationCapture:
             let threshold:
                 CGFloat = 52
 
-            if !gestureTriggered {
-                if accumulatedX
-                    >= threshold
-                {
-                    gestureTriggered =
-                        true
+            if accumulatedX >= threshold {
+                gestureTriggered =
+                    true
 
-                    onForward()
-                } else if
-                    accumulatedX
-                        <= -threshold
-                {
-                    gestureTriggered =
-                        true
+                onForward()
 
-                    onBack()
-                }
-            }
-
-            if
-                event.phase == .ended
-                || event.phase == .cancelled
-                || event.momentumPhase
-                    == .ended
+            } else if
+                accumulatedX
+                    <= -threshold
             {
-                resetGesture()
+                gestureTriggered =
+                    true
+
+                onBack()
             }
         }
 
@@ -314,6 +292,24 @@ private struct DetailTrackpadNavigationCapture:
         }
     }
 }
+
+struct WorkCreationRequest:
+    Identifiable,
+    Equatable
+{
+    let id =
+        UUID()
+
+    let initialKind:
+        WorkItemKind
+
+    let themeID:
+        UUID?
+
+    let parentWorkItemID:
+        UUID?
+}
+
 
 private enum DetailNavigationEntry:
     Equatable
@@ -366,8 +362,8 @@ struct ContentView: View {
         UUID?
 
     @State
-    private var showingCreateTask =
-        false
+    private var workCreationRequest:
+        WorkCreationRequest?
 
     @State
     private var detailBackStack:
@@ -386,23 +382,33 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 List(selection: $selection) {
                     Section {
-                        ForEach(
-                            SidebarSection.allCases.filter {
-                                ![
-                                    "themes",
-                                    "organizations",
-                                    "groups",
-                                    "people"
-                                ].contains($0.rawValue)
-                            }
-                        ) { item in
-                            Label(
-                                item.title,
-                                systemImage: item.icon
-                            )
-                            .tag(item)
-                            .padding(.vertical, 1)
-                        }
+                        sidebarRow(
+                            .today
+                        )
+
+                        sidebarRow(
+                            .calendar
+                        )
+
+                        sidebarRow(
+                            .allTasks
+                        )
+
+                        sidebarRow(
+                            .todo
+                        )
+
+                        sidebarRow(
+                            .inProgress
+                        )
+
+                        sidebarRow(
+                            .completed
+                        )
+
+                        sidebarRow(
+                            .timeline
+                        )
                     } header: {
                         HStack(
                             spacing: 6
@@ -412,8 +418,15 @@ struct ContentView: View {
                             Spacer()
 
                             Button {
-                                showingCreateTask =
-                                    true
+                                workCreationRequest =
+                                    WorkCreationRequest(
+                                        initialKind:
+                                            .task,
+                                        themeID:
+                                            nil,
+                                        parentWorkItemID:
+                                            nil
+                                    )
                             } label: {
                                 Image(
                                     systemName:
@@ -445,23 +458,21 @@ struct ContentView: View {
                     }
 
                     Section("Structure") {
-                        ForEach(
-                            SidebarSection.allCases.filter {
-                                [
-                                    "themes",
-                                    "organizations",
-                                    "groups",
-                                    "people"
-                                ].contains($0.rawValue)
-                            }
-                        ) { item in
-                            Label(
-                                item.title,
-                                systemImage: item.icon
-                            )
-                            .tag(item)
-                            .padding(.vertical, 1)
-                        }
+                        sidebarRow(
+                            .themes
+                        )
+
+                        sidebarRow(
+                            .organizations
+                        )
+
+                        sidebarRow(
+                            .groups
+                        )
+
+                        sidebarRow(
+                            .people
+                        )
                     }
                 }
                 .listStyle(.sidebar)
@@ -489,7 +500,9 @@ struct ContentView: View {
                 selectedPersonID:
                     $selectedPersonID,
                 selectedWorkItemID:
-                    $selectedWorkItemID
+                    $selectedWorkItemID,
+                workCreationRequest:
+                    $workCreationRequest
             )
             .padding(.top, 12)
             .background(
@@ -522,7 +535,9 @@ struct ContentView: View {
                     selectedWorkItemID:
                         $selectedWorkItemID,
                     selectedPersonID:
-                        $selectedPersonID
+                        $selectedPersonID,
+                    workCreationRequest:
+                        $workCreationRequest
                 )
                 .frame(
                     maxWidth: .infinity,
@@ -551,18 +566,6 @@ struct ContentView: View {
             )
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(
-            isPresented:
-                $showingCreateTask
-        ) {
-            CreateWorkItemView(
-                themeID: nil,
-                parentWorkItemID: nil,
-                initialKind: .task,
-                isPresented:
-                    $showingCreateTask
-            )
-        }
         .onChange(
             of: selectedWorkItemID
         ) {
@@ -628,6 +631,48 @@ struct ContentView: View {
     // ========================================================
     // Browser-style detail navigation
     // ========================================================
+
+    private var workSidebarSections:
+        [SidebarSection]
+    {
+        [
+            .today,
+            .calendar,
+            .allTasks,
+            .todo,
+            .inProgress,
+            .completed,
+            .timeline
+        ]
+    }
+
+    private var structureSidebarSections:
+        [SidebarSection]
+    {
+        [
+            .themes,
+            .organizations,
+            .groups,
+            .people
+        ]
+    }
+
+    @ViewBuilder
+    private func sidebarRow(
+        _ item: SidebarSection
+    ) -> some View {
+        Label(
+            item.title,
+            systemImage:
+                item.icon
+        )
+        .tag(item)
+        .padding(
+            .vertical,
+            1
+        )
+    }
+
 
     private var detailNavigationBar:
         some View
@@ -1123,6 +1168,10 @@ private struct SectionContentView: View {
     @Binding
     var selectedWorkItemID: UUID?
 
+    @Binding
+    var workCreationRequest:
+        WorkCreationRequest?
+
     @State
     private var showingCreateSheet = false
 
@@ -1268,7 +1317,11 @@ private struct SectionContentView: View {
         case .themes:
             ThemeListView(
                 selection:
-                    $selectedThemeID
+                    $selectedThemeID,
+                selectedWorkItemID:
+                    $selectedWorkItemID,
+                workCreationRequest:
+                    $workCreationRequest
             )
 
         case .organizations:
@@ -1498,6 +1551,15 @@ private struct ThemeListView: View {
 
     @Binding
     var selection: UUID?
+
+    @Binding
+    var selectedWorkItemID:
+        UUID?
+
+    @Binding
+    var workCreationRequest:
+        WorkCreationRequest?
+
 
     var body: some View {
         let roots =

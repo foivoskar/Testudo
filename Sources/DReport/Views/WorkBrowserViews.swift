@@ -4954,6 +4954,11 @@ struct WorkDetailRouterView: View {
     @Binding
     var selectedPersonID: UUID?
 
+    @Binding
+    var workCreationRequest:
+        WorkCreationRequest?
+
+
     var body: some View {
         ZStack {
             DReportStyle
