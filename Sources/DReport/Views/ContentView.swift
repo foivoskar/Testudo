@@ -6,6 +6,7 @@ enum SidebarSection:
     Identifiable
 {
     case today
+    case calendar
     case allTasks
     case todo
     case inProgress
@@ -24,6 +25,8 @@ enum SidebarSection:
         switch self {
         case .today:
             return "Today"
+        case .calendar:
+            return "Calendar"
         case .allTasks:
             return "All Tasks"
         case .todo:
@@ -49,6 +52,8 @@ enum SidebarSection:
         switch self {
         case .today:
             return "calendar"
+        case .calendar:
+            return "calendar.badge.clock"
         case .allTasks:
             return "list.bullet.indent"
         case .todo:
@@ -275,6 +280,12 @@ private struct SectionContentView: View {
                 selection:
                     $selectedWorkItemID
             )
+        case .calendar:
+            WorkCalendarView(
+                selectedWorkItemID:
+                    $selectedWorkItemID
+            )
+
         case .allTasks:
             WorkListView(
                 mode: .all,
@@ -479,6 +490,9 @@ private struct SectionContentView: View {
 
     private var subtitle: String {
         switch section {
+        case .calendar:
+            return "Deadlines, events and reminders"
+
         case .today:
             return
                 "Work and activity recorded today"

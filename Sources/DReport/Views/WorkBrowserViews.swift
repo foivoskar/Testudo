@@ -1665,6 +1665,7 @@ struct WorkDetailRouterView: View {
     private var isWorkSection: Bool {
         switch section {
         case .today,
+             .calendar,
              .allTasks,
              .todo,
              .inProgress,
