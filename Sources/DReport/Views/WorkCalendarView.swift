@@ -307,16 +307,6 @@ struct WorkCalendarView: View {
                         }
 
                         if
-                            summary.events
-                                > 0
-                        {
-                            Image(
-                                systemName:
-                                    "calendar"
-                            )
-                        }
-
-                        if
                             summary.reminders
                                 > 0
                         {
@@ -409,12 +399,6 @@ struct WorkCalendarView: View {
             )
 
             agendaSection(
-                title: "Events",
-                occurrences:
-                    eventOccurrences
-            )
-
-            agendaSection(
                 title: "Reminders",
                 occurrences:
                     reminderOccurrences
@@ -463,16 +447,6 @@ struct WorkCalendarView: View {
             .filter {
                 $0.kind
                     == .deadline
-            }
-    }
-
-    private var eventOccurrences:
-        [CalendarOccurrence]
-    {
-        selectedDayOccurrences
-            .filter {
-                $0.kind
-                    == .event
             }
     }
 
@@ -646,26 +620,7 @@ struct WorkCalendarView: View {
             }
 
             if
-                item.kind == .activity,
-                let eventDate =
-                    item.scheduledAt,
-                calendar.isDate(
-                    eventDate,
-                    inSameDayAs:
-                        date
-                )
-            {
-                result.append(
-                    CalendarOccurrence(
-                        item: item,
-                        kind: .event,
-                        date: eventDate
-                    )
-                )
-            }
-
-            if
-                item.kind != .task,
+                item.kind == .note,
                 let reminder =
                     item.reminderAt,
                 calendar.isDate(
@@ -708,10 +663,6 @@ struct WorkCalendarView: View {
             deadlines:
                 items.filter {
                     $0.kind == .deadline
-                }.count,
-            events:
-                items.filter {
-                    $0.kind == .event
                 }.count,
             reminders:
                 items.filter {
@@ -823,12 +774,10 @@ struct WorkCalendarView: View {
 
 private struct CalendarDaySummary {
     let deadlines: Int
-    let events: Int
     let reminders: Int
 
     var total: Int {
         deadlines
-        + events
         + reminders
     }
 }
@@ -840,17 +789,14 @@ private struct CalendarOccurrence:
         String
     {
         case deadline
-        case event
         case reminder
 
         var sortOrder: Int {
             switch self {
-            case .event:
-                return 0
             case .deadline:
-                return 1
+                return 0
             case .reminder:
-                return 2
+                return 1
             }
         }
     }
@@ -885,13 +831,6 @@ private struct CalendarOccurrence:
 
             return
                 "Due \(date.formatted(date: .omitted, time: .shortened))"
-
-        case .event:
-            return
-                date.formatted(
-                    date: .omitted,
-                    time: .shortened
-                )
 
         case .reminder:
             return

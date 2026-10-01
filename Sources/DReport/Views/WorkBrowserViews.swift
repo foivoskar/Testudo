@@ -1016,6 +1016,46 @@ struct WorkItemDetailView: View {
         UUID?
 
     @State
+    private var showingChildComposer =
+        false
+
+    @State
+    private var childKindDraft:
+        WorkItemKind = .task
+
+    @State
+    private var childTitleDraft =
+        ""
+
+    @State
+    private var childBodyDraft =
+        ""
+
+    @State
+    private var childHasDeadline =
+        false
+
+    @State
+    private var childDeadlineDraft =
+        Date()
+
+    @State
+    private var childHasReminder =
+        false
+
+    @State
+    private var childReminderDraft =
+        Date()
+
+    @State
+    private var childOccurredAtDraft =
+        Date()
+
+    @State
+    private var childErrorMessage:
+        String?
+
+    @State
     private var errorMessage:
         String?
 
@@ -1332,8 +1372,7 @@ struct WorkItemDetailView: View {
                     item.kind
                         == .activity
                 {
-                    eventDateRow(item)
-                    reminderRow(item)
+                    occurredRow(item)
                 }
             }
 
@@ -1621,7 +1660,7 @@ struct WorkItemDetailView: View {
     }
 
     @ViewBuilder
-    private func eventDateRow(
+    private func occurredRow(
         _ item: WorkItem
     ) -> some View {
         if
@@ -1629,22 +1668,22 @@ struct WorkItemDetailView: View {
                 == .eventDate
         {
             dateEditorRow(
-                label: "Event",
+                label: "Occurred",
                 field: .eventDate,
                 item: item
             )
         } else {
             EditableValueRow(
-                label: "Event",
+                label: "Occurred",
                 value:
-                    item.scheduledAt
+                    item.loggedAt
                         .map(formatted)
-                    ?? "None",
+                    ?? "Unknown",
                 onEdit: {
                     beginDateEdit(
                         .eventDate,
                         date:
-                            item.scheduledAt
+                            item.loggedAt
                     )
                 }
             )
@@ -1733,70 +1772,537 @@ struct WorkItemDetailView: View {
                 of: item.id
             )
 
-        if !children.isEmpty {
-            InspectorSection(
-                title: "Contains"
+        if item.kind == .task {
+            VStack(
+                alignment: .leading,
+                spacing: 10
             ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    ForEach(
-                        children
-                    ) { child in
+                HStack {
+                    Text("Contains")
+                        .font(.headline)
+
+                    Spacer()
+
+                    Menu {
                         Button {
-                            cancelEdit()
-
-                            selectedWorkItemID =
-                                child.id
-                        } label: {
-                            HStack(
-                                spacing: 9
-                            ) {
-                                Image(
-                                    systemName:
-                                        largeIcon(
-                                            child
-                                        )
-                                )
-                                .frame(
-                                    width: 18
-                                )
-
-                                Text(
-                                    displayTitle(
-                                        child
-                                    )
-                                )
-
-                                Spacer()
-
-                                Text(
-                                    typeLabel(
-                                        child
-                                    )
-                                )
-                                .font(
-                                    .caption
-                                )
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                            }
-                            .padding(
-                                .vertical,
-                                5
+                            beginChildComposer(
+                                .task
                             )
-                            .contentShape(
-                                Rectangle()
+                        } label: {
+                            Label(
+                                "Sub-task",
+                                systemImage:
+                                    "circle"
                             )
                         }
-                        .buttonStyle(
-                            .plain
+
+                        Button {
+                            beginChildComposer(
+                                .note
+                            )
+                        } label: {
+                            Label(
+                                "Note",
+                                systemImage:
+                                    "note.text"
+                            )
+                        }
+
+                        Button {
+                            beginChildComposer(
+                                .activity
+                            )
+                        } label: {
+                            Label(
+                                "Event",
+                                systemImage:
+                                    "clock.arrow.circlepath"
+                            )
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "plus.circle"
                         )
+                        .font(
+                            .system(
+                                size: 13,
+                                weight:
+                                    .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .frame(
+                            width: 24,
+                            height: 24
+                        )
+                    }
+                    .menuStyle(
+                        .borderlessButton
+                    )
+                    .menuIndicator(
+                        .hidden
+                    )
+                    .help(
+                        "Add to this task"
+                    )
+                }
+
+                if showingChildComposer {
+                    childComposer(
+                        parent: item
+                    )
+                }
+
+                if children.isEmpty
+                    && !showingChildComposer
+                {
+                    Text(
+                        "No sub-tasks, notes or events."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+
+                if !children.isEmpty {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        ForEach(
+                            children
+                        ) { child in
+                            Button {
+                                cancelEdit()
+
+                                selectedWorkItemID =
+                                    child.id
+                            } label: {
+                                HStack(
+                                    spacing: 9
+                                ) {
+                                    Image(
+                                        systemName:
+                                            childIcon(
+                                                child
+                                            )
+                                    )
+                                    .frame(
+                                        width: 18
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 2
+                                    ) {
+                                        Text(
+                                            displayTitle(
+                                                child
+                                            )
+                                        )
+
+                                        if
+                                            child.kind
+                                                == .activity,
+                                            let occurred =
+                                                child.loggedAt
+                                        {
+                                            Text(
+                                                "Occurred \(formatted(occurred))"
+                                            )
+                                            .font(
+                                                .caption2
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    Text(
+                                        childTypeLabel(
+                                            child
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+                                .padding(
+                                    .vertical,
+                                    5
+                                )
+                                .contentShape(
+                                    Rectangle()
+                                )
+                            }
+                            .buttonStyle(
+                                .plain
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private func childComposer(
+        parent: WorkItem
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                Label(
+                    childComposerTitle,
+                    systemImage:
+                        childComposerIcon
+                )
+                .font(.callout)
+                .fontWeight(.medium)
+
+                Spacer()
+            }
+
+            TextField(
+                childKindDraft == .note
+                ? "Title (optional)"
+                : "Title",
+                text:
+                    $childTitleDraft
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                Text(
+                    childKindDraft == .note
+                    ? "Note"
+                    : (
+                        childKindDraft
+                            == .activity
+                        ? "What happened?"
+                        : "Description"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+
+                TextEditor(
+                    text:
+                        $childBodyDraft
+                )
+                .frame(
+                    minHeight: 72
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 6
+                    )
+                    .stroke(
+                        Color.secondary
+                            .opacity(0.15)
+                    )
+                }
+            }
+
+            if childKindDraft == .task {
+                Toggle(
+                    "Set deadline",
+                    isOn:
+                        $childHasDeadline
+                )
+                .toggleStyle(
+                    .checkbox
+                )
+
+                if childHasDeadline {
+                    DatePicker(
+                        "Deadline",
+                        selection:
+                            $childDeadlineDraft,
+                        displayedComponents:
+                            [
+                                .date,
+                                .hourAndMinute
+                            ]
+                    )
+                }
+            }
+
+            if childKindDraft == .note {
+                Toggle(
+                    "Set reminder",
+                    isOn:
+                        $childHasReminder
+                )
+                .toggleStyle(
+                    .checkbox
+                )
+
+                if childHasReminder {
+                    DatePicker(
+                        "Reminder",
+                        selection:
+                            $childReminderDraft,
+                        displayedComponents:
+                            [
+                                .date,
+                                .hourAndMinute
+                            ]
+                    )
+                }
+            }
+
+            if childKindDraft == .activity {
+                DatePicker(
+                    "Occurred",
+                    selection:
+                        $childOccurredAtDraft,
+                    displayedComponents:
+                        [
+                            .date,
+                            .hourAndMinute
+                        ]
+                )
+
+                Text(
+                    "Events record something that happened. They are not calendar appointments."
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            if let childErrorMessage {
+                Text(
+                    childErrorMessage
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .red
+                )
+            }
+
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    cancelChildComposer()
+                }
+                .buttonStyle(
+                    .borderless
+                )
+
+                Button("Add") {
+                    addChild(
+                        to: parent
+                    )
+                }
+                .buttonStyle(
+                    .borderless
+                )
+                .fontWeight(
+                    .medium
+                )
+                .keyboardShortcut(
+                    .defaultAction
+                )
+            }
+        }
+        .padding(12)
+        .background(
+            Color.primary
+                .opacity(0.025)
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 8
+            )
+        )
+    }
+
+    private func beginChildComposer(
+        _ kind: WorkItemKind
+    ) {
+        cancelEdit()
+
+        childKindDraft =
+            kind
+
+        childTitleDraft =
+            ""
+
+        childBodyDraft =
+            ""
+
+        childHasDeadline =
+            false
+
+        childDeadlineDraft =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 1,
+                to: Date()
+            )
+            ?? Date()
+
+        childHasReminder =
+            false
+
+        childReminderDraft =
+            Calendar.current.date(
+                byAdding: .hour,
+                value: 1,
+                to: Date()
+            )
+            ?? Date()
+
+        childOccurredAtDraft =
+            Date()
+
+        childErrorMessage =
+            nil
+
+        showingChildComposer =
+            true
+    }
+
+    private func cancelChildComposer() {
+        showingChildComposer =
+            false
+
+        childErrorMessage =
+            nil
+
+        childTitleDraft =
+            ""
+
+        childBodyDraft =
+            ""
+    }
+
+    private func addChild(
+        to parent: WorkItem
+    ) {
+        let result =
+            store.createChildWorkItem(
+                parentTaskID:
+                    parent.id,
+                kind:
+                    childKindDraft,
+                title:
+                    childTitleDraft,
+                body:
+                    childBodyDraft,
+                deadlineAt:
+                    childKindDraft
+                        == .task
+                    && childHasDeadline
+                    ? childDeadlineDraft
+                    : nil,
+                reminderAt:
+                    childKindDraft
+                        == .note
+                    && childHasReminder
+                    ? childReminderDraft
+                    : nil,
+                occurredAt:
+                    childKindDraft
+                        == .activity
+                    ? childOccurredAtDraft
+                    : nil
+            )
+
+        if let error = result.error {
+            childErrorMessage =
+                error
+            return
+        }
+
+        cancelChildComposer()
+    }
+
+    private var childComposerTitle:
+        String
+    {
+        switch childKindDraft {
+        case .task:
+            return "New Sub-task"
+
+        case .note:
+            return "New Note"
+
+        case .activity:
+            return "New Event"
+        }
+    }
+
+    private var childComposerIcon:
+        String
+    {
+        switch childKindDraft {
+        case .task:
+            return "circle"
+
+        case .note:
+            return "note.text"
+
+        case .activity:
+            return "clock.arrow.circlepath"
+        }
+    }
+
+    private func childTypeLabel(
+        _ item: WorkItem
+    ) -> String {
+        switch item.kind {
+        case .task:
+            return "Sub-task"
+
+        case .note:
+            return "Note"
+
+        case .activity:
+            return "Event"
+        }
+    }
+
+    private func childIcon(
+        _ item: WorkItem
+    ) -> String {
+        switch item.kind {
+        case .task:
+            switch item.status {
+            case .completed:
+                return "checkmark.circle"
+
+            case .inProgress:
+                return "clock"
+
+            case .todo,
+                 nil:
+                return "circle"
+            }
+
+        case .note:
+            return "note.text"
+
+        case .activity:
+            return "clock.arrow.circlepath"
         }
     }
 
@@ -2285,9 +2791,9 @@ struct WorkItemDetailView: View {
             finish(
                 update(
                     item,
-                    scheduled:
+                    loggedAt:
                         value,
-                    scheduledWasEdited:
+                    loggedAtWasEdited:
                         true
                 )
             )
@@ -2347,8 +2853,8 @@ struct WorkItemDetailView: View {
         deadlineWasEdited: Bool = false,
         reminder: Date? = nil,
         reminderWasEdited: Bool = false,
-        scheduled: Date? = nil,
-        scheduledWasEdited: Bool = false
+        loggedAt: Date? = nil,
+        loggedAtWasEdited: Bool = false
     ) -> String? {
         store.updateWorkItemDetails(
             itemID:
@@ -2393,13 +2899,15 @@ struct WorkItemDetailView: View {
                 )
                 : nil,
             scheduledAt:
+                nil,
+            loggedAt:
                 item.kind == .activity
                 ? (
-                    scheduledWasEdited
-                    ? scheduled
-                    : item.scheduledAt
+                    loggedAtWasEdited
+                    ? loggedAt
+                    : item.loggedAt
                 )
-                : nil
+                : item.loggedAt
         )
     }
 

@@ -1815,7 +1815,8 @@ extension DReportStore {
         status: TaskStatus?,
         deadlineAt: Date?,
         reminderAt: Date?,
-        scheduledAt: Date?
+        scheduledAt: Date?,
+        loggedAt: Date? = nil
     ) -> String? {
         guard
             let index =
@@ -2006,11 +2007,17 @@ extension DReportStore {
 
             data.workItems[index]
                 .scheduledAt =
-                scheduledAt
+                nil
 
             data.workItems[index]
                 .reminderAt =
-                reminderAt
+                nil
+
+            data.workItems[index]
+                .loggedAt =
+                loggedAt
+                ?? data.workItems[index].loggedAt
+                ?? now
         }
 
         data.workItems[index].updatedAt =
@@ -2079,5 +2086,140 @@ extension DReportStore {
             }
 
         save()
+    }
+}
+
+extension DReportStore {
+    func createChildWorkItem(
+        parentTaskID: UUID,
+        kind: WorkItemKind,
+        title: String,
+        body: String,
+        deadlineAt: Date?,
+        reminderAt: Date?,
+        occurredAt: Date?
+    ) -> (
+        id: UUID?,
+        error: String?
+    ) {
+        guard
+            let parent =
+                data.workItems.first(
+                    where: {
+                        $0.id == parentTaskID
+                    }
+                )
+        else {
+            return (
+                nil,
+                "Parent task not found."
+            )
+        }
+
+        guard parent.kind == .task else {
+            return (
+                nil,
+                "Only Tasks can contain child items."
+            )
+        }
+
+        let cleanedTitle =
+            title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanedBody =
+            body.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard
+            !cleanedTitle.isEmpty
+            || !cleanedBody.isEmpty
+        else {
+            return (
+                nil,
+                "Enter a title or description."
+            )
+        }
+
+        let now = Date()
+
+        let item =
+            WorkItem(
+                themeID:
+                    parent.themeID,
+                parentWorkItemID:
+                    parentTaskID,
+                kind:
+                    kind,
+                title:
+                    cleanedTitle.isEmpty
+                    ? nil
+                    : cleanedTitle,
+                body:
+                    cleanedBody,
+                status:
+                    kind == .task
+                    ? .todo
+                    : nil,
+                createdAt:
+                    now,
+                updatedAt:
+                    now,
+                scheduledAt:
+                    nil,
+                deadlineAt:
+                    kind == .task
+                    ? deadlineAt
+                    : nil,
+                reminderAt:
+                    kind == .note
+                    ? reminderAt
+                    : nil,
+                startedAt:
+                    nil,
+                completedAt:
+                    nil,
+                loggedAt:
+                    kind == .activity
+                    ? (
+                        occurredAt
+                        ?? now
+                    )
+                    : nil,
+                createdByUserID:
+                    currentUserID,
+                updatedByUserID:
+                    currentUserID
+            )
+
+        data.workItems.append(
+            item
+        )
+
+        data.historyEvents.append(
+            HistoryEvent(
+                workItemID:
+                    item.id,
+                kind:
+                    .created,
+                timestamp:
+                    now,
+                text:
+                    kind == .activity
+                    ? "Logged event"
+                    : "Created \(kind.displayName.lowercased())",
+                actorUserID:
+                    currentUserID
+            )
+        )
+
+        save()
+
+        return (
+            item.id,
+            nil
+        )
     }
 }

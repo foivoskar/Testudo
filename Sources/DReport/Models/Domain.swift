@@ -14,7 +14,7 @@ enum WorkItemKind: String, Codable, CaseIterable, Identifiable {
         case .note:
             return "Note"
         case .activity:
-            return "Activity"
+            return "Event"
         }
     }
 }

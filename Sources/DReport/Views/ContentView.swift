@@ -491,7 +491,7 @@ private struct SectionContentView: View {
     private var subtitle: String {
         switch section {
         case .calendar:
-            return "Deadlines, events and reminders"
+            return "Deadlines and reminders"
 
         case .today:
             return
