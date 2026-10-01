@@ -2125,42 +2125,10 @@ struct WorkItemDetailView: View {
 
                     Spacer()
 
-                    Menu {
-                        Button {
-                            beginChildComposer(
-                                .task
-                            )
-                        } label: {
-                            Label(
-                                "Sub-task",
-                                systemImage:
-                                    "circle"
-                            )
-                        }
-
-                        Button {
-                            beginChildComposer(
-                                .note
-                            )
-                        } label: {
-                            Label(
-                                "Note",
-                                systemImage:
-                                    "note.text"
-                            )
-                        }
-
-                        Button {
-                            beginChildComposer(
-                                .activity
-                            )
-                        } label: {
-                            Label(
-                                "Event",
-                                systemImage:
-                                    "clock.arrow.circlepath"
-                            )
-                        }
+                    Button {
+                        beginChildComposer(
+                            .task
+                        )
                     } label: {
                         Image(
                             systemName:
@@ -2181,21 +2149,20 @@ struct WorkItemDetailView: View {
                             height: 24
                         )
                     }
-                    .menuStyle(
-                        .borderlessButton
-                    )
-                    .menuIndicator(
-                        .hidden
-                    )
+                    .buttonStyle(.plain)
                     .help(
                         "Add to this task"
                     )
-                }
-
-                if showingChildComposer {
-                    childComposer(
-                        parent: item
-                    )
+                    .popover(
+                        isPresented:
+                            $showingChildComposer,
+                        arrowEdge:
+                            .top
+                    ) {
+                        childComposer(
+                            parent: item
+                        )
+                    }
                 }
 
                 if children.isEmpty
@@ -2301,172 +2268,543 @@ struct WorkItemDetailView: View {
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 12
+            spacing: 0
         ) {
-            HStack {
-                Label(
-                    childComposerTitle,
-                    systemImage:
-                        childComposerIcon
-                )
-                .font(.callout)
-                .fontWeight(.medium)
-
-                Spacer()
-            }
-
-            TextField(
-                childKindDraft == .note
-                ? "Title (optional)"
-                : "Title",
-                text:
-                    $childTitleDraft
-            )
+            // ------------------------------------------------
+            // Header
+            // ------------------------------------------------
 
             VStack(
                 alignment: .leading,
-                spacing: 5
+                spacing: 6
             ) {
-                Text(
-                    childKindDraft == .note
-                    ? "Note"
-                    : (
-                        childKindDraft
-                            == .activity
-                        ? "What happened?"
-                        : "Description"
+                Text("Add to Task")
+                    .font(
+                        .system(
+                            size: 20,
+                            weight:
+                                .semibold
+                        )
                     )
+
+                Text(
+                    "Create an item inside “\(displayTitle(parent))”."
                 )
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(
                     .secondary
                 )
+                .lineLimit(2)
+            }
+            .padding(
+                .horizontal,
+                24
+            )
+            .padding(
+                .top,
+                22
+            )
 
-                TextEditor(
-                    text:
-                        $childBodyDraft
-                )
-                .frame(
-                    minHeight: 72
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 6
+            // ------------------------------------------------
+            // Segmented type selector
+            // ------------------------------------------------
+
+            Picker(
+                "Type",
+                selection:
+                    $childKindDraft
+            ) {
+                Text("Sub-task")
+                    .tag(
+                        WorkItemKind.task
                     )
-                    .stroke(
-                        Color.secondary
-                            .opacity(0.15)
+
+                Text("Note")
+                    .tag(
+                        WorkItemKind.note
                     )
+
+                Text("Event")
+                    .tag(
+                        WorkItemKind.activity
+                    )
+            }
+            .pickerStyle(
+                .segmented
+            )
+            .labelsHidden()
+            .padding(
+                .horizontal,
+                24
+            )
+            .padding(
+                .top,
+                20
+            )
+
+            Divider()
+                .padding(
+                    .top,
+                    18
+                )
+
+            // ------------------------------------------------
+            // Form
+            // ------------------------------------------------
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 18
+                ) {
+                    childTitleField
+
+                    childBodyField
+
+                    switch childKindDraft {
+                    case .task:
+                        childTaskOptions
+
+                    case .note:
+                        childNoteOptions
+
+                    case .activity:
+                        childEventOptions
+                    }
+
+                    if let childErrorMessage {
+                        HStack(
+                            alignment: .top,
+                            spacing: 8
+                        ) {
+                            Image(
+                                systemName:
+                                    "exclamationmark.circle.fill"
+                            )
+                            .foregroundStyle(
+                                .red
+                            )
+
+                            Text(
+                                childErrorMessage
+                            )
+                            .font(.callout)
+                            .foregroundStyle(
+                                .red
+                            )
+
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(
+                            Color.red
+                                .opacity(0.06),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 8,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
                 }
-            }
-
-            if childKindDraft == .task {
-                Toggle(
-                    "Set deadline",
-                    isOn:
-                        $childHasDeadline
+                .padding(
+                    .horizontal,
+                    24
                 )
-                .toggleStyle(
-                    .checkbox
-                )
-
-                if childHasDeadline {
-                    TimeZoneAwareDateEditor(
-                        label: "Deadline",
-                        date:
-                            $childDeadlineDraft,
-                        timeZoneID:
-                            $childDeadlineTimeZoneID
-                    )
-                }
-            }
-
-            if childKindDraft == .note {
-                Toggle(
-                    "Set reminder",
-                    isOn:
-                        $childHasReminder
-                )
-                .toggleStyle(
-                    .checkbox
-                )
-
-                if childHasReminder {
-                    TimeZoneAwareDateEditor(
-                        label: "Reminder",
-                        date:
-                            $childReminderDraft,
-                        timeZoneID:
-                            $childReminderTimeZoneID
-                    )
-                }
-            }
-
-            if childKindDraft == .activity {
-                TimeZoneAwareDateEditor(
-                    label: "Occurred",
-                    date:
-                        $childOccurredAtDraft,
-                    timeZoneID:
-                        $childOccurredTimeZoneID
-                )
-
-                Text(
-                    "Events record something that happened. They are not calendar appointments."
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
+                .padding(
+                    .vertical,
+                    20
                 )
             }
+            .frame(
+                maxHeight: 420
+            )
 
-            if let childErrorMessage {
-                Text(
-                    childErrorMessage
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .red
-                )
-            }
+            Divider()
 
-            HStack {
+            // ------------------------------------------------
+            // Actions
+            // ------------------------------------------------
+
+            HStack(
+                spacing: 10
+            ) {
                 Spacer()
 
-                Button("Cancel") {
+                Button(
+                    "Cancel"
+                ) {
                     cancelChildComposer()
                 }
-                .buttonStyle(
-                    .borderless
+                .keyboardShortcut(
+                    .cancelAction
                 )
 
-                Button("Add") {
+                Button(
+                    childAddButtonTitle
+                ) {
                     addChild(
                         to: parent
                     )
                 }
                 .buttonStyle(
-                    .borderless
-                )
-                .fontWeight(
-                    .medium
+                    .borderedProminent
                 )
                 .keyboardShortcut(
                     .defaultAction
                 )
+                .disabled(
+                    !childCanAdd
+                )
             }
-        }
-        .padding(12)
-        .background(
-            Color.primary
-                .opacity(0.025)
-        )
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 8
+            .padding(
+                .horizontal,
+                24
             )
+            .padding(
+                .vertical,
+                16
+            )
+        }
+        .frame(
+            width: 520
+        )
+        .background(
+            DReportStyle
+                .contentBackground
         )
     }
+
+
+    private var childTitleField:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(
+                childKindDraft == .note
+                ? "Title"
+                : "Title"
+            )
+            .font(
+                .caption
+                    .weight(.medium)
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+            TextField(
+                childKindDraft == .note
+                ? "Optional title"
+                : (
+                    childKindDraft
+                        == .activity
+                    ? "Event title"
+                    : "Sub-task title"
+                ),
+                text:
+                    $childTitleDraft
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+        }
+    }
+
+
+    private var childBodyField:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(
+                childKindDraft == .note
+                ? "Note"
+                : (
+                    childKindDraft
+                        == .activity
+                    ? "What happened?"
+                    : "Description"
+                )
+            )
+            .font(
+                .caption
+                    .weight(.medium)
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+            TextEditor(
+                text:
+                    $childBodyDraft
+            )
+            .font(.body)
+            .scrollContentBackground(
+                .hidden
+            )
+            .padding(8)
+            .frame(
+                minHeight: 105
+            )
+            .background(
+                Color(
+                    nsColor:
+                        .textBackgroundColor
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 8,
+                        style:
+                            .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 8,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.primary
+                        .opacity(0.12),
+                    lineWidth: 1
+                )
+            }
+        }
+    }
+
+
+    private var childTaskOptions:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            childOptionHeader(
+                title:
+                    "Task options",
+                icon:
+                    "checkmark.circle"
+            )
+
+            Toggle(
+                "Set deadline",
+                isOn:
+                    $childHasDeadline
+            )
+            .toggleStyle(
+                .checkbox
+            )
+
+            if childHasDeadline {
+                TimeZoneAwareDateEditor(
+                    label:
+                        "Deadline",
+                    date:
+                        $childDeadlineDraft,
+                    timeZoneID:
+                        $childDeadlineTimeZoneID
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            Color.primary
+                .opacity(0.025),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 10,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+
+    private var childNoteOptions:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            childOptionHeader(
+                title:
+                    "Note options",
+                icon:
+                    "note.text"
+            )
+
+            Toggle(
+                "Set reminder",
+                isOn:
+                    $childHasReminder
+            )
+            .toggleStyle(
+                .checkbox
+            )
+
+            if childHasReminder {
+                TimeZoneAwareDateEditor(
+                    label:
+                        "Reminder",
+                    date:
+                        $childReminderDraft,
+                    timeZoneID:
+                        $childReminderTimeZoneID
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            Color.primary
+                .opacity(0.025),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 10,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+
+    private var childEventOptions:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            childOptionHeader(
+                title:
+                    "Event details",
+                icon:
+                    "clock.arrow.circlepath"
+            )
+
+            TimeZoneAwareDateEditor(
+                label:
+                    "Occurred",
+                date:
+                    $childOccurredAtDraft,
+                timeZoneID:
+                    $childOccurredTimeZoneID
+            )
+
+            HStack(
+                alignment: .top,
+                spacing: 7
+            ) {
+                Image(
+                    systemName:
+                        "info.circle"
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                Text(
+                    "This Event records something that happened inside the task. It is not a Calendar Event."
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal:
+                        false,
+                    vertical:
+                        true
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            Color.primary
+                .opacity(0.025),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 10,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+
+    private func childOptionHeader(
+        title: String,
+        icon: String
+    ) -> some View {
+        Label(
+            title,
+            systemImage:
+                icon
+        )
+        .font(
+            .callout
+                .weight(.medium)
+        )
+    }
+
+
+    private var childCanAdd:
+        Bool
+    {
+        let title =
+            childTitleDraft
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let body =
+            childBodyDraft
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        switch childKindDraft {
+        case .task:
+            return !title.isEmpty
+                || !body.isEmpty
+
+        case .note:
+            return !title.isEmpty
+                || !body.isEmpty
+
+        case .activity:
+            return !title.isEmpty
+                || !body.isEmpty
+        }
+    }
+
+
+    private var childAddButtonTitle:
+        String
+    {
+        switch childKindDraft {
+        case .task:
+            return "Add Sub-task"
+
+        case .note:
+            return "Add Note"
+
+        case .activity:
+            return "Add Event"
+        }
+    }
+
 
     private func beginChildComposer(
         _ kind: WorkItemKind
