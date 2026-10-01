@@ -1114,6 +1114,345 @@ extension DReportStore {
 
 
 extension DReportStore {
+    func user(
+        id: UUID
+    ) -> DReportUser? {
+        data.users.first {
+            $0.id == id
+        }
+    }
+
+    func availablePeopleForUserLink(
+        userID: UUID
+    ) -> [Entity] {
+        guard
+            let user =
+                user(id: userID)
+        else {
+            return []
+        }
+
+        return data.entities
+            .filter {
+                $0.kind == .person
+            }
+            .filter { person in
+                if
+                    person.id
+                        == user.personEntityID
+                {
+                    return true
+                }
+
+                return !data.users.contains {
+                    $0.id != userID
+                    && $0.personEntityID
+                        == person.id
+                }
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    func updateUsername(
+        userID: UUID,
+        username: String
+    ) -> String? {
+        guard
+            currentUserIsAdministrator
+        else {
+            return
+                "Administrator rights are required."
+        }
+
+        let cleaned =
+            username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleaned.isEmpty else {
+            return "Username is required."
+        }
+
+        guard
+            cleaned.rangeOfCharacter(
+                from: .whitespacesAndNewlines
+            ) == nil
+        else {
+            return
+                "Username cannot contain spaces."
+        }
+
+        guard
+            let index =
+                data.users.firstIndex(
+                    where: {
+                        $0.id == userID
+                    }
+                )
+        else {
+            return "User not found."
+        }
+
+        let duplicate =
+            data.users.contains {
+                $0.id != userID
+                && $0.username
+                    .caseInsensitiveCompare(
+                        cleaned
+                    )
+                    == .orderedSame
+            }
+
+        guard !duplicate else {
+            return
+                "That username already exists."
+        }
+
+        data.users[index].username =
+            cleaned
+
+        save()
+
+        return nil
+    }
+
+    func changeUserPassword(
+        userID: UUID,
+        newPassword: String
+    ) -> String? {
+        guard
+            currentUserIsAdministrator
+        else {
+            return
+                "Administrator rights are required."
+        }
+
+        guard
+            data.users.contains(
+                where: {
+                    $0.id == userID
+                }
+            )
+        else {
+            return "User not found."
+        }
+
+        guard
+            newPassword.count >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+        let hash:
+            (
+                saltBase64: String,
+                hashBase64: String,
+                iterations: Int
+            )
+
+        do {
+            hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            newPassword
+                    )
+        } catch {
+            return
+                "The password could not be secured."
+        }
+
+        guard
+            let index =
+                data.users.firstIndex(
+                    where: {
+                        $0.id == userID
+                    }
+                )
+        else {
+            return "User not found."
+        }
+
+        data.users[index]
+            .passwordSaltBase64 =
+            hash.saltBase64
+
+        data.users[index]
+            .passwordHashBase64 =
+            hash.hashBase64
+
+        data.users[index]
+            .passwordIterations =
+            hash.iterations
+
+        save()
+
+        return nil
+    }
+
+    func relinkUser(
+        userID: UUID,
+        toPerson personEntityID: UUID
+    ) -> String? {
+        guard
+            currentUserIsAdministrator
+        else {
+            return
+                "Administrator rights are required."
+        }
+
+        guard
+            let userIndex =
+                data.users.firstIndex(
+                    where: {
+                        $0.id == userID
+                    }
+                )
+        else {
+            return "User not found."
+        }
+
+        guard
+            let person =
+                data.entities.first(
+                    where: {
+                        $0.id
+                            == personEntityID
+                        && $0.kind
+                            == .person
+                    }
+                )
+        else {
+            return "Person not found."
+        }
+
+        let alreadyLinked =
+            data.users.contains {
+                $0.id != userID
+                && $0.personEntityID
+                    == personEntityID
+            }
+
+        guard !alreadyLinked else {
+            return
+                "This Person already has a DReport user account."
+        }
+
+        data.users[userIndex]
+            .personEntityID =
+            personEntityID
+
+        if
+            let profile =
+                personProfile(
+                    for: personEntityID
+                )
+        {
+            data.users[userIndex]
+                .firstName =
+                profile.firstName
+
+            data.users[userIndex]
+                .lastName =
+                profile.lastName
+
+            data.users[userIndex]
+                .avatarData =
+                profile.avatarData
+        } else {
+            data.users[userIndex]
+                .firstName =
+                person.name
+
+            data.users[userIndex]
+                .lastName =
+                ""
+        }
+
+        save()
+
+        return nil
+    }
+
+    func setUserActive(
+        userID: UUID,
+        isActive: Bool
+    ) -> String? {
+        guard
+            currentUserIsAdministrator
+        else {
+            return
+                "Administrator rights are required."
+        }
+
+        guard
+            let index =
+                data.users.firstIndex(
+                    where: {
+                        $0.id == userID
+                    }
+                )
+        else {
+            return "User not found."
+        }
+
+        if
+            !isActive,
+            currentUserID == userID
+        {
+            return
+                "You cannot disable the account you are currently using."
+        }
+
+        if
+            !isActive,
+            data.users[index].role
+                == .administrator
+        {
+            let otherActiveAdmins =
+                data.users.filter {
+                    $0.id != userID
+                    && $0.role
+                        == .administrator
+                    && $0.isActive
+                }
+
+            guard
+                !otherActiveAdmins.isEmpty
+            else {
+                return
+                    "The last active Administrator cannot be disabled."
+            }
+        }
+
+        data.users[index].isActive =
+            isActive
+
+        if !isActive {
+            if
+                PersistentSession
+                    .loadUserID()
+                    == userID
+            {
+                PersistentSession.clear()
+            }
+        }
+
+        save()
+
+        return nil
+    }
+}
+
+
+extension DReportStore {
     var users: [DReportUser] {
         data.users.sorted {
             $0.displayName
@@ -1446,5 +1785,22 @@ extension DReportStore {
 
         currentUserID =
             storedID
+    }
+}
+
+
+extension DReportStore {
+    func resetApplication() {
+        guard currentUserIsAdministrator else {
+            return
+        }
+
+        PersistentSession.clear()
+
+        currentUserID = nil
+
+        data = DReportData()
+
+        save()
     }
 }

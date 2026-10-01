@@ -220,6 +220,9 @@ struct PersonDetailView: View {
     @State
     private var showingEditor = false
 
+    @State
+    private var showingAccountManager = false
+
     var body: some View {
         if
             let person =
@@ -259,6 +262,31 @@ struct PersonDetailView: View {
                     personID:
                         personID
                 )
+            }
+            .sheet(
+                isPresented:
+                    $showingAccountManager
+            ) {
+                if
+                    let user =
+                        store.user(
+                            linkedToPerson:
+                                personID
+                        )
+                {
+                    UserAccountEditorView(
+                        userID:
+                            user.id,
+                        showsCloseButton:
+                            true
+                    )
+                    .frame(
+                        minWidth: 680,
+                        idealWidth: 720,
+                        minHeight: 600,
+                        idealHeight: 650
+                    )
+                }
             }
         } else {
             ContentUnavailableView(
@@ -711,6 +739,13 @@ struct PersonDetailView: View {
                             ? "Active"
                             : "Disabled"
                     )
+
+                    if store.currentUserIsAdministrator {
+                        Button("Manage Account…") {
+                            showingAccountManager = true
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
         }

@@ -11,12 +11,15 @@ struct SidebarUserFooter: View {
     @State
     private var showingUsers = false
 
+    @State
+    private var showingAdminTools = false
+
     var body: some View {
         if let user = store.currentUser {
             Button {
                 showingAccountPopover.toggle()
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     SidebarMiniAvatar(
                         user: user
                     )
@@ -24,7 +27,7 @@ struct SidebarUserFooter: View {
                     Text(user.displayName)
                         .font(
                             .system(
-                                size: 12,
+                                size: 13,
                                 weight: .regular
                             )
                         )
@@ -33,16 +36,19 @@ struct SidebarUserFooter: View {
 
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 9)
+                .padding(.horizontal, 4)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 30,
-                    maxHeight: 30,
+                    minHeight: 34,
+                    maxHeight: 34,
                     alignment: .leading
                 )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
             .popover(
                 isPresented:
                     $showingAccountPopover,
@@ -58,6 +64,12 @@ struct SidebarUserFooter: View {
             ) {
                 UserManagementView()
             }
+            .sheet(
+                isPresented:
+                    $showingAdminTools
+            ) {
+                AdminToolsView()
+            }
         }
     }
 
@@ -68,16 +80,31 @@ struct SidebarUserFooter: View {
             alignment: .leading,
             spacing: 10
         ) {
-            Text(user.displayName)
-                .fontWeight(.semibold)
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(user.displayName)
+                    .fontWeight(.semibold)
 
-            Text("@\(user.username)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text("@\(user.username)")
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                if store.currentUserIsAdministrator {
+                    Text(
+                        user.role.displayName
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+            }
 
             if store.currentUserIsAdministrator {
-                Divider()
-
                 Button("Users…") {
                     showingAccountPopover = false
 
@@ -86,9 +113,16 @@ struct SidebarUserFooter: View {
                     }
                 }
                 .buttonStyle(.plain)
-            }
 
-            Divider()
+                Button("Admin Tools…") {
+                    showingAccountPopover = false
+
+                    DispatchQueue.main.async {
+                        showingAdminTools = true
+                    }
+                }
+                .buttonStyle(.plain)
+            }
 
             Button("Sign Out") {
                 showingAccountPopover = false
@@ -98,7 +132,7 @@ struct SidebarUserFooter: View {
         }
         .padding(12)
         .frame(
-            width: 180,
+            width: 200,
             alignment: .leading
         )
     }
@@ -107,11 +141,16 @@ struct SidebarUserFooter: View {
 private struct SidebarMiniAvatar: View {
     let user: DReportUser
 
-    private let size: CGFloat = 22
+    private let size: CGFloat = 24
 
     var body: some View {
         Group {
-            if let image = thumbnail {
+            if
+                let data = user.avatarData,
+                let image = NSImage(
+                    data: data
+                )
+            {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -131,7 +170,7 @@ private struct SidebarMiniAvatar: View {
                     Text(user.initials)
                         .font(
                             .system(
-                                size: 9,
+                                size: 10,
                                 weight: .semibold
                             )
                         )
@@ -150,89 +189,5 @@ private struct SidebarMiniAvatar: View {
             height: size
         )
         .clipShape(Circle())
-    }
-
-    private var thumbnail: NSImage? {
-        guard
-            let data = user.avatarData,
-            let source = NSImage(data: data)
-        else {
-            return nil
-        }
-
-        let targetSize =
-            NSSize(
-                width: 36,
-                height: 36
-            )
-
-        let target =
-            NSImage(
-                size: targetSize
-            )
-
-        target.lockFocus()
-
-        NSGraphicsContext.current?
-            .imageInterpolation = .high
-
-        let sourceSize =
-            source.size
-
-        let sourceAspect =
-            sourceSize.width
-            / sourceSize.height
-
-        let targetAspect =
-            targetSize.width
-            / targetSize.height
-
-        var sourceRect =
-            NSRect(
-                origin: .zero,
-                size: sourceSize
-            )
-
-        if sourceAspect > targetAspect {
-            let newWidth =
-                sourceSize.height
-                * targetAspect
-
-            sourceRect.origin.x =
-                (
-                    sourceSize.width
-                    - newWidth
-                ) / 2
-
-            sourceRect.size.width =
-                newWidth
-        } else {
-            let newHeight =
-                sourceSize.width
-                / targetAspect
-
-            sourceRect.origin.y =
-                (
-                    sourceSize.height
-                    - newHeight
-                ) / 2
-
-            sourceRect.size.height =
-                newHeight
-        }
-
-        source.draw(
-            in: NSRect(
-                origin: .zero,
-                size: targetSize
-            ),
-            from: sourceRect,
-            operation: .copy,
-            fraction: 1
-        )
-
-        target.unlockFocus()
-
-        return target
     }
 }
