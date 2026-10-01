@@ -14,6 +14,7 @@ struct DReportApp: App {
             width: 1250,
             height: 760
         )
+        .windowStyle(.hiddenTitleBar)
 
         Settings {
             SettingsView()

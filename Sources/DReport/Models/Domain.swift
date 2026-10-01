@@ -67,6 +67,7 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var updatedAt: Date = Date()
 
     var scheduledAt: Date?
+    var deadlineAt: Date?
     var startedAt: Date?
     var completedAt: Date?
     var loggedAt: Date?

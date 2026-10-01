@@ -6,6 +6,7 @@ enum SidebarSection:
     Identifiable
 {
     case today
+    case allTasks
     case todo
     case inProgress
     case completed
@@ -23,6 +24,8 @@ enum SidebarSection:
         switch self {
         case .today:
             return "Today"
+        case .allTasks:
+            return "All Tasks"
         case .todo:
             return "To Do"
         case .inProgress:
@@ -46,6 +49,8 @@ enum SidebarSection:
         switch self {
         case .today:
             return "calendar"
+        case .allTasks:
+            return "list.bullet.indent"
         case .todo:
             return "circle"
         case .inProgress:
@@ -73,20 +78,53 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(
-                SidebarSection.allCases,
-                selection: $selection
-            ) { item in
-                Label(
-                    item.title,
-                    systemImage: item.icon
-                )
-                .tag(item)
+            List(selection: $selection) {
+                Section("Work") {
+                    ForEach(
+                        SidebarSection.allCases.filter {
+                            ![
+                                "themes",
+                                "organizations",
+                                "groups",
+                                "people"
+                            ].contains($0.rawValue)
+                        }
+                    ) { item in
+                        Label(
+                            item.title,
+                            systemImage: item.icon
+                        )
+                        .tag(item)
+                        .padding(.vertical, 1)
+                    }
+                }
+
+                Section("Structure") {
+                    ForEach(
+                        SidebarSection.allCases.filter {
+                            [
+                                "themes",
+                                "organizations",
+                                "groups",
+                                "people"
+                            ].contains($0.rawValue)
+                        }
+                    ) { item in
+                        Label(
+                            item.title,
+                            systemImage: item.icon
+                        )
+                        .tag(item)
+                        .padding(.vertical, 1)
+                    }
+                }
             }
-            .navigationTitle("DReport")
-            .navigationSplitViewColumnWidth(
-                min: 180,
-                ideal: 215,
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(.regularMaterial)
+                        .navigationSplitViewColumnWidth(
+                min: 190,
+                ideal: 220,
                 max: 280
             )
         } content: {
@@ -94,17 +132,25 @@ struct ContentView: View {
                 section:
                     selection ?? .today
             )
+            .background(
+                DReportStyle.contentBackground
+            )
             .navigationSplitViewColumnWidth(
-                min: 340,
-                ideal: 480
+                min: 330,
+                ideal: 390,
+                max: 560
             )
         } detail: {
             DetailPlaceholderView()
+                .background(
+                    DReportStyle.contentBackground
+                )
                 .navigationSplitViewColumnWidth(
-                    min: 320,
-                    ideal: 430
+                    min: 420,
+                    ideal: 650
                 )
         }
+        .navigationSplitViewStyle(.balanced)
     }
 }
 
@@ -119,11 +165,69 @@ private struct SectionContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            HStack(spacing: 12) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text(section.title)
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .semibold
+                            )
+                        )
+
+                    Text(sectionSummary)
+                        .font(.caption)
+                        .foregroundStyle(
+                            DReportStyle.secondaryText
+                        )
+                }
+
+                Spacer()
+
+                if canCreate {
+                    Button {
+                        showingCreateSheet = true
+                    } label: {
+                        Image(
+                            systemName:
+                                "square.and.pencil"
+                        )
+                        .font(
+                            .system(
+                                size: 14,
+                                weight: .medium
+                            )
+                        )
+                        .frame(
+                            width: 28,
+                            height: 28
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help("New")
+                }
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 10)
+            .padding(.top, 7)
+            .padding(.bottom, 7)
+            .frame(minHeight: 48)
+            .background(
+                DReportStyle.headerBackground
+            )
 
             Divider()
 
             sectionBody
+                .background(
+                    DReportStyle.contentBackground
+                )
         }
         .sheet(
             isPresented:
@@ -133,42 +237,33 @@ private struct SectionContentView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(section.title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-            }
-
-            Spacer()
-
-            if canCreate {
-                Button {
-                    showingCreateSheet = true
-                } label: {
-                    Label(
-                        "New",
-                        systemImage: "plus"
-                    )
-                }
-            }
-        }
-        .padding()
-    }
-
     @ViewBuilder
     private var sectionBody: some View {
         switch section {
+        case .today:
+            TodayView()
+
+        case .allTasks:
+            AllTasksView()
+
+        case .todo:
+            StatusTaskListView(
+                status: .todo
+            )
+
+        case .inProgress:
+            StatusTaskListView(
+                status: .inProgress
+            )
+
+        case .completed:
+            StatusTaskListView(
+                status: .completed
+            )
+
+        case .timeline:
+            TimelineView()
+
         case .themes:
             ThemeListView()
 
@@ -186,9 +281,6 @@ private struct SectionContentView: View {
             EntityListView(
                 kind: .person
             )
-
-        default:
-            genericEmptyView
         }
     }
 
@@ -240,11 +332,118 @@ private struct SectionContentView: View {
         }
     }
 
+    private var sectionSummary: String {
+        switch section.rawValue {
+        case "today":
+            let count =
+                store.todayWorkItems().count
+
+            return count == 1
+                ? "1 item today"
+                : "\(count) items today"
+
+        case "allTasks":
+            let count =
+                store.data.workItems
+                    .filter {
+                        $0.kind == .task
+                    }
+                    .count
+
+            return count == 1
+                ? "1 task"
+                : "\(count) tasks"
+
+        case "todo":
+            let count =
+                store.tasks(
+                    with: .todo
+                ).count
+
+            return count == 1
+                ? "1 task"
+                : "\(count) tasks"
+
+        case "inProgress":
+            let count =
+                store.tasks(
+                    with: .inProgress
+                ).count
+
+            return count == 1
+                ? "1 task"
+                : "\(count) tasks"
+
+        case "completed":
+            let count =
+                store.tasks(
+                    with: .completed
+                ).count
+
+            return count == 1
+                ? "1 task"
+                : "\(count) tasks"
+
+        case "timeline":
+            let count =
+                store.data.historyEvents.count
+
+            return count == 1
+                ? "1 event"
+                : "\(count) events"
+
+        case "themes":
+            let count =
+                store.data.themes.count
+
+            return count == 1
+                ? "1 theme"
+                : "\(count) themes"
+
+        case "organizations":
+            let count =
+                store.entities(
+                    of: .organization
+                ).count
+
+            return count == 1
+                ? "1 organization"
+                : "\(count) organizations"
+
+        case "groups":
+            let count =
+                store.entities(
+                    of: .group
+                ).count
+
+            return count == 1
+                ? "1 group"
+                : "\(count) groups"
+
+        case "people":
+            let count =
+                store.entities(
+                    of: .person
+                ).count
+
+            return count == 1
+                ? "1 person"
+                : "\(count) people"
+
+        default:
+            return subtitle
+        }
+    }
+
     private var subtitle: String {
         switch section {
         case .today:
             return
-                "Scheduled work and activity recorded today"
+                "Work and activity recorded today"
+
+        case .allTasks:
+            return
+                "Complete task hierarchy across all statuses"
 
         case .todo:
             return
@@ -264,7 +463,7 @@ private struct SectionContentView: View {
 
         case .themes:
             return
-                "Hierarchical areas of work"
+                "Themes, tasks, notes and activity"
 
         case .organizations:
             return
@@ -279,60 +478,6 @@ private struct SectionContentView: View {
                 "People and their affiliations"
         }
     }
-
-    private var genericEmptyView: some View {
-        ContentUnavailableView {
-            Label(
-                emptyTitle,
-                systemImage:
-                    section.icon
-            )
-        } description: {
-            Text(emptyDescription)
-        }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity
-        )
-    }
-
-    private var emptyTitle: String {
-        switch section {
-        case .today:
-            return "No Activity Yet"
-        case .todo:
-            return "No Tasks To Do"
-        case .inProgress:
-            return "Nothing In Progress"
-        case .completed:
-            return "No Completed Tasks"
-        case .timeline:
-            return "No History Yet"
-        default:
-            return "Nothing Here Yet"
-        }
-    }
-
-    private var emptyDescription: String {
-        switch section {
-        case .today:
-            return
-                "Activity recorded today will appear here."
-
-        case .todo,
-             .inProgress,
-             .completed:
-            return
-                "Tasks with this status will appear here."
-
-        case .timeline:
-            return
-                "DReport will build a chronological record as you work."
-
-        default:
-            return ""
-        }
-    }
 }
 
 private struct ThemeListView: View {
@@ -340,7 +485,10 @@ private struct ThemeListView: View {
     private var store: DReportStore
 
     var body: some View {
-        if store.data.themes.isEmpty {
+        let roots =
+            store.childThemes(of: nil)
+
+        if roots.isEmpty {
             ContentUnavailableView {
                 Label(
                     "No Themes Yet",
@@ -349,7 +497,7 @@ private struct ThemeListView: View {
                 )
             } description: {
                 Text(
-                    "Create a theme to define an area of work."
+                    "Create a theme to begin organizing your work."
                 )
             }
             .frame(
@@ -358,33 +506,504 @@ private struct ThemeListView: View {
             )
         } else {
             List {
-                ForEach(themeRows) { row in
-                    HStack(spacing: 8) {
-                        Image(
-                            systemName:
-                                "folder"
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-
-                        Text(row.theme.name)
-
-                        Spacer()
-                    }
-                    .padding(
-                        .leading,
-                        CGFloat(row.depth) * 20
+                ForEach(roots) { theme in
+                    ThemeNodeView(
+                        theme: theme
                     )
-                    .contextMenu {
-                        Button(
-                            "Delete",
-                            role: .destructive
-                        ) {
-                            store.deleteTheme(
-                                id:
-                                    row.theme.id
-                            )
+                }
+            }
+        }
+    }
+}
+
+private struct ThemeNodeView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let theme: Theme
+
+    @State
+    private var isExpanded = true
+
+    @State
+    private var createKind:
+        WorkItemKind?
+
+    var body: some View {
+        DisclosureGroup(
+            isExpanded: $isExpanded
+        ) {
+            ForEach(
+                store.rootWorkItems(
+                    for: theme.id
+                )
+            ) { item in
+                WorkItemNodeView(
+                    item: item
+                )
+            }
+
+            ForEach(
+                store.childThemes(
+                    of: theme.id
+                )
+            ) { child in
+                ThemeNodeView(
+                    theme: child
+                )
+            }
+        } label: {
+            HStack {
+                Label(
+                    theme.name,
+                    systemImage: "folder"
+                )
+                .fontWeight(.medium)
+
+                Spacer()
+
+                Menu {
+                    Button("New Task") {
+                        createKind = .task
+                    }
+
+                    Button("New Note") {
+                        createKind = .note
+                    }
+
+                    Button("New Activity") {
+                        createKind = .activity
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "plus.circle"
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+        }
+        .sheet(
+            item: $createKind
+        ) { kind in
+            CreateWorkItemView(
+                themeID: theme.id,
+                parentWorkItemID: nil,
+                initialKind: kind,
+                isPresented:
+                    Binding(
+                        get: {
+                            createKind != nil
+                        },
+                        set: { newValue in
+                            if !newValue {
+                                createKind = nil
+                            }
+                        }
+                    )
+            )
+        }
+        .contextMenu {
+            Button(
+                "Delete Theme",
+                role: .destructive
+            ) {
+                store.deleteTheme(
+                    id: theme.id
+                )
+            }
+        }
+    }
+}
+
+private struct WorkItemNodeView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let item: WorkItem
+
+    @State
+    private var isExpanded = true
+
+    @State
+    private var createKind:
+        WorkItemKind?
+
+    var body: some View {
+        let children =
+            store.childWorkItems(
+                of: item.id
+            )
+
+        if children.isEmpty {
+            label
+                .sheet(
+                    item: $createKind
+                ) { kind in
+                    createSheet(kind)
+                }
+                .contextMenu {
+                    contextMenuContent
+                }
+        } else {
+            DisclosureGroup(
+                isExpanded: $isExpanded
+            ) {
+                ForEach(children) { child in
+                    WorkItemNodeView(
+                        item: child
+                    )
+                }
+            } label: {
+                label
+            }
+            .sheet(
+                item: $createKind
+            ) { kind in
+                createSheet(kind)
+            }
+            .contextMenu {
+                contextMenuContent
+            }
+        }
+    }
+
+    private var label: some View {
+        HStack(spacing: 8) {
+            Image(
+                systemName: itemIcon
+            )
+            .foregroundStyle(
+                item.kind == .task
+                ? .primary
+                : .secondary
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(displayTitle)
+                    .lineLimit(1)
+
+                if
+                    item.kind == .task,
+                    let status =
+                        item.status
+                {
+                    Text(
+                        status.displayName
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    if let deadline =
+                        item.deadlineAt
+                    {
+                        Text(
+                            "Deadline: \(deadline.formatted(date: .abbreviated, time: .shortened))"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            deadline < Date()
+                            && status != .completed
+                            ? .red
+                            : .secondary
+                        )
+                    }
+                } else {
+                    Text(
+                        item.kind.displayName
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+            Spacer()
+
+            Menu {
+                Button("New Task") {
+                    createKind = .task
+                }
+
+                Button("New Note") {
+                    createKind = .note
+                }
+
+                Button("New Activity") {
+                    createKind = .activity
+                }
+            } label: {
+                Image(
+                    systemName:
+                        "plus.circle"
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+
+    @ViewBuilder
+    private var contextMenuContent:
+        some View
+    {
+        if item.kind == .task {
+            Menu("Status") {
+                ForEach(
+                    TaskStatus.allCases
+                ) { status in
+                    Button(
+                        status.displayName
+                    ) {
+                        store.setTaskStatus(
+                            workItemID:
+                                item.id,
+                            status: status
+                        )
+                    }
+                }
+            }
+
+            Divider()
+        }
+
+        Button("New Task") {
+            createKind = .task
+        }
+
+        Button("New Note") {
+            createKind = .note
+        }
+
+        Button("New Activity") {
+            createKind = .activity
+        }
+
+        Divider()
+
+        Button(
+            "Delete",
+            role: .destructive
+        ) {
+            store.deleteWorkItem(
+                id: item.id
+            )
+        }
+    }
+
+    private func createSheet(
+        _ kind: WorkItemKind
+    ) -> some View {
+        CreateWorkItemView(
+            themeID: item.themeID,
+            parentWorkItemID:
+                item.id,
+            initialKind: kind,
+            isPresented:
+                Binding(
+                    get: {
+                        createKind != nil
+                    },
+                    set: { newValue in
+                        if !newValue {
+                            createKind = nil
+                        }
+                    }
+                )
+        )
+    }
+
+    private var displayTitle: String {
+        if
+            let title = item.title,
+            !title.isEmpty
+        {
+            return title
+        }
+
+        if !item.body.isEmpty {
+            return item.body
+        }
+
+        return item.kind.displayName
+    }
+
+    private var itemIcon: String {
+        switch item.kind {
+        case .task:
+            if item.status == .completed {
+                return "checkmark.circle"
+            }
+
+            if item.status == .inProgress {
+                return "clock"
+            }
+
+            return "circle"
+
+        case .note:
+            return "note.text"
+
+        case .activity:
+            return "waveform.path.ecg"
+        }
+    }
+}
+
+private struct AllTasksView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    var body: some View {
+        let rootThemes =
+            store.childThemes(of: nil)
+
+        if store.data.workItems
+            .filter({ $0.kind == .task })
+            .isEmpty
+        {
+            ContentUnavailableView {
+                Label(
+                    "No Tasks Yet",
+                    systemImage:
+                        "list.bullet.indent"
+                )
+            } description: {
+                Text(
+                    "Tasks created inside your themes will appear here."
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+        } else {
+            List {
+                ForEach(rootThemes) { theme in
+                    AllTasksThemeNodeView(
+                        theme: theme
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct AllTasksThemeNodeView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let theme: Theme
+
+    @State
+    private var isExpanded = true
+
+    var body: some View {
+        DisclosureGroup(
+            isExpanded: $isExpanded
+        ) {
+            ForEach(
+                store.rootWorkItems(
+                    for: theme.id
+                )
+            ) { item in
+                TaskHierarchyRootView(
+                    item: item
+                )
+            }
+
+            ForEach(
+                store.childThemes(
+                    of: theme.id
+                )
+            ) { childTheme in
+                AllTasksThemeNodeView(
+                    theme: childTheme
+                )
+            }
+        } label: {
+            Label(
+                theme.name,
+                systemImage: "folder"
+            )
+            .fontWeight(.semibold)
+        }
+    }
+}
+
+private struct TaskHierarchyRootView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let item: WorkItem
+
+    var body: some View {
+        if item.kind == .task {
+            WorkItemNodeView(
+                item: item
+            )
+        } else {
+            ForEach(
+                store.childWorkItems(
+                    of: item.id
+                )
+            ) { child in
+                TaskHierarchyRootView(
+                    item: child
+                )
+            }
+        }
+    }
+}
+
+private struct StatusTaskListView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let status: TaskStatus
+
+    var body: some View {
+        let tasks =
+            store.tasks(with: status)
+
+        if tasks.isEmpty {
+            ContentUnavailableView {
+                Label(
+                    "No \(status.displayName) Tasks",
+                    systemImage: icon
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+        } else {
+            List(tasks) { task in
+                WorkSummaryRow(
+                    item: task
+                )
+                .contextMenu {
+                    Menu("Status") {
+                        ForEach(
+                            TaskStatus.allCases
+                        ) { newStatus in
+                            Button(
+                                newStatus.displayName
+                            ) {
+                                store.setTaskStatus(
+                                    workItemID:
+                                        task.id,
+                                    status:
+                                        newStatus
+                                )
+                            }
                         }
                     }
                 }
@@ -392,78 +1011,504 @@ private struct ThemeListView: View {
         }
     }
 
-    private var themeRows:
-        [ThemeRow]
-    {
-        var result: [ThemeRow] = []
-
-        let roots =
-            store.data.themes
-                .filter {
-                    $0.parentThemeID == nil
-                }
-                .sorted {
-                    $0.name
-                        .localizedCaseInsensitiveCompare(
-                            $1.name
-                        )
-                        == .orderedAscending
-                }
-
-        for root in roots {
-            appendTheme(
-                root,
-                depth: 0,
-                to: &result
-            )
-        }
-
-        return result
-    }
-
-    private func appendTheme(
-        _ theme: Theme,
-        depth: Int,
-        to result:
-            inout [ThemeRow]
-    ) {
-        result.append(
-            ThemeRow(
-                theme: theme,
-                depth: depth
-            )
-        )
-
-        let children =
-            store.data.themes
-                .filter {
-                    $0.parentThemeID
-                    == theme.id
-                }
-                .sorted {
-                    $0.name
-                        .localizedCaseInsensitiveCompare(
-                            $1.name
-                        )
-                        == .orderedAscending
-                }
-
-        for child in children {
-            appendTheme(
-                child,
-                depth: depth + 1,
-                to: &result
-            )
+    private var icon: String {
+        switch status {
+        case .todo:
+            return "circle"
+        case .inProgress:
+            return "clock"
+        case .completed:
+            return "checkmark.circle"
         }
     }
 }
 
-private struct ThemeRow: Identifiable {
-    let theme: Theme
-    let depth: Int
+private struct TodayView: View {
+    @EnvironmentObject
+    private var store: DReportStore
 
-    var id: UUID {
-        theme.id
+    var body: some View {
+        let items =
+            store.todayWorkItems()
+
+        if items.isEmpty {
+            ContentUnavailableView {
+                Label(
+                    "No Activity Today",
+                    systemImage:
+                        "calendar"
+                )
+            } description: {
+                Text(
+                    "Work created, started, completed or logged today will appear here."
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+        } else {
+            List(items) { item in
+                WorkSummaryRow(
+                    item: item
+                )
+            }
+        }
+    }
+}
+
+private struct WorkSummaryRow: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let item: WorkItem
+
+    var body: some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName: icon
+            )
+            .frame(width: 20)
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(displayTitle)
+                    .fontWeight(.medium)
+
+                HStack(spacing: 8) {
+                    if
+                        let theme =
+                            store.theme(
+                                id: item.themeID
+                            )
+                    {
+                        Text(theme.name)
+                    }
+
+                    Text(
+                        item.kind.displayName
+                    )
+
+                    if
+                        let status =
+                            item.status
+                    {
+                        Text(
+                            status.displayName
+                        )
+                    }
+
+                    if let deadline =
+                        item.deadlineAt
+                    {
+                        Text(
+                            "Due \(deadline.formatted(date: .abbreviated, time: .omitted))"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+
+                if
+                    item.title != nil,
+                    !item.body.isEmpty
+                {
+                    Text(item.body)
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            Text(
+                item.updatedAt,
+                format:
+                    .dateTime
+                    .hour()
+                    .minute()
+            )
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 3)
+    }
+
+    private var displayTitle: String {
+        if
+            let title = item.title,
+            !title.isEmpty
+        {
+            return title
+        }
+
+        return item.body
+    }
+
+    private var icon: String {
+        switch item.kind {
+        case .task:
+            switch item.status {
+            case .todo:
+                return "circle"
+            case .inProgress:
+                return "clock"
+            case .completed:
+                return "checkmark.circle"
+            case nil:
+                return "circle"
+            }
+
+        case .note:
+            return "note.text"
+
+        case .activity:
+            return "waveform.path.ecg"
+        }
+    }
+}
+
+private struct TimelineView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    var body: some View {
+        let events =
+            store.data.historyEvents
+                .sorted {
+                    $0.timestamp
+                    > $1.timestamp
+                }
+
+        if events.isEmpty {
+            ContentUnavailableView {
+                Label(
+                    "No History Yet",
+                    systemImage:
+                        "list.bullet.rectangle"
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+        } else {
+            List(events) { event in
+                HStack(
+                    alignment: .top,
+                    spacing: 10
+                ) {
+                    Image(
+                        systemName:
+                            historyIcon(
+                                event.kind
+                            )
+                    )
+                    .frame(width: 20)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            workTitle(
+                                event.workItemID
+                            )
+                        )
+                        .fontWeight(.medium)
+
+                        Text(
+                            event.text
+                            ?? historyName(
+                                event.kind
+                            )
+                        )
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Text(
+                        event.timestamp,
+                        format:
+                            .dateTime
+                            .day()
+                            .month()
+                            .hour()
+                            .minute()
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+                .padding(
+                    .vertical,
+                    3
+                )
+            }
+        }
+    }
+
+    private func workTitle(
+        _ id: UUID
+    ) -> String {
+        guard
+            let item =
+                store.workItem(id: id)
+        else {
+            return "Work item"
+        }
+
+        if
+            let title = item.title,
+            !title.isEmpty
+        {
+            return title
+        }
+
+        if !item.body.isEmpty {
+            return item.body
+        }
+
+        return item.kind.displayName
+    }
+
+    private func historyName(
+        _ kind: HistoryEventKind
+    ) -> String {
+        switch kind {
+        case .created:
+            return "Created"
+        case .edited:
+            return "Edited"
+        case .statusChanged:
+            return "Status changed"
+        case .scheduled:
+            return "Scheduled"
+        case .started:
+            return "Started"
+        case .completed:
+            return "Completed"
+        case .activityLogged:
+            return "Activity logged"
+        case .relationshipAdded:
+            return "Relationship added"
+        case .relationshipRemoved:
+            return "Relationship removed"
+        case .moved:
+            return "Moved"
+        }
+    }
+
+    private func historyIcon(
+        _ kind: HistoryEventKind
+    ) -> String {
+        switch kind {
+        case .created:
+            return "plus.circle"
+        case .edited:
+            return "pencil"
+        case .statusChanged:
+            return "arrow.triangle.2.circlepath"
+        case .scheduled:
+            return "calendar"
+        case .started:
+            return "play.circle"
+        case .completed:
+            return "checkmark.circle"
+        case .activityLogged:
+            return "waveform.path.ecg"
+        case .relationshipAdded:
+            return "link.badge.plus"
+        case .relationshipRemoved:
+            return "link.badge.minus"
+        case .moved:
+            return "arrow.right"
+        }
+    }
+}
+
+private struct CreateWorkItemView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let themeID: UUID?
+    let parentWorkItemID: UUID?
+
+    @Binding
+    var isPresented: Bool
+
+    @State
+    private var kind: WorkItemKind
+
+    @State
+    private var title = ""
+
+    @State
+    private var bodyText = ""
+
+    @State
+    private var hasDeadline = false
+
+    @State
+    private var deadlineAt =
+        Calendar.current.date(
+            byAdding: .day,
+            value: 1,
+            to: Date()
+        ) ?? Date()
+
+    init(
+        themeID: UUID?,
+        parentWorkItemID: UUID?,
+        initialKind: WorkItemKind,
+        isPresented: Binding<Bool>
+    ) {
+        self.themeID = themeID
+        self.parentWorkItemID =
+            parentWorkItemID
+
+        self._kind =
+            State(
+                initialValue:
+                    initialKind
+            )
+
+        self._isPresented =
+            isPresented
+    }
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 18
+        ) {
+            Text("New Work Entry")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Picker(
+                "Type",
+                selection: $kind
+            ) {
+                ForEach(
+                    WorkItemKind.allCases
+                ) { kind in
+                    Text(kind.displayName)
+                        .tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            TextField(
+                "Title (optional)",
+                text: $title
+            )
+
+            Text("Text")
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+
+            TextEditor(
+                text: $bodyText
+            )
+            .font(.body)
+            .frame(
+                minHeight: 170
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 6
+                )
+                .stroke(
+                    Color.secondary
+                        .opacity(0.25)
+                )
+            }
+
+            if kind == .task {
+                Divider()
+
+                Toggle(
+                    "Deadline",
+                    isOn: $hasDeadline
+                )
+
+                if hasDeadline {
+                    DatePicker(
+                        "Due",
+                        selection: $deadlineAt,
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
+                    )
+                }
+            }
+
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    isPresented = false
+                }
+
+                Button("Create") {
+                    store.createWorkItem(
+                        themeID: themeID,
+                        parentWorkItemID:
+                            parentWorkItemID,
+                        kind: kind,
+                        title: title,
+                        body: bodyText,
+                        deadlineAt:
+                            kind == .task
+                            && hasDeadline
+                            ? deadlineAt
+                            : nil
+                    )
+
+                    isPresented = false
+                }
+                .keyboardShortcut(
+                    .defaultAction
+                )
+                .disabled(!hasContent)
+            }
+        }
+        .padding(24)
+        .frame(
+            width: 520
+        )
+    }
+
+    private var hasContent: Bool {
+        !title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty
+        || !bodyText
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty
     }
 }
 
@@ -516,13 +1561,11 @@ private struct EntityListView: View {
                             .secondary
                         )
                     } else {
-                        Text(
-                            "Independent"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .tertiary
-                        )
+                        Text("Independent")
+                            .font(.caption)
+                            .foregroundStyle(
+                                .tertiary
+                            )
                     }
                 }
                 .contextMenu {
@@ -808,16 +1851,38 @@ private struct CreateEntityView: View {
 
 private struct DetailPlaceholderView: View {
     var body: some View {
-        ContentUnavailableView {
-            Label(
-                "Nothing Selected",
-                systemImage: "doc.text"
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+            }
+            .frame(height: 48)
+            .background(
+                DReportStyle.headerBackground
             )
-        } description: {
-            Text(
-                "Select a task, note, activity entry, theme, organization, group or person."
+
+            ZStack {
+                DReportStyle.contentBackground
+
+                ContentUnavailableView {
+                    Label(
+                        "Nothing Selected",
+                        systemImage: "doc.text"
+                    )
+                } description: {
+                    Text(
+                        "Select a task, note, activity entry or entity."
+                    )
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
         }
+        .ignoresSafeArea(
+            .container,
+            edges: .top
+        )
     }
 }
 
