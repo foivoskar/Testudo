@@ -18,8 +18,7 @@ struct PeopleListView: View {
             ContentUnavailableView {
                 Label(
                     "No People Yet",
-                    systemImage:
-                        "person.2"
+                    systemImage: "person.2"
                 )
             } description: {
                 Text(
@@ -53,7 +52,13 @@ private struct PersonListRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            avatar
+            PersonSmallAvatar(
+                person: person,
+                profile:
+                    store.personProfile(
+                        for: person.id
+                    )
+            )
 
             VStack(
                 alignment: .leading,
@@ -113,67 +118,6 @@ private struct PersonListRow: View {
         .padding(.vertical, 3)
     }
 
-    @ViewBuilder
-    private var avatar:
-        some View
-    {
-        let profile =
-            store.personProfile(
-                for: person.id
-            )
-
-        if
-            let data =
-                profile?.avatarData,
-            let image =
-                NSImage(
-                    data: data
-                )
-        {
-            Image(
-                nsImage: image
-            )
-            .resizable()
-            .scaledToFill()
-            .frame(
-                width: 30,
-                height: 30
-            )
-            .clipShape(Circle())
-        } else {
-            ZStack {
-                Circle()
-                    .fill(
-                        Color.accentColor
-                            .opacity(0.12)
-                    )
-
-                Text(
-                    String(
-                        person.name
-                            .first
-                        ?? "?"
-                    )
-                    .uppercased()
-                )
-                .font(
-                    .system(
-                        size: 12,
-                        weight:
-                            .semibold
-                    )
-                )
-                .foregroundStyle(
-                    Color.accentColor
-                )
-            }
-            .frame(
-                width: 30,
-                height: 30
-            )
-        }
-    }
-
     private func secondaryText(
         profile: PersonProfile?,
         affiliations: [Entity]
@@ -201,6 +145,72 @@ private struct PersonListRow: View {
     }
 }
 
+private struct PersonSmallAvatar: View {
+    let person: Entity
+    let profile: PersonProfile?
+
+    var body: some View {
+        if
+            let data =
+                profile?.avatarData,
+            let image =
+                NSImage(data: data)
+        {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: 30,
+                    height: 30
+                )
+                .clipShape(Circle())
+        } else {
+            ZStack {
+                Circle()
+                    .fill(
+                        Color.accentColor
+                            .opacity(0.12)
+                    )
+
+                Text(initial)
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.accentColor
+                    )
+            }
+            .frame(
+                width: 30,
+                height: 30
+            )
+        }
+    }
+
+    private var initial: String {
+        if
+            let first =
+                profile?.firstName
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .first
+        {
+            return String(first)
+                .uppercased()
+        }
+
+        return String(
+            person.name.first ?? "?"
+        )
+        .uppercased()
+    }
+}
+
 struct PersonDetailView: View {
     @EnvironmentObject
     private var store: DReportStore
@@ -208,12 +218,7 @@ struct PersonDetailView: View {
     let personID: UUID
 
     @State
-    private var draft:
-        PersonProfile?
-
-    @State
-    private var savedIndicator =
-        false
+    private var showingEditor = false
 
     var body: some View {
         if
@@ -225,42 +230,35 @@ struct PersonDetailView: View {
             ScrollView {
                 VStack(
                     alignment: .leading,
-                    spacing: 24
+                    spacing: 26
                 ) {
-                    profileHeader(
+                    if !relatedWorkItems.isEmpty {
+                        relatedWorkSection
+
+                        Divider()
+                    }
+
+                    personProfile(
                         person: person
                     )
-
-                    Divider()
-
-                    if draft != nil {
-                        identitySection
-                        contactSection
-                        workplaceSection
-                        onlineSection
-                        researchSection
-                        preferencesSection
-                        affiliationsSection
-                        accountSection
-                        notesSection
-                    }
                 }
                 .padding(24)
                 .frame(
-                    maxWidth: 760,
+                    maxWidth: .infinity,
                     alignment: .leading
                 )
             }
             .background(
                 DReportStyle.contentBackground
             )
-            .onAppear {
-                loadProfile()
-            }
-            .onChange(
-                of: personID
+            .sheet(
+                isPresented:
+                    $showingEditor
             ) {
-                loadProfile()
+                PersonEditView(
+                    personID:
+                        personID
+                )
             }
         } else {
             ContentUnavailableView(
@@ -271,63 +269,22 @@ struct PersonDetailView: View {
         }
     }
 
-    private func profileHeader(
-        person: Entity
-    ) -> some View {
-        HStack(
-            alignment: .center,
-            spacing: 16
+    private var relatedWorkSection:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 14
         ) {
-            editableAvatar
+            HStack {
+                Text("Related Work")
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
+                Spacer()
+
                 Text(
-                    draft?.displayName
-                        .isEmpty == false
-                    ? draft!.displayName
-                    : person.name
-                )
-                .font(.title2)
-                .fontWeight(.semibold)
-
-                if
-                    let job =
-                        draft?.jobTitle,
-                    !job.isEmpty
-                {
-                    Text(job)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                }
-
-                if
-                    let user =
-                        store.user(
-                            linkedToPerson:
-                                personID
-                        )
-                {
-                    Text(
-                        "@\(user.username) · \(user.role.displayName)"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
-            }
-
-            Spacer()
-
-            if savedIndicator {
-                Label(
-                    "Saved",
-                    systemImage:
-                        "checkmark"
+                    "\(relatedWorkItems.count)"
                 )
                 .font(.caption)
                 .foregroundStyle(
@@ -335,315 +292,1158 @@ struct PersonDetailView: View {
                 )
             }
 
-            Button("Save") {
-                saveProfile()
+            VStack(spacing: 0) {
+                ForEach(
+                    relatedWorkItems
+                ) { item in
+                    RelatedWorkRow(
+                        item: item
+                    )
+
+                    if
+                        item.id
+                            != relatedWorkItems
+                                .last?.id
+                    {
+                        Divider()
+                            .padding(
+                                .leading,
+                                30
+                            )
+                    }
+                }
             }
-            .keyboardShortcut(
-                "s",
-                modifiers: [.command]
+        }
+    }
+
+    private func personProfile(
+        person: Entity
+    ) -> some View {
+        let profile =
+            store.personProfile(
+                for: personID
             )
+
+        return VStack(
+            alignment: .leading,
+            spacing: 26
+        ) {
+            HStack(
+                alignment: .center,
+                spacing: 16
+            ) {
+                PersonLargeAvatar(
+                    person: person,
+                    profile: profile
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        profile?.displayName
+                            .isEmpty == false
+                        ? profile!.displayName
+                        : person.name
+                    )
+                    .font(.title)
+                    .fontWeight(.semibold)
+
+                    if
+                        let academic =
+                            profile?
+                                .academicTitle,
+                        !academic.isEmpty
+                    {
+                        Text(academic)
+                            .font(.callout)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+
+                    if
+                        let job =
+                            profile?.jobTitle,
+                        !job.isEmpty
+                    {
+                        Text(job)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+
+                    let affiliations =
+                        store.containers(
+                            for: personID
+                        )
+
+                    if !affiliations.isEmpty {
+                        Text(
+                            affiliations
+                                .map(\.name)
+                                .joined(
+                                    separator: " · "
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    showingEditor = true
+                } label: {
+                    Label(
+                        "Edit",
+                        systemImage:
+                            "pencil"
+                    )
+                }
+            }
+
+            if let profile {
+                readOnlySections(
+                    profile: profile
+                )
+            }
+
+            affiliationsSection
+
+            accountSection
         }
     }
 
     @ViewBuilder
-    private var editableAvatar:
-        some View
-    {
-        if draft != nil {
-            AvatarPicker(
-                avatarData:
-                    binding(
-                        \.avatarData
-                    )
+    private func readOnlySections(
+        profile: PersonProfile
+    ) -> some View {
+        let identityRows =
+            compactRows([
+                (
+                    "First name",
+                    profile.firstName
+                ),
+                (
+                    "Middle name",
+                    profile.middleName
+                ),
+                (
+                    "Last name",
+                    profile.lastName
+                ),
+                (
+                    "Preferred name",
+                    profile.preferredName
+                ),
+                (
+                    "Academic title",
+                    profile.academicTitle
+                ),
+                (
+                    "Position",
+                    profile.jobTitle
+                )
+            ])
+
+        if !identityRows.isEmpty {
+            ReadOnlyProfileSection(
+                title: "Identity",
+                rows: identityRows
             )
         }
-    }
 
-    private var identitySection:
-        some View
-    {
-        profileSection(
-            title: "Identity"
-        ) {
-            ProfileTextField(
-                "First name",
-                text:
-                    binding(
-                        \.firstName
-                    )
-            )
+        let contactRows =
+            compactRows([
+                (
+                    "Email",
+                    profile.professionalEmail
+                ),
+                (
+                    "Secondary email",
+                    profile.secondaryProfessionalEmail
+                ),
+                (
+                    "Phone",
+                    profile.professionalPhone
+                ),
+                (
+                    "Secondary phone",
+                    profile.secondaryPhone
+                ),
+                (
+                    "Office",
+                    profile.office
+                ),
+                (
+                    "Assistant / contact",
+                    profile.assistantContact
+                )
+            ])
 
-            ProfileTextField(
-                "Middle name",
-                text:
-                    binding(
-                        \.middleName
-                    )
-            )
-
-            ProfileTextField(
-                "Last name",
-                text:
-                    binding(
-                        \.lastName
-                    )
-            )
-
-            ProfileTextField(
-                "Preferred / display name",
-                text:
-                    binding(
-                        \.preferredName
-                    )
-            )
-
-            ProfileTextField(
-                "Academic title",
-                text:
-                    optionalBinding(
-                        \.academicTitle
-                    )
-            )
-
-            ProfileTextField(
-                "Position / job title",
-                text:
-                    binding(
-                        \.jobTitle
-                    )
+        if !contactRows.isEmpty {
+            ReadOnlyProfileSection(
+                title:
+                    "Professional Contact",
+                rows:
+                    contactRows
             )
         }
-    }
 
-    private var contactSection:
-        some View
-    {
-        profileSection(
-            title: "Professional Contact"
-        ) {
-            ProfileTextField(
-                "Email",
-                text:
-                    binding(
-                        \.professionalEmail
-                    )
-            )
+        let workplaceRows =
+            compactRows([
+                (
+                    "Staff / employee ID",
+                    profile.employeeID
+                ),
+                (
+                    "Address",
+                    profile.professionalAddress
+                ),
+                (
+                    "City",
+                    profile.city
+                ),
+                (
+                    "Postal code",
+                    profile.postalCode
+                ),
+                (
+                    "Country",
+                    profile.country
+                )
+            ])
 
-            ProfileTextField(
-                "Secondary email",
-                text:
-                    binding(
-                        \.secondaryProfessionalEmail
-                    )
-            )
-
-            ProfileTextField(
-                "Phone",
-                text:
-                    binding(
-                        \.professionalPhone
-                    )
-            )
-
-            ProfileTextField(
-                "Secondary phone",
-                text:
-                    optionalBinding(
-                        \.secondaryPhone
-                    )
-            )
-
-            ProfileTextField(
-                "Office",
-                text:
-                    binding(
-                        \.office
-                    )
-            )
-
-            ProfileTextField(
-                "Assistant / contact",
-                text:
-                    optionalBinding(
-                        \.assistantContact
-                    )
+        if !workplaceRows.isEmpty {
+            ReadOnlyProfileSection(
+                title: "Workplace",
+                rows: workplaceRows
             )
         }
-    }
 
-    private var workplaceSection:
-        some View
-    {
-        profileSection(
-            title: "Workplace"
-        ) {
-            ProfileTextField(
-                "Staff / employee ID",
-                text:
-                    binding(
-                        \.employeeID
-                    )
-            )
+        let onlineRows =
+            compactRows([
+                (
+                    "Website",
+                    profile.website
+                ),
+                (
+                    "LinkedIn",
+                    profile.linkedIn
+                ),
+                (
+                    "GitHub",
+                    profile.github
+                )
+            ])
 
-            ProfileTextField(
-                "Address",
-                text:
-                    optionalBinding(
-                        \.professionalAddress
-                    )
-            )
-
-            ProfileTextField(
-                "City",
-                text:
-                    optionalBinding(
-                        \.city
-                    )
-            )
-
-            ProfileTextField(
-                "Postal code",
-                text:
-                    optionalBinding(
-                        \.postalCode
-                    )
-            )
-
-            ProfileTextField(
-                "Country",
-                text:
-                    optionalBinding(
-                        \.country
-                    )
+        if !onlineRows.isEmpty {
+            ReadOnlyProfileSection(
+                title: "Online",
+                rows: onlineRows
             )
         }
-    }
 
-    private var onlineSection:
-        some View
-    {
-        profileSection(
-            title: "Online"
-        ) {
-            ProfileTextField(
-                "Website",
-                text:
-                    binding(
-                        \.website
-                    )
-            )
+        let researchRows =
+            compactRows([
+                (
+                    "ORCID",
+                    profile.orcid
+                ),
+                (
+                    "ResearcherID",
+                    profile.researcherID
+                ),
+                (
+                    "Scopus Author ID",
+                    profile.scopusAuthorID
+                ),
+                (
+                    "Google Scholar",
+                    profile.googleScholarURL
+                ),
+                (
+                    "Fields / expertise",
+                    profile.professionalFields
+                ),
+                (
+                    "Responsibilities",
+                    profile.responsibilities
+                ),
+                (
+                    "Tags",
+                    profile.tags
+                )
+            ])
 
-            ProfileTextField(
-                "LinkedIn",
-                text:
-                    binding(
-                        \.linkedIn
-                    )
-            )
-
-            ProfileTextField(
-                "GitHub",
-                text:
-                    binding(
-                        \.github
-                    )
-            )
-        }
-    }
-
-    private var researchSection:
-        some View
-    {
-        profileSection(
-            title: "Research & Professional IDs"
-        ) {
-            ProfileTextField(
-                "ORCID",
-                text:
-                    binding(
-                        \.orcid
-                    )
-            )
-
-            ProfileTextField(
-                "ResearcherID",
-                text:
-                    optionalBinding(
-                        \.researcherID
-                    )
-            )
-
-            ProfileTextField(
-                "Scopus Author ID",
-                text:
-                    optionalBinding(
-                        \.scopusAuthorID
-                    )
-            )
-
-            ProfileTextField(
-                "Google Scholar",
-                text:
-                    optionalBinding(
-                        \.googleScholarURL
-                    )
-            )
-
-            ProfileTextField(
-                "Fields / expertise",
-                text:
-                    binding(
-                        \.professionalFields
-                    )
-            )
-
-            ProfileTextField(
-                "Responsibilities",
-                text:
-                    binding(
-                        \.responsibilities
-                    )
-            )
-
-            ProfileTextField(
-                "Tags",
-                text:
-                    optionalBinding(
-                        \.tags
-                    )
+        if !researchRows.isEmpty {
+            ReadOnlyProfileSection(
+                title:
+                    "Research & Professional",
+                rows:
+                    researchRows
             )
         }
-    }
 
-    private var preferencesSection:
-        some View
-    {
-        profileSection(
-            title: "Professional Preferences"
-        ) {
-            ProfileTextField(
-                "Preferred language",
-                text:
-                    optionalBinding(
-                        \.preferredLanguage
-                    )
-            )
+        let preferenceRows =
+            compactRows([
+                (
+                    "Preferred language",
+                    profile.preferredLanguage
+                ),
+                (
+                    "Time zone",
+                    profile.timeZone
+                )
+            ])
 
-            ProfileTextField(
-                "Time zone",
-                text:
-                    optionalBinding(
-                        \.timeZone
-                    )
+        if !preferenceRows.isEmpty {
+            ReadOnlyProfileSection(
+                title: "Preferences",
+                rows: preferenceRows
             )
+        }
+
+        if
+            !profile.notes
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text("Notes")
+                    .font(.headline)
+
+                Text(profile.notes)
+                    .textSelection(
+                        .enabled
+                    )
+            }
         }
     }
 
     private var affiliationsSection:
         some View
     {
-        profileSection(
-            title: "Affiliations"
+        let affiliations =
+            store.containers(
+                for: personID
+            )
+
+        return Group {
+            if !affiliations.isEmpty {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    Text("Affiliations")
+                        .font(.headline)
+
+                    ForEach(
+                        affiliations
+                    ) { affiliation in
+                        HStack(spacing: 8) {
+                            Image(
+                                systemName:
+                                    affiliation.kind
+                                        == .organization
+                                    ? "building.2"
+                                    : "person.3"
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+
+                            Text(
+                                affiliation.name
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var accountSection:
+        some View
+    {
+        Group {
+            if
+                let user =
+                    store.user(
+                        linkedToPerson:
+                            personID
+                    )
+            {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    Text("DReport Account")
+                        .font(.headline)
+
+                    ReadOnlyValueRow(
+                        label: "Username",
+                        value:
+                            "@\(user.username)"
+                    )
+
+                    ReadOnlyValueRow(
+                        label: "Role",
+                        value:
+                            user.role
+                                .displayName
+                    )
+
+                    ReadOnlyValueRow(
+                        label: "Status",
+                        value:
+                            user.isActive
+                            ? "Active"
+                            : "Disabled"
+                    )
+                }
+            }
+        }
+    }
+
+    private var relatedWorkItems:
+        [WorkItem]
+    {
+        store.data.workItems
+            .filter {
+                workItemIsRelated(
+                    $0
+                )
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+
+    private func workItemIsRelated(
+        _ item: WorkItem
+    ) -> Bool {
+        if
+            store.data
+                .workEntityRelationships
+                .contains(
+                    where: {
+                        $0.workItemID
+                            == item.id
+                        && $0.entityID
+                            == personID
+                    }
+                )
+        {
+            return true
+        }
+
+        var currentParent =
+            item.parentWorkItemID
+
+        var visited =
+            Set<UUID>()
+
+        while let parentID =
+            currentParent
+        {
+            if visited.contains(
+                parentID
+            ) {
+                break
+            }
+
+            visited.insert(
+                parentID
+            )
+
+            if
+                store.data
+                    .workEntityRelationships
+                    .contains(
+                        where: {
+                            $0.workItemID
+                                == parentID
+                            && $0.entityID
+                                == personID
+                            && $0
+                                .inheritedByChildren
+                        }
+                    )
+            {
+                return true
+            }
+
+            currentParent =
+                store.workItem(
+                    id: parentID
+                )?
+                .parentWorkItemID
+        }
+
+        return false
+    }
+
+    private func compactRows(
+        _ values:
+            [(String, String?)]
+    ) -> [(String, String)] {
+        values.compactMap {
+            label,
+            value in
+
+            guard
+                let value,
+                !value
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+            else {
+                return nil
+            }
+
+            return (
+                label,
+                value
+            )
+        }
+    }
+}
+
+private struct RelatedWorkRow: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let item: WorkItem
+
+    var body: some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName: icon
+            )
+            .frame(width: 20)
+            .foregroundStyle(
+                .secondary
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(title)
+                    .fontWeight(.medium)
+
+                HStack(spacing: 7) {
+                    Text(typeName)
+
+                    if
+                        let status =
+                            item.status
+                    {
+                        Text(
+                            status.displayName
+                        )
+                    }
+
+                    if
+                        let theme =
+                            store.theme(
+                                id: item.themeID
+                            )
+                    {
+                        Text(theme.name)
+                    }
+
+                    if
+                        let deadline =
+                            item.deadlineAt
+                    {
+                        Text(
+                            "Due \(deadline.formatted(date: .abbreviated, time: .shortened))"
+                        )
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+
+                if
+                    item.title != nil,
+                    !item.body.isEmpty
+                {
+                    Text(item.body)
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .lineLimit(3)
+                }
+            }
+
+            Spacer()
+
+            Text(
+                relevantDate,
+                format:
+                    .dateTime
+                    .day()
+                    .month()
+                    .year()
+            )
+            .font(.caption)
+            .foregroundStyle(
+                .tertiary
+            )
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var title: String {
+        if
+            let title = item.title,
+            !title.isEmpty
+        {
+            return title
+        }
+
+        if !item.body.isEmpty {
+            return item.body
+        }
+
+        return typeName
+    }
+
+    private var typeName: String {
+        switch item.kind {
+        case .task:
+            return "Task"
+
+        case .note:
+            return "Note"
+
+        case .activity:
+            return "Activity"
+        }
+    }
+
+    private var icon: String {
+        switch item.kind {
+        case .task:
+            switch item.status {
+            case .todo:
+                return "circle"
+            case .inProgress:
+                return "clock"
+            case .completed:
+                return "checkmark.circle"
+            case nil:
+                return "circle"
+            }
+
+        case .note:
+            return "note.text"
+
+        case .activity:
+            return "waveform.path.ecg"
+        }
+    }
+
+    private var relevantDate: Date {
+        item.loggedAt
+        ?? item.completedAt
+        ?? item.startedAt
+        ?? item.updatedAt
+    }
+}
+
+private struct PersonLargeAvatar: View {
+    let person: Entity
+    let profile: PersonProfile?
+
+    var body: some View {
+        if
+            let data =
+                profile?.avatarData,
+            let image =
+                NSImage(data: data)
+        {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: 64,
+                    height: 64
+                )
+                .clipShape(Circle())
+        } else {
+            ZStack {
+                Circle()
+                    .fill(
+                        Color.accentColor
+                            .opacity(0.12)
+                    )
+
+                Text(initial)
+                    .font(
+                        .system(
+                            size: 24,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.accentColor
+                    )
+            }
+            .frame(
+                width: 64,
+                height: 64
+            )
+        }
+    }
+
+    private var initial: String {
+        if
+            let first =
+                profile?.firstName
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .first
+        {
+            return String(first)
+                .uppercased()
+        }
+
+        return String(
+            person.name.first ?? "?"
+        )
+        .uppercased()
+    }
+}
+
+private struct ReadOnlyProfileSection: View {
+    let title: String
+    let rows: [(String, String)]
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(title)
+                .font(.headline)
+
+            VStack(spacing: 7) {
+                ForEach(
+                    Array(
+                        rows.enumerated()
+                    ),
+                    id: \.offset
+                ) { _, row in
+                    ReadOnlyValueRow(
+                        label: row.0,
+                        value: row.1
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct ReadOnlyValueRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(
+            alignment: .firstTextBaseline,
+            spacing: 16
+        ) {
+            Text(label)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    width: 150,
+                    alignment: .leading
+                )
+
+            Text(value)
+                .textSelection(.enabled)
+
+            Spacer()
+        }
+        .font(.callout)
+    }
+}
+
+private struct PersonEditView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let personID: UUID
+
+    @State
+    private var draft:
+        PersonProfile?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Edit Person")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Spacer()
+
+                Button("Cancel") {
+                    dismiss()
+                }
+
+                Button("Save") {
+                    save()
+                }
+                .keyboardShortcut(
+                    .defaultAction
+                )
+            }
+            .padding()
+
+            Divider()
+
+            ScrollView {
+                if draft != nil {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 24
+                    ) {
+                        AvatarPicker(
+                            avatarData:
+                                dataBinding(
+                                    \.avatarData
+                                )
+                        )
+
+                        editSection(
+                            "Identity"
+                        ) {
+                            ProfileTextField(
+                                "First name",
+                                text:
+                                    binding(
+                                        \.firstName
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Middle name",
+                                text:
+                                    binding(
+                                        \.middleName
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Last name",
+                                text:
+                                    binding(
+                                        \.lastName
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Preferred / display name",
+                                text:
+                                    binding(
+                                        \.preferredName
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Academic title",
+                                text:
+                                    optionalBinding(
+                                        \.academicTitle
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Position / job title",
+                                text:
+                                    binding(
+                                        \.jobTitle
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Professional Contact"
+                        ) {
+                            ProfileTextField(
+                                "Email",
+                                text:
+                                    binding(
+                                        \.professionalEmail
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Secondary email",
+                                text:
+                                    binding(
+                                        \.secondaryProfessionalEmail
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Phone",
+                                text:
+                                    binding(
+                                        \.professionalPhone
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Secondary phone",
+                                text:
+                                    optionalBinding(
+                                        \.secondaryPhone
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Office",
+                                text:
+                                    binding(
+                                        \.office
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Assistant / contact",
+                                text:
+                                    optionalBinding(
+                                        \.assistantContact
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Workplace"
+                        ) {
+                            ProfileTextField(
+                                "Staff / employee ID",
+                                text:
+                                    binding(
+                                        \.employeeID
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Address",
+                                text:
+                                    optionalBinding(
+                                        \.professionalAddress
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "City",
+                                text:
+                                    optionalBinding(
+                                        \.city
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Postal code",
+                                text:
+                                    optionalBinding(
+                                        \.postalCode
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Country",
+                                text:
+                                    optionalBinding(
+                                        \.country
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Online"
+                        ) {
+                            ProfileTextField(
+                                "Website",
+                                text:
+                                    binding(
+                                        \.website
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "LinkedIn",
+                                text:
+                                    binding(
+                                        \.linkedIn
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "GitHub",
+                                text:
+                                    binding(
+                                        \.github
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Research & Professional"
+                        ) {
+                            ProfileTextField(
+                                "ORCID",
+                                text:
+                                    binding(
+                                        \.orcid
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "ResearcherID",
+                                text:
+                                    optionalBinding(
+                                        \.researcherID
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Scopus Author ID",
+                                text:
+                                    optionalBinding(
+                                        \.scopusAuthorID
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Google Scholar",
+                                text:
+                                    optionalBinding(
+                                        \.googleScholarURL
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Fields / expertise",
+                                text:
+                                    binding(
+                                        \.professionalFields
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Responsibilities",
+                                text:
+                                    binding(
+                                        \.responsibilities
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Tags",
+                                text:
+                                    optionalBinding(
+                                        \.tags
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Preferences"
+                        ) {
+                            ProfileTextField(
+                                "Preferred language",
+                                text:
+                                    optionalBinding(
+                                        \.preferredLanguage
+                                    )
+                            )
+
+                            ProfileTextField(
+                                "Time zone",
+                                text:
+                                    optionalBinding(
+                                        \.timeZone
+                                    )
+                            )
+                        }
+
+                        affiliationEditor
+
+                        editSection(
+                            "Notes"
+                        ) {
+                            TextEditor(
+                                text:
+                                    binding(
+                                        \.notes
+                                    )
+                            )
+                            .frame(
+                                minHeight: 120
+                            )
+                            .overlay {
+                                RoundedRectangle(
+                                    cornerRadius: 6
+                                )
+                                .stroke(
+                                    Color.secondary
+                                        .opacity(0.2)
+                                )
+                            }
+                        }
+                    }
+                    .padding(24)
+                }
+            }
+        }
+        .frame(
+            width: 680,
+            height: 720
+        )
+        .onAppear {
+            load()
+        }
+    }
+
+    private var affiliationEditor:
+        some View
+    {
+        editSection(
+            "Affiliations"
         ) {
             let affiliations =
                 store.containers(
@@ -654,7 +1454,6 @@ struct PersonDetailView: View {
                 Text(
                     "No organization or group affiliations."
                 )
-                .font(.callout)
                 .foregroundStyle(
                     .secondary
                 )
@@ -669,9 +1468,6 @@ struct PersonDetailView: View {
                                     == .organization
                                 ? "building.2"
                                 : "person.3"
-                        )
-                        .foregroundStyle(
-                            .secondary
                         )
 
                         Text(
@@ -702,9 +1498,7 @@ struct PersonDetailView: View {
                 ForEach(
                     availableAffiliations
                 ) { entity in
-                    Button(
-                        entity.name
-                    ) {
+                    Button(entity.name) {
                         store.addMembership(
                             memberID:
                                 personID,
@@ -721,82 +1515,10 @@ struct PersonDetailView: View {
         }
     }
 
-    private var accountSection:
-        some View
-    {
-        profileSection(
-            title: "DReport Account"
-        ) {
-            if
-                let user =
-                    store.user(
-                        linkedToPerson:
-                            personID
-                    )
-            {
-                LabeledContent(
-                    "Username",
-                    value:
-                        "@\(user.username)"
-                )
-
-                LabeledContent(
-                    "Role",
-                    value:
-                        user.role
-                            .displayName
-                )
-
-                LabeledContent(
-                    "Status",
-                    value:
-                        user.isActive
-                        ? "Active"
-                        : "Disabled"
-                )
-            } else {
-                Text(
-                    "This person does not have a DReport user account."
-                )
-                .font(.callout)
-                .foregroundStyle(
-                    .secondary
-                )
-            }
-        }
-    }
-
-    private var notesSection:
-        some View
-    {
-        profileSection(
-            title: "Notes"
-        ) {
-            TextEditor(
-                text:
-                    binding(
-                        \.notes
-                    )
-            )
-            .frame(
-                minHeight: 120
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 6
-                )
-                .stroke(
-                    Color.secondary
-                        .opacity(0.2)
-                )
-            }
-        }
-    }
-
     private var availableAffiliations:
         [Entity]
     {
-        let currentIDs =
+        let current =
             Set(
                 store.containers(
                     for: personID
@@ -812,7 +1534,7 @@ struct PersonDetailView: View {
                     || $0.kind
                         == .group
                 )
-                && !currentIDs.contains(
+                && !current.contains(
                     $0.id
                 )
             }
@@ -825,8 +1547,8 @@ struct PersonDetailView: View {
             }
     }
 
-    private func profileSection<Content: View>(
-        title: String,
+    private func editSection<Content: View>(
+        _ title: String,
         @ViewBuilder content:
             () -> Content
     ) -> some View {
@@ -841,26 +1563,18 @@ struct PersonDetailView: View {
         }
     }
 
-    private func loadProfile() {
-        if
-            let existing =
-                store.personProfile(
-                    for: personID
-                )
-        {
-            draft = existing
-        } else {
-            draft =
-                PersonProfile(
-                    entityID:
-                        personID
-                )
-        }
-
-        savedIndicator = false
+    private func load() {
+        draft =
+            store.personProfile(
+                for: personID
+            )
+            ?? PersonProfile(
+                entityID:
+                    personID
+            )
     }
 
-    private func saveProfile() {
+    private func save() {
         guard
             let draft
         else {
@@ -871,20 +1585,7 @@ struct PersonDetailView: View {
             draft
         )
 
-        self.draft =
-            store.personProfile(
-                for: personID
-            )
-
-        savedIndicator = true
-
-        DispatchQueue.main
-            .asyncAfter(
-                deadline:
-                    .now() + 1.5
-            ) {
-                savedIndicator = false
-            }
+        dismiss()
     }
 
     private func binding(
@@ -899,9 +1600,9 @@ struct PersonDetailView: View {
                 draft?[keyPath: keyPath]
                 ?? ""
             },
-            set: { newValue in
+            set: {
                 draft?[keyPath: keyPath] =
-                    newValue
+                    $0
             }
         )
     }
@@ -918,16 +1619,16 @@ struct PersonDetailView: View {
                 draft?[keyPath: keyPath]
                 ?? ""
             },
-            set: { newValue in
+            set: {
                 draft?[keyPath: keyPath] =
-                    newValue.isEmpty
+                    $0.isEmpty
                     ? nil
-                    : newValue
+                    : $0
             }
         )
     }
 
-    private func binding(
+    private func dataBinding(
         _ keyPath:
             WritableKeyPath<
                 PersonProfile,
@@ -938,9 +1639,9 @@ struct PersonDetailView: View {
             get: {
                 draft?[keyPath: keyPath]
             },
-            set: { newValue in
+            set: {
                 draft?[keyPath: keyPath] =
-                    newValue
+                    $0
             }
         )
     }
@@ -970,7 +1671,7 @@ private struct ProfileTextField: View {
                 .roundedBorder
             )
             .frame(
-                minWidth: 260
+                minWidth: 280
             )
         }
     }
