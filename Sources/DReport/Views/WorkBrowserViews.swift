@@ -16,7 +16,7 @@ struct TodayDashboardView: View {
     var selection: UUID?
 
     private var calendar: Calendar {
-        Calendar.current
+        Calendar.autoupdatingCurrent
     }
 
     private var now: Date {
@@ -2153,7 +2153,7 @@ struct WorkItemDetailView: View {
             false
 
         childDeadlineDraft =
-            Calendar.current.date(
+            Calendar.autoupdatingCurrent.date(
                 byAdding: .day,
                 value: 1,
                 to: Date()
@@ -2164,7 +2164,7 @@ struct WorkItemDetailView: View {
             false
 
         childReminderDraft =
-            Calendar.current.date(
+            Calendar.autoupdatingCurrent.date(
                 byAdding: .hour,
                 value: 1,
                 to: Date()
@@ -2505,10 +2505,18 @@ struct WorkItemDetailView: View {
     private func historySection(
         _ item: WorkItem
     ) -> some View {
-        InspectorSection(
+        let logEntries =
+            taskLogEntries(
+                for: item
+            )
+
+        return InspectorSection(
             title: "History"
         ) {
-            VStack(spacing: 9) {
+            VStack(
+                alignment: .leading,
+                spacing: 9
+            ) {
                 ReadOnlyInspectorRow(
                     label: "Created",
                     value:
@@ -2553,18 +2561,537 @@ struct WorkItemDetailView: View {
                 }
 
                 if
+                    item.kind
+                        == .activity,
                     let logged =
                         item.loggedAt
                 {
                     ReadOnlyInspectorRow(
-                        label: "Logged",
+                        label: "Occurred",
                         value:
                             formatted(
                                 logged
                             )
                     )
                 }
+
+                if !logEntries.isEmpty {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        Text("Log")
+                            .font(
+                                .subheadline
+                            )
+                            .fontWeight(
+                                .semibold
+                            )
+                            .padding(
+                                .top,
+                                10
+                            )
+
+                        ForEach(
+                            logEntries
+                        ) { entry in
+                            HStack(
+                                alignment: .top,
+                                spacing: 10
+                            ) {
+                                Image(
+                                    systemName:
+                                        entry.icon
+                                )
+                                .font(
+                                    .system(
+                                        size: 11,
+                                        weight:
+                                            .medium
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .frame(
+                                    width: 17,
+                                    height: 17
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        entry.text
+                                    )
+                                    .font(
+                                        .callout
+                                    )
+
+                                    if
+                                        let detail =
+                                            entry.detail,
+                                        !detail.isEmpty
+                                    {
+                                        Text(
+                                            detail
+                                        )
+                                        .font(
+                                            .caption
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                        .lineLimit(3)
+                                    }
+                                }
+
+                                Spacer(
+                                    minLength: 12
+                                )
+
+                                Text(
+                                    DReportTime
+                                        .dateTime(
+                                            entry.timestamp,
+                                            includeTimeZone:
+                                                true
+                                        )
+                                )
+                                .font(
+                                    .caption2
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .multilineTextAlignment(
+                                    .trailing
+                                )
+                            }
+                            .padding(
+                                .vertical,
+                                2
+                            )
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    private struct TaskLogEntry:
+        Identifiable
+    {
+        let id: String
+        let timestamp: Date
+        let text: String
+        let detail: String?
+        let icon: String
+    }
+
+    private func taskLogEntries(
+        for root: WorkItem
+    ) -> [TaskLogEntry] {
+        let ids: Set<UUID>
+
+        if root.kind == .task {
+            ids =
+                Set(
+                    descendantIDs(
+                        of: root.id
+                    )
+                )
+                .union(
+                    [root.id]
+                )
+        } else {
+            ids = [root.id]
+        }
+
+        let items =
+            store.data.workItems
+                .filter {
+                    ids.contains(
+                        $0.id
+                    )
+                }
+
+        let itemByID =
+            Dictionary(
+                uniqueKeysWithValues:
+                    items.map {
+                        (
+                            $0.id,
+                            $0
+                        )
+                    }
+            )
+
+        let storedEvents =
+            store.data.historyEvents
+                .filter {
+                    ids.contains(
+                        $0.workItemID
+                    )
+                }
+
+        var entries:
+            [TaskLogEntry] = []
+
+        for event in storedEvents {
+            guard
+                let work =
+                    itemByID[
+                        event.workItemID
+                    ]
+            else {
+                continue
+            }
+
+            if
+                work.kind
+                    == .activity,
+                event.kind
+                    == .created
+            {
+                continue
+            }
+
+            if
+                event.kind
+                    == .statusChanged,
+                (
+                    event.newValue
+                        == TaskStatus
+                            .inProgress
+                            .rawValue
+                    ||
+                    event.newValue
+                        == TaskStatus
+                            .completed
+                            .rawValue
+                )
+            {
+                continue
+            }
+
+            entries.append(
+                TaskLogEntry(
+                    id:
+                        "history-\(event.id.uuidString)",
+                    timestamp:
+                        event.timestamp,
+                    text:
+                        historyText(
+                            event,
+                            work: work
+                        ),
+                    detail:
+                        historyDetail(
+                            event
+                        ),
+                    icon:
+                        historyIcon(
+                            event.kind
+                        )
+                )
+            )
+        }
+
+        for work in items
+        where work.kind == .task {
+            let hasStartedEvent =
+                storedEvents.contains {
+                    $0.workItemID
+                        == work.id
+                    &&
+                    $0.kind
+                        == .started
+                }
+
+            if
+                !hasStartedEvent,
+                let startedAt =
+                    work.startedAt
+            {
+                entries.append(
+                    TaskLogEntry(
+                        id:
+                            "legacy-start-\(work.id.uuidString)",
+                        timestamp:
+                            startedAt,
+                        text:
+                            "\(logTitle(work)) started",
+                        detail:
+                            nil,
+                        icon:
+                            "play.circle"
+                    )
+                )
+            }
+
+            let hasCompletedEvent =
+                storedEvents.contains {
+                    $0.workItemID
+                        == work.id
+                    &&
+                    $0.kind
+                        == .completed
+                }
+
+            if
+                !hasCompletedEvent,
+                let completedAt =
+                    work.completedAt
+            {
+                entries.append(
+                    TaskLogEntry(
+                        id:
+                            "legacy-complete-\(work.id.uuidString)",
+                        timestamp:
+                            completedAt,
+                        text:
+                            "\(logTitle(work)) completed",
+                        detail:
+                            nil,
+                        icon:
+                            "checkmark.circle"
+                    )
+                )
+            }
+        }
+
+        for work in items
+        where work.kind == .activity {
+            guard
+                let occurred =
+                    work.loggedAt
+            else {
+                continue
+            }
+
+            entries.append(
+                TaskLogEntry(
+                    id:
+                        "event-\(work.id.uuidString)",
+                    timestamp:
+                        occurred,
+                    text:
+                        logTitle(
+                            work
+                        ),
+                    detail:
+                        work.body
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                        ? nil
+                        : work.body,
+                    icon:
+                        "clock.arrow.circlepath"
+                )
+            )
+        }
+
+        return entries
+            .sorted {
+                if
+                    $0.timestamp
+                        == $1.timestamp
+                {
+                    return
+                        $0.id
+                        > $1.id
+                }
+
+                return
+                    $0.timestamp
+                    > $1.timestamp
+            }
+    }
+
+    private func historyText(
+        _ event: HistoryEvent,
+        work: WorkItem
+    ) -> String {
+        let title =
+            logTitle(
+                work
+            )
+
+        switch event.kind {
+        case .created:
+            switch work.kind {
+            case .task:
+                return
+                    "\(title) created"
+
+            case .note:
+                return
+                    "\(title) note added"
+
+            case .activity:
+                return title
+            }
+
+        case .edited:
+            return
+                event.text
+                ?? "\(title) edited"
+
+        case .statusChanged:
+            if
+                let raw =
+                    event.newValue,
+                let status =
+                    TaskStatus(
+                        rawValue: raw
+                    )
+            {
+                return
+                    "\(title) status changed to \(status.displayName)"
+            }
+
+            return
+                event.text
+                ?? "\(title) status changed"
+
+        case .scheduled:
+            return
+                event.text
+                ?? "\(title) scheduled"
+
+        case .started:
+            return
+                event.text
+                ?? "\(title) started"
+
+        case .completed:
+            return
+                event.text
+                ?? "\(title) completed"
+
+        case .activityLogged:
+            return
+                event.text
+                ?? title
+
+        case .relationshipAdded:
+            return
+                event.text
+                ?? "\(title) relationship added"
+
+        case .relationshipRemoved:
+            return
+                event.text
+                ?? "\(title) relationship removed"
+
+        case .moved:
+            return
+                event.text
+                ?? "\(title) moved"
+        }
+    }
+
+    private func historyDetail(
+        _ event: HistoryEvent
+    ) -> String? {
+        if
+            event.kind == .scheduled,
+            let newValue =
+                event.newValue
+        {
+            if
+                let date =
+                    ISO8601DateFormatter()
+                        .date(
+                            from:
+                                newValue
+                        )
+            {
+                return
+                    "Deadline: \(DReportTime.dateTime(date, includeTimeZone: true))"
+            }
+        }
+
+        return nil
+    }
+
+    private func historyIcon(
+        _ kind: HistoryEventKind
+    ) -> String {
+        switch kind {
+        case .created:
+            return "plus.circle"
+
+        case .edited:
+            return "pencil"
+
+        case .statusChanged:
+            return "arrow.triangle.2.circlepath"
+
+        case .scheduled:
+            return "calendar.badge.clock"
+
+        case .started:
+            return "play.circle"
+
+        case .completed:
+            return "checkmark.circle"
+
+        case .activityLogged:
+            return "clock.arrow.circlepath"
+
+        case .relationshipAdded:
+            return "link.badge.plus"
+
+        case .relationshipRemoved:
+            return "link.badge.minus"
+
+        case .moved:
+            return "arrow.turn.down.right"
+        }
+    }
+
+    private func logTitle(
+        _ item: WorkItem
+    ) -> String {
+        if
+            let title =
+                item.title?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !title.isEmpty
+        {
+            return title
+        }
+
+        let body =
+            item.body
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !body.isEmpty {
+            return body
+        }
+
+        switch item.kind {
+        case .task:
+            return "Task"
+
+        case .note:
+            return "Note"
+
+        case .activity:
+            return "Event"
         }
     }
 
@@ -2675,7 +3202,7 @@ struct WorkItemDetailView: View {
 
         dateDraft =
             date
-            ?? Calendar.current.date(
+            ?? Calendar.autoupdatingCurrent.date(
                 byAdding: .day,
                 value: 1,
                 to: Date()
@@ -3053,11 +3580,13 @@ struct WorkItemDetailView: View {
     private func formatted(
         _ date: Date
     ) -> String {
-        date.formatted(
-            date: .abbreviated,
-            time: .shortened
+        DReportTime.dateTime(
+            date,
+            includeTimeZone:
+                true
         )
     }
+
 
     private func relationshipLabel(
         _ role:

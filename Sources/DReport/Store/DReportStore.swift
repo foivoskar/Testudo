@@ -285,6 +285,27 @@ final class DReportStore: ObservableObject {
             )
         )
 
+        if
+            kind == .task,
+            let deadlineAt
+        {
+            appendTaskLifecycleHistory(
+                workItemID:
+                    item.id,
+                kind:
+                    .scheduled,
+                timestamp:
+                    now,
+                text:
+                    "\(taskHistoryTitle(item)) scheduled",
+                newValue:
+                    DReportTime
+                        .utcString(
+                            deadlineAt
+                        )
+            )
+        }
+
         save()
     }
 
@@ -363,6 +384,10 @@ final class DReportStore: ObservableObject {
         let previous =
             data.workItems[index].status
 
+        let hadStarted =
+            data.workItems[index]
+                .startedAt != nil
+
         guard previous != status else {
             return
         }
@@ -393,6 +418,46 @@ final class DReportStore: ObservableObject {
         } else {
             data.workItems[index].completedAt =
                 nil
+        }
+
+        let updatedTask =
+            data.workItems[index]
+
+        let historyTitle =
+            taskHistoryTitle(
+                updatedTask
+            )
+
+        if
+            status == .inProgress,
+            !hadStarted
+        {
+            appendTaskLifecycleHistory(
+                workItemID:
+                    workItemID,
+                kind:
+                    .started,
+                timestamp:
+                    now,
+                text:
+                    "\(historyTitle) started"
+            )
+        }
+
+        if
+            status == .completed,
+            previous != .completed
+        {
+            appendTaskLifecycleHistory(
+                workItemID:
+                    workItemID,
+                kind:
+                    .completed,
+                timestamp:
+                    now,
+                text:
+                    "\(historyTitle) completed"
+            )
         }
 
         data.historyEvents.append(
@@ -469,7 +534,7 @@ final class DReportStore: ObservableObject {
 
     func todayWorkItems() -> [WorkItem] {
         let calendar =
-            Calendar.current
+            Calendar.autoupdatingCurrent
 
         return data.workItems
             .filter { item in
@@ -827,6 +892,12 @@ extension DReportStore {
         }
 
         var updated = profile
+
+        updated.timeZone =
+            DReportTime
+                .validTimeZoneIdentifier(
+                    updated.timeZone
+                )
         updated.updatedAt = Date()
 
         let cleanedName =
@@ -1905,6 +1976,14 @@ extension DReportStore {
             data.workItems[index]
                 .status
 
+        let oldDeadline =
+            data.workItems[index]
+                .deadlineAt
+
+        let hadStarted =
+            data.workItems[index]
+                .startedAt != nil
+
         let cleanedTitle =
             title.trimmingCharacters(
                 in:
@@ -2018,6 +2097,86 @@ extension DReportStore {
                 loggedAt
                 ?? data.workItems[index].loggedAt
                 ?? now
+        }
+
+        if
+            data.workItems[index].kind
+                == .task
+        {
+            let updatedTask =
+                data.workItems[index]
+
+            let historyTitle =
+                taskHistoryTitle(
+                    updatedTask
+                )
+
+            if
+                oldDeadline
+                    != updatedTask
+                        .deadlineAt,
+                let newDeadline =
+                    updatedTask
+                        .deadlineAt
+            {
+                appendTaskLifecycleHistory(
+                    workItemID:
+                        updatedTask.id,
+                    kind:
+                        .scheduled,
+                    timestamp:
+                        now,
+                    text:
+                        "\(historyTitle) scheduled",
+                    previousValue:
+                        oldDeadline.map {
+                            DReportTime
+                                .utcString(
+                                    $0
+                                )
+                        },
+                    newValue:
+                        DReportTime
+                            .utcString(
+                                newDeadline
+                            )
+                )
+            }
+
+            if
+                updatedTask.status
+                    == .inProgress,
+                !hadStarted
+            {
+                appendTaskLifecycleHistory(
+                    workItemID:
+                        updatedTask.id,
+                    kind:
+                        .started,
+                    timestamp:
+                        now,
+                    text:
+                        "\(historyTitle) started"
+                )
+            }
+
+            if
+                updatedTask.status
+                    == .completed,
+                oldStatus
+                    != .completed
+            {
+                appendTaskLifecycleHistory(
+                    workItemID:
+                        updatedTask.id,
+                    kind:
+                        .completed,
+                    timestamp:
+                        now,
+                    text:
+                        "\(historyTitle) completed"
+                )
+            }
         }
 
         data.workItems[index].updatedAt =
@@ -2215,11 +2374,91 @@ extension DReportStore {
             )
         )
 
+        if
+            kind == .task,
+            let deadlineAt
+        {
+            appendTaskLifecycleHistory(
+                workItemID:
+                    item.id,
+                kind:
+                    .scheduled,
+                timestamp:
+                    now,
+                text:
+                    "\(taskHistoryTitle(item)) scheduled",
+                newValue:
+                    DReportTime
+                        .utcString(
+                            deadlineAt
+                        )
+            )
+        }
+
         save()
 
         return (
             item.id,
             nil
+        )
+    }
+}
+
+extension DReportStore {
+    func taskHistoryTitle(
+        _ item: WorkItem
+    ) -> String {
+        if
+            let title =
+                item.title?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !title.isEmpty
+        {
+            return title
+        }
+
+        let body =
+            item.body
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !body.isEmpty {
+            return body
+        }
+
+        return "Task"
+    }
+
+    func appendTaskLifecycleHistory(
+        workItemID: UUID,
+        kind: HistoryEventKind,
+        timestamp: Date,
+        text: String,
+        previousValue: String? = nil,
+        newValue: String? = nil
+    ) {
+        data.historyEvents.append(
+            HistoryEvent(
+                workItemID:
+                    workItemID,
+                kind:
+                    kind,
+                timestamp:
+                    timestamp,
+                text:
+                    text,
+                previousValue:
+                    previousValue,
+                newValue:
+                    newValue,
+                actorUserID:
+                    currentUserID
+            )
         )
     }
 }

@@ -626,7 +626,12 @@ struct PersonDetailView: View {
                 ),
                 (
                     "Time zone",
-                    profile.timeZone
+                    profile.timeZone.map {
+                        DReportTime
+                            .timeZoneLabel(
+                                identifier: $0
+                            )
+                    }
                 )
             ])
 
@@ -1427,9 +1432,8 @@ private struct PersonEditView: View {
                                     )
                             )
 
-                            ProfileTextField(
-                                "Time zone",
-                                text:
+                            TimeZoneIdentifierPicker(
+                                selection:
                                     optionalBinding(
                                         \.timeZone
                                     )

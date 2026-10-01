@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 @main
 struct DReportApp: App {
@@ -9,6 +10,10 @@ struct DReportApp: App {
         WindowGroup {
             AccountGateView()
                 .environmentObject(store)
+        .environment(
+            \.timeZone,
+            TimeZone.autoupdatingCurrent
+        )
         }
         .defaultSize(
             width: 1250,
@@ -19,6 +24,10 @@ struct DReportApp: App {
         Settings {
             SettingsView()
                 .environmentObject(store)
+        .environment(
+            \.timeZone,
+            TimeZone.autoupdatingCurrent
+        )
         }
     }
 }

@@ -14,7 +14,7 @@ struct WorkCalendarView: View {
     private var visibleMonth = Date()
 
     private var calendar: Calendar {
-        Calendar.current
+        Calendar.autoupdatingCurrent
     }
 
     private let columns =
@@ -830,11 +830,11 @@ private struct CalendarOccurrence:
             }
 
             return
-                "Due \(date.formatted(date: .omitted, time: .shortened))"
+                "Due \(DReportTime.time(date))"
 
         case .reminder:
             return
-                "Reminder \(date.formatted(date: .omitted, time: .shortened))"
+                "Reminder \(DReportTime.time(date))"
         }
     }
 }
