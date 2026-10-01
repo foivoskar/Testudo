@@ -88,7 +88,12 @@ struct WorkCalendarView: View {
                 spacing: 2
             ) {
                 Text("Calendar")
-                    .font(.headline)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
 
                 Text(
                     monthTitle
@@ -142,11 +147,11 @@ struct WorkCalendarView: View {
         )
         .padding(
             .top,
-            14
+            2
         )
         .padding(
             .bottom,
-            10
+            4
         )
     }
 
@@ -830,11 +835,11 @@ private struct CalendarOccurrence:
             }
 
             return
-                "Due \(DReportTime.time(date))"
+                "Due \(DReportTime.displayTime(date, sourceTimeZoneID: item.deadlineTimeZoneID))"
 
         case .reminder:
             return
-                "Reminder \(DReportTime.time(date))"
+                "Reminder \(DReportTime.displayTime(date, sourceTimeZoneID: item.reminderTimeZoneID))"
         }
     }
 }

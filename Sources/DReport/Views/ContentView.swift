@@ -1,4 +1,6 @@
 import SwiftUI
+import Foundation
+import AppKit
 
 enum SidebarSection:
     String,
@@ -76,10 +78,284 @@ enum SidebarSection:
     }
 }
 
+private struct DetailTrackpadNavigationCapture:
+    NSViewRepresentable
+{
+    let onBack: () -> Void
+    let onForward: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            onBack: onBack,
+            onForward: onForward
+        )
+    }
+
+    func makeNSView(
+        context: Context
+    ) -> NSView {
+        let view = NSView()
+
+        context.coordinator.hostView =
+            view
+
+        context.coordinator.install()
+
+        return view
+    }
+
+    func updateNSView(
+        _ nsView: NSView,
+        context: Context
+    ) {
+        context.coordinator.hostView =
+            nsView
+
+        context.coordinator.onBack =
+            onBack
+
+        context.coordinator.onForward =
+            onForward
+    }
+
+    static func dismantleNSView(
+        _ nsView: NSView,
+        coordinator: Coordinator
+    ) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator {
+        weak var hostView: NSView?
+
+        var onBack: () -> Void
+        var onForward: () -> Void
+
+        private var monitor:
+            Any?
+
+        private var accumulatedX:
+            CGFloat = 0
+
+        private var gestureTriggered =
+            false
+
+        private var lastTimestamp:
+            TimeInterval = 0
+
+        init(
+            onBack: @escaping () -> Void,
+            onForward: @escaping () -> Void
+        ) {
+            self.onBack =
+                onBack
+
+            self.onForward =
+                onForward
+        }
+
+        func install() {
+            guard monitor == nil
+            else {
+                return
+            }
+
+            monitor =
+                NSEvent
+                    .addLocalMonitorForEvents(
+                        matching:
+                            .scrollWheel
+                    ) {
+                        [weak self]
+                        event in
+
+                        self?.handle(
+                            event
+                        )
+
+                        // Never swallow the event.
+                        // Vertical scrolling remains native.
+                        return event
+                    }
+        }
+
+        func uninstall() {
+            if let monitor {
+                NSEvent
+                    .removeMonitor(
+                        monitor
+                    )
+
+                self.monitor =
+                    nil
+            }
+        }
+
+        private func handle(
+            _ event: NSEvent
+        ) {
+            guard
+                event
+                    .hasPreciseScrollingDeltas,
+                let hostView,
+                let window =
+                    hostView.window,
+                event.window === window
+            else {
+                return
+            }
+
+            let point =
+                hostView.convert(
+                    event.locationInWindow,
+                    from: nil
+                )
+
+            guard
+                hostView.bounds
+                    .contains(
+                        point
+                    )
+            else {
+                return
+            }
+
+            if
+                event.timestamp
+                    - lastTimestamp
+                    > 0.30
+            {
+                resetGesture()
+            }
+
+            lastTimestamp =
+                event.timestamp
+
+            if event.phase == .began {
+                resetGesture()
+            }
+
+            var dx =
+                event.scrollingDeltaX
+
+            let dy =
+                event.scrollingDeltaY
+
+            // Convert to physical finger direction so the gesture
+            // behaves like browser navigation independently of the
+            // macOS "Natural scrolling" preference.
+            if
+                event
+                    .isDirectionInvertedFromDevice
+            {
+                dx = -dx
+            }
+
+            // Ignore ordinary vertical scrolling with tiny
+            // horizontal noise.
+            guard
+                abs(dx) > 0.8,
+                abs(dx)
+                    > abs(dy) * 1.35
+            else {
+                if
+                    event.phase == .ended
+                    || event.phase == .cancelled
+                    || event.momentumPhase
+                        == .ended
+                {
+                    resetGesture()
+                }
+
+                return
+            }
+
+            accumulatedX += dx
+
+            let threshold:
+                CGFloat = 52
+
+            if !gestureTriggered {
+                if accumulatedX
+                    >= threshold
+                {
+                    gestureTriggered =
+                        true
+
+                    onForward()
+                } else if
+                    accumulatedX
+                        <= -threshold
+                {
+                    gestureTriggered =
+                        true
+
+                    onBack()
+                }
+            }
+
+            if
+                event.phase == .ended
+                || event.phase == .cancelled
+                || event.momentumPhase
+                    == .ended
+            {
+                resetGesture()
+            }
+        }
+
+        private func resetGesture() {
+            accumulatedX = 0
+            gestureTriggered = false
+        }
+
+        deinit {
+            uninstall()
+        }
+    }
+}
+
+private enum DetailNavigationEntry:
+    Equatable
+{
+    case work(
+        section: SidebarSection,
+        id: UUID
+    )
+
+    case theme(
+        id: UUID
+    )
+
+    case organization(
+        id: UUID
+    )
+
+    case group(
+        id: UUID
+    )
+
+    case person(
+        id: UUID
+    )
+}
+
 struct ContentView: View {
     @State
     private var selection:
         SidebarSection? = .today
+
+    @State
+    private var selectedThemeID:
+        UUID?
+
+    @State
+    private var selectedOrganizationID:
+        UUID?
+
+    @State
+    private var selectedGroupID:
+        UUID?
 
     @State
     private var selectedPersonID:
@@ -89,11 +365,27 @@ struct ContentView: View {
     private var selectedWorkItemID:
         UUID?
 
+    @State
+    private var showingCreateTask =
+        false
+
+    @State
+    private var detailBackStack:
+        [DetailNavigationEntry] = []
+
+    @State
+    private var detailForwardStack:
+        [DetailNavigationEntry] = []
+
+    @State
+    private var currentDetailEntry:
+        DetailNavigationEntry?
+
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
                 List(selection: $selection) {
-                    Section("Work") {
+                    Section {
                         ForEach(
                             SidebarSection.allCases.filter {
                                 ![
@@ -110,6 +402,45 @@ struct ContentView: View {
                             )
                             .tag(item)
                             .padding(.vertical, 1)
+                        }
+                    } header: {
+                        HStack(
+                            spacing: 6
+                        ) {
+                            Text("Work")
+
+                            Spacer()
+
+                            Button {
+                                showingCreateTask =
+                                    true
+                            } label: {
+                                Image(
+                                    systemName:
+                                        "plus"
+                                )
+                                .font(
+                                    .system(
+                                        size: 10,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .frame(
+                                    width: 18,
+                                    height: 18
+                                )
+                                .contentShape(
+                                    Rectangle()
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .help("New Task")
+                            .keyboardShortcut(
+                                "n",
+                                modifiers:
+                                    .command
+                            )
                         }
                     }
 
@@ -149,13 +480,24 @@ struct ContentView: View {
             SectionContentView(
                 section:
                     selection ?? .today,
+                selectedThemeID:
+                    $selectedThemeID,
+                selectedOrganizationID:
+                    $selectedOrganizationID,
+                selectedGroupID:
+                    $selectedGroupID,
                 selectedPersonID:
                     $selectedPersonID,
                 selectedWorkItemID:
                     $selectedWorkItemID
             )
+            .padding(.top, 12)
             .background(
                 DReportStyle.contentBackground
+            )
+            .ignoresSafeArea(
+                .container,
+                edges: .top
             )
             .navigationSplitViewColumnWidth(
                 min: 330,
@@ -163,23 +505,600 @@ struct ContentView: View {
                 max: 560
             )
         } detail: {
-            WorkDetailRouterView(
-                section:
-                    selection ?? .today,
-                selectedWorkItemID:
-                    $selectedWorkItemID,
-                selectedPersonID:
-                    $selectedPersonID
-            )
+            VStack(
+                spacing: 0
+            ) {
+                detailNavigationBar
+
+                WorkDetailRouterView(
+                    section:
+                        selection ?? .today,
+                    selectedThemeID:
+                        $selectedThemeID,
+                    selectedOrganizationID:
+                        $selectedOrganizationID,
+                    selectedGroupID:
+                        $selectedGroupID,
+                    selectedWorkItemID:
+                        $selectedWorkItemID,
+                    selectedPersonID:
+                        $selectedPersonID
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+            }
+            .padding(.top, 12)
             .background(
                 DReportStyle.contentBackground
             )
-                .navigationSplitViewColumnWidth(
-                    min: 420,
-                    ideal: 650
+            .background {
+                DetailTrackpadNavigationCapture(
+                    onBack:
+                        navigateDetailBack,
+                    onForward:
+                        navigateDetailForward
                 )
+            }
+            .ignoresSafeArea(
+                .container,
+                edges: .top
+            )
+            .navigationSplitViewColumnWidth(
+                min: 420,
+                ideal: 650
+            )
         }
         .navigationSplitViewStyle(.balanced)
+        .sheet(
+            isPresented:
+                $showingCreateTask
+        ) {
+            CreateWorkItemView(
+                themeID: nil,
+                parentWorkItemID: nil,
+                initialKind: .task,
+                isPresented:
+                    $showingCreateTask
+            )
+        }
+        .onChange(
+            of: selectedWorkItemID
+        ) {
+            _,
+            newValue in
+
+            registerWorkSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selectedThemeID
+        ) {
+            _,
+            newValue in
+
+            registerThemeSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selectedOrganizationID
+        ) {
+            _,
+            newValue in
+
+            registerOrganizationSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selectedGroupID
+        ) {
+            _,
+            newValue in
+
+            registerGroupSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selectedPersonID
+        ) {
+            _,
+            newValue in
+
+            registerPersonSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selection
+        ) {
+            _,
+            newValue in
+
+            sectionDidChange(
+                newValue
+            )
+        }
+    }
+
+    // ========================================================
+    // Browser-style detail navigation
+    // ========================================================
+
+    private var detailNavigationBar:
+        some View
+    {
+        HStack(
+            spacing: 2
+        ) {
+            Button {
+                navigateDetailBack()
+            } label: {
+                Image(
+                    systemName:
+                        "chevron.left"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+                .frame(
+                    width: 26,
+                    height: 26
+                )
+                .contentShape(
+                    Rectangle()
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                detailBackStack
+                    .isEmpty
+            )
+            .help("Back")
+
+            Button {
+                navigateDetailForward()
+            } label: {
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+                .frame(
+                    width: 26,
+                    height: 26
+                )
+                .contentShape(
+                    Rectangle()
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                detailForwardStack
+                    .isEmpty
+            )
+            .help("Forward")
+
+            Spacer()
+        }
+        .padding(
+            .leading,
+            10
+        )
+        .padding(
+            .trailing,
+            8
+        )
+        .padding(
+            .top,
+            2
+        )
+        .padding(
+            .bottom,
+            2
+        )
+        .frame(
+            minHeight: 30
+        )
+        .background(
+            DReportStyle
+                .contentBackground
+        )
+    }
+
+    private func registerWorkSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            let section =
+                selection,
+            isWorkSection(
+                section
+            )
+        else {
+            return
+        }
+
+        registerDetailNavigation(
+            .work(
+                section:
+                    section,
+                id:
+                    id
+            )
+        )
+    }
+
+    private func registerThemeSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            selection == .themes
+        else {
+            return
+        }
+
+        registerDetailNavigation(
+            .theme(
+                id: id
+            )
+        )
+    }
+
+    private func registerOrganizationSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            selection == .organizations
+        else {
+            return
+        }
+
+        registerDetailNavigation(
+            .organization(
+                id: id
+            )
+        )
+    }
+
+    private func registerGroupSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            selection == .groups
+        else {
+            return
+        }
+
+        registerDetailNavigation(
+            .group(
+                id: id
+            )
+        )
+    }
+
+    private func registerPersonSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            selection == .people
+        else {
+            return
+        }
+
+        registerDetailNavigation(
+            .person(
+                id: id
+            )
+        )
+    }
+
+    private func sectionDidChange(
+        _ newSection:
+            SidebarSection?
+    ) {
+        guard let newSection
+        else {
+            return
+        }
+
+        // Moving between Work filters does not create a
+        // new browser-history entry when the right pane
+        // still shows exactly the same object. We merely
+        // update the section context of the current entry.
+        if
+            isWorkSection(
+                newSection
+            ),
+            let selectedWorkItemID
+        {
+            let newEntry =
+                DetailNavigationEntry
+                    .work(
+                        section:
+                            newSection,
+                        id:
+                            selectedWorkItemID
+                    )
+
+            if
+                case
+                    .work(
+                        _,
+                        let currentID
+                    )? =
+                    currentDetailEntry,
+                currentID
+                    == selectedWorkItemID
+            {
+                currentDetailEntry =
+                    newEntry
+            } else {
+                registerDetailNavigation(
+                    newEntry
+                )
+            }
+
+            return
+        }
+
+        if
+            newSection == .themes,
+            let selectedThemeID
+        {
+            registerDetailNavigation(
+                .theme(
+                    id:
+                        selectedThemeID
+                )
+            )
+
+            return
+        }
+
+        if
+            newSection == .organizations,
+            let selectedOrganizationID
+        {
+            registerDetailNavigation(
+                .organization(
+                    id:
+                        selectedOrganizationID
+                )
+            )
+
+            return
+        }
+
+        if
+            newSection == .groups,
+            let selectedGroupID
+        {
+            registerDetailNavigation(
+                .group(
+                    id:
+                        selectedGroupID
+                )
+            )
+
+            return
+        }
+
+        if
+            newSection == .people,
+            let selectedPersonID
+        {
+            registerDetailNavigation(
+                .person(
+                    id:
+                        selectedPersonID
+                )
+            )
+        }
+    }
+
+    private func registerDetailNavigation(
+        _ entry:
+            DetailNavigationEntry
+    ) {
+        guard
+            currentDetailEntry
+                != entry
+        else {
+            return
+        }
+
+        if
+            let current =
+                currentDetailEntry
+        {
+            detailBackStack
+                .append(
+                    current
+                )
+
+            if
+                detailBackStack
+                    .count
+                    > 100
+            {
+                detailBackStack
+                    .removeFirst(
+                        detailBackStack
+                            .count
+                        - 100
+                    )
+            }
+        }
+
+        currentDetailEntry =
+            entry
+
+        // Browser semantics:
+        // choosing a new destination after Back
+        // discards the Forward branch.
+        detailForwardStack
+            .removeAll()
+    }
+
+    private func navigateDetailBack() {
+        guard
+            let destination =
+                detailBackStack
+                    .popLast()
+        else {
+            return
+        }
+
+        if
+            let current =
+                currentDetailEntry
+        {
+            detailForwardStack
+                .append(
+                    current
+                )
+        }
+
+        currentDetailEntry =
+            destination
+
+        applyDetailNavigation(
+            destination
+        )
+    }
+
+    private func navigateDetailForward() {
+        guard
+            let destination =
+                detailForwardStack
+                    .popLast()
+        else {
+            return
+        }
+
+        if
+            let current =
+                currentDetailEntry
+        {
+            detailBackStack
+                .append(
+                    current
+                )
+        }
+
+        currentDetailEntry =
+            destination
+
+        applyDetailNavigation(
+            destination
+        )
+    }
+
+    private func applyDetailNavigation(
+        _ entry:
+            DetailNavigationEntry
+    ) {
+        switch entry {
+        case
+            .work(
+                let section,
+                let id
+            ):
+
+            // Set the item first. If the section is currently
+            // People, its onChange is deliberately ignored.
+            selectedWorkItemID =
+                id
+
+            // Changing the section then synchronises both
+            // sidebar and middle column.
+            selection =
+                section
+
+        case
+            .theme(
+                let id
+            ):
+
+            selectedThemeID =
+                id
+
+            selection =
+                .themes
+
+        case
+            .organization(
+                let id
+            ):
+
+            selectedOrganizationID =
+                id
+
+            selection =
+                .organizations
+
+        case
+            .group(
+                let id
+            ):
+
+            selectedGroupID =
+                id
+
+            selection =
+                .groups
+
+        case
+            .person(
+                let id
+            ):
+
+            selectedPersonID =
+                id
+
+            selection =
+                .people
+        }
+    }
+
+    private func isWorkSection(
+        _ section:
+            SidebarSection
+    ) -> Bool {
+        switch section {
+        case .today,
+             .calendar,
+             .allTasks,
+             .todo,
+             .inProgress,
+             .completed,
+             .timeline:
+            return true
+
+        case .themes,
+             .organizations,
+             .groups,
+             .people:
+            return false
+        }
     }
 }
 
@@ -188,6 +1107,15 @@ private struct SectionContentView: View {
     private var store: DReportStore
 
     let section: SidebarSection
+
+    @Binding
+    var selectedThemeID: UUID?
+
+    @Binding
+    var selectedOrganizationID: UUID?
+
+    @Binding
+    var selectedGroupID: UUID?
 
     @Binding
     var selectedPersonID: UUID?
@@ -200,7 +1128,8 @@ private struct SectionContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
+            if showsOuterHeader {
+                HStack(spacing: 12) {
                 VStack(
                     alignment: .leading,
                     spacing: 1
@@ -250,14 +1179,15 @@ private struct SectionContentView: View {
             }
             .padding(.leading, 16)
             .padding(.trailing, 10)
-            .padding(.top, 7)
-            .padding(.bottom, 7)
-            .frame(minHeight: 48)
+            .padding(.top, 2)
+            .padding(.bottom, 3)
+            .frame(minHeight: 36)
             .background(
                 DReportStyle.headerBackground
             )
 
-            Divider()
+                Divider()
+            }
 
             sectionBody
                 .background(
@@ -269,6 +1199,25 @@ private struct SectionContentView: View {
                 $showingCreateSheet
         ) {
             createSheet
+        }
+    }
+
+    private var showsOuterHeader: Bool {
+        switch section {
+        case .today,
+             .calendar,
+             .allTasks,
+             .todo,
+             .inProgress,
+             .completed,
+             .timeline:
+            return false
+
+        case .themes,
+             .organizations,
+             .groups,
+             .people:
+            return true
         }
     }
 
@@ -317,16 +1266,23 @@ private struct SectionContentView: View {
                     $selectedWorkItemID
             )
         case .themes:
-            ThemeListView()
+            ThemeListView(
+                selection:
+                    $selectedThemeID
+            )
 
         case .organizations:
             EntityListView(
-                kind: .organization
+                kind: .organization,
+                selection:
+                    $selectedOrganizationID
             )
 
         case .groups:
             EntityListView(
-                kind: .group
+                kind: .group,
+                selection:
+                    $selectedGroupID
             )
 
         case .people:
@@ -540,6 +1496,9 @@ private struct ThemeListView: View {
     @EnvironmentObject
     private var store: DReportStore
 
+    @Binding
+    var selection: UUID?
+
     var body: some View {
         let roots =
             store.childThemes(of: nil)
@@ -564,7 +1523,9 @@ private struct ThemeListView: View {
             List {
                 ForEach(roots) { theme in
                     ThemeNodeView(
-                        theme: theme
+                        theme: theme,
+                        selection:
+                            $selection
                     )
                 }
             }
@@ -577,6 +1538,9 @@ private struct ThemeNodeView: View {
     private var store: DReportStore
 
     let theme: Theme
+
+    @Binding
+    var selection: UUID?
 
     @State
     private var isExpanded = true
@@ -605,7 +1569,9 @@ private struct ThemeNodeView: View {
                 )
             ) { child in
                 ThemeNodeView(
-                    theme: child
+                    theme: child,
+                    selection:
+                        $selection
                 )
             }
         } label: {
@@ -638,6 +1604,13 @@ private struct ThemeNodeView: View {
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+            }
+            .contentShape(
+                Rectangle()
+            )
+            .onTapGesture {
+                selection =
+                    theme.id
             }
         }
         .sheet(
@@ -760,7 +1733,7 @@ private struct WorkItemNodeView: View {
                         item.deadlineAt
                     {
                         Text(
-                            "Deadline: \(deadline.formatted(date: .abbreviated, time: .shortened))"
+                            "Deadline: \(DReportTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))"
                         )
                         .font(.caption2)
                         .foregroundStyle(
@@ -1428,6 +2401,11 @@ private struct CreateWorkItemView: View {
             to: Date()
         ) ?? Date()
 
+    @State
+    private var deadlineTimeZoneID =
+        DReportTime.deviceTimeZoneID
+
+
     init(
         themeID: UUID?,
         parentWorkItemID: UUID?,
@@ -1507,13 +2485,12 @@ private struct CreateWorkItemView: View {
                 )
 
                 if hasDeadline {
-                    DatePicker(
-                        "Due",
-                        selection: $deadlineAt,
-                        displayedComponents: [
-                            .date,
-                            .hourAndMinute
-                        ]
+                    TimeZoneAwareDateEditor(
+                        label: "Due",
+                        date:
+                            $deadlineAt,
+                        timeZoneID:
+                            $deadlineTimeZoneID
                     )
                 }
             }
@@ -1537,6 +2514,11 @@ private struct CreateWorkItemView: View {
                             kind == .task
                             && hasDeadline
                             ? deadlineAt
+                            : nil,
+                        deadlineTimeZoneID:
+                            kind == .task
+                            && hasDeadline
+                            ? deadlineTimeZoneID
                             : nil
                     )
 
@@ -1574,6 +2556,9 @@ private struct EntityListView: View {
 
     let kind: EntityKind
 
+    @Binding
+    var selection: UUID?
+
     var body: some View {
         let entities =
             store.entities(of: kind)
@@ -1592,7 +2577,11 @@ private struct EntityListView: View {
                 maxHeight: .infinity
             )
         } else {
-            List(entities) { entity in
+            List(
+                entities,
+                selection:
+                    $selection
+            ) { entity in
                 VStack(
                     alignment: .leading,
                     spacing: 4

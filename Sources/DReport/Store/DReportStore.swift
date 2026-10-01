@@ -219,7 +219,8 @@ final class DReportStore: ObservableObject {
         kind: WorkItemKind,
         title: String,
         body: String,
-        deadlineAt: Date?
+        deadlineAt: Date?,
+        deadlineTimeZoneID: String? = nil
     ) {
         let cleanedTitle =
             title.trimmingCharacters(
@@ -239,6 +240,10 @@ final class DReportStore: ObservableObject {
         }
 
         let now = Date()
+
+        let currentTimeZoneID =
+            DReportTime
+                .deviceTimeZoneID
 
         let item =
             WorkItem(
@@ -268,7 +273,26 @@ final class DReportStore: ObservableObject {
                 createdByUserID:
                     currentUserID,
                 updatedByUserID:
-                    currentUserID
+                    currentUserID,
+                createdTimeZoneID:
+                    currentTimeZoneID,
+                updatedTimeZoneID:
+                    currentTimeZoneID,
+                deadlineTimeZoneID:
+                    kind == .task
+                    && deadlineAt != nil
+                    ? (
+                        DReportTime
+                            .validTimeZoneIdentifier(
+                                deadlineTimeZoneID
+                            )
+                        ?? currentTimeZoneID
+                    )
+                    : nil,
+                loggedTimeZoneID:
+                    kind == .activity
+                    ? currentTimeZoneID
+                    : nil
             )
 
         data.workItems.append(item)
@@ -281,7 +305,9 @@ final class DReportStore: ObservableObject {
                 text:
                     "Created \(kind.displayName.lowercased())",
                 actorUserID:
-                    currentUserID
+                    currentUserID,
+                timeZoneID:
+                    currentTimeZoneID
             )
         )
 
@@ -302,7 +328,13 @@ final class DReportStore: ObservableObject {
                     DReportTime
                         .utcString(
                             deadlineAt
+                        ),
+                valueTimeZoneID:
+                    DReportTime
+                        .validTimeZoneIdentifier(
+                            deadlineTimeZoneID
                         )
+                    ?? currentTimeZoneID
             )
         }
 
@@ -394,6 +426,10 @@ final class DReportStore: ObservableObject {
 
         let now = Date()
 
+        let currentTimeZoneID =
+            DReportTime
+                .deviceTimeZoneID
+
         data.workItems[index].status =
             status
 
@@ -403,6 +439,10 @@ final class DReportStore: ObservableObject {
         data.workItems[index].updatedByUserID =
             currentUserID
 
+        data.workItems[index]
+            .updatedTimeZoneID =
+            currentTimeZoneID
+
         if
             status == .inProgress,
             data.workItems[index].startedAt
@@ -410,13 +450,25 @@ final class DReportStore: ObservableObject {
         {
             data.workItems[index].startedAt =
                 now
+
+            data.workItems[index]
+                .startedTimeZoneID =
+                currentTimeZoneID
         }
 
         if status == .completed {
             data.workItems[index].completedAt =
                 now
+
+            data.workItems[index]
+                .completedTimeZoneID =
+                currentTimeZoneID
         } else {
             data.workItems[index].completedAt =
+                nil
+
+            data.workItems[index]
+                .completedTimeZoneID =
                 nil
         }
 
@@ -473,7 +525,9 @@ final class DReportStore: ObservableObject {
                     status.rawValue,
                 actorUserID:
                     currentUserID
-            )
+,
+                timeZoneID:
+                    currentTimeZoneID            )
         )
 
         save()
@@ -1887,7 +1941,10 @@ extension DReportStore {
         deadlineAt: Date?,
         reminderAt: Date?,
         scheduledAt: Date?,
-        loggedAt: Date? = nil
+        loggedAt: Date? = nil,
+        deadlineTimeZoneID: String? = nil,
+        reminderTimeZoneID: String? = nil,
+        loggedTimeZoneID: String? = nil
     ) -> String? {
         guard
             let index =
@@ -1972,6 +2029,10 @@ extension DReportStore {
 
         let now = Date()
 
+        let currentTimeZoneID =
+            DReportTime
+                .deviceTimeZoneID
+
         let oldStatus =
             data.workItems[index]
                 .status
@@ -2020,6 +2081,20 @@ extension DReportStore {
                 deadlineAt
 
             data.workItems[index]
+                .deadlineTimeZoneID =
+                deadlineAt == nil
+                ? nil
+                : (
+                    DReportTime
+                        .validTimeZoneIdentifier(
+                            deadlineTimeZoneID
+                        )
+                    ?? data.workItems[index]
+                        .deadlineTimeZoneID
+                    ?? currentTimeZoneID
+                )
+
+            data.workItems[index]
                 .reminderAt =
                 nil
 
@@ -2036,6 +2111,10 @@ extension DReportStore {
                 data.workItems[index]
                     .startedAt =
                     now
+
+                data.workItems[index]
+                    .startedTimeZoneID =
+                    currentTimeZoneID
             }
 
             if
@@ -2047,6 +2126,10 @@ extension DReportStore {
                 data.workItems[index]
                     .completedAt =
                     now
+
+                data.workItems[index]
+                    .completedTimeZoneID =
+                    currentTimeZoneID
             }
 
             if
@@ -2057,6 +2140,10 @@ extension DReportStore {
             {
                 data.workItems[index]
                     .completedAt =
+                    nil
+
+                data.workItems[index]
+                    .completedTimeZoneID =
                     nil
             }
 
@@ -2075,6 +2162,20 @@ extension DReportStore {
             data.workItems[index]
                 .reminderAt =
                 reminderAt
+
+            data.workItems[index]
+                .reminderTimeZoneID =
+                reminderAt == nil
+                ? nil
+                : (
+                    DReportTime
+                        .validTimeZoneIdentifier(
+                            reminderTimeZoneID
+                        )
+                    ?? data.workItems[index]
+                        .reminderTimeZoneID
+                    ?? currentTimeZoneID
+                )
 
         case .activity:
             data.workItems[index].status =
@@ -2097,6 +2198,16 @@ extension DReportStore {
                 loggedAt
                 ?? data.workItems[index].loggedAt
                 ?? now
+
+            data.workItems[index]
+                .loggedTimeZoneID =
+                DReportTime
+                    .validTimeZoneIdentifier(
+                        loggedTimeZoneID
+                    )
+                ?? data.workItems[index]
+                    .loggedTimeZoneID
+                ?? currentTimeZoneID
         }
 
         if
@@ -2139,7 +2250,10 @@ extension DReportStore {
                         DReportTime
                             .utcString(
                                 newDeadline
-                            )
+                            ),
+                    valueTimeZoneID:
+                        updatedTask
+                            .deadlineTimeZoneID
                 )
             }
 
@@ -2181,6 +2295,10 @@ extension DReportStore {
 
         data.workItems[index].updatedAt =
             now
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            currentTimeZoneID
 
         data.workItems[index]
             .updatedByUserID =
@@ -2256,7 +2374,10 @@ extension DReportStore {
         body: String,
         deadlineAt: Date?,
         reminderAt: Date?,
-        occurredAt: Date?
+        occurredAt: Date?,
+        deadlineTimeZoneID: String? = nil,
+        reminderTimeZoneID: String? = nil,
+        occurredTimeZoneID: String? = nil
     ) -> (
         id: UUID?,
         error: String?
@@ -2304,6 +2425,10 @@ extension DReportStore {
 
         let now = Date()
 
+        let currentTimeZoneID =
+            DReportTime
+                .deviceTimeZoneID
+
         let item =
             WorkItem(
                 themeID:
@@ -2350,7 +2475,43 @@ extension DReportStore {
                 createdByUserID:
                     currentUserID,
                 updatedByUserID:
-                    currentUserID
+                    currentUserID,
+                createdTimeZoneID:
+                    currentTimeZoneID,
+                updatedTimeZoneID:
+                    currentTimeZoneID,
+                deadlineTimeZoneID:
+                    kind == .task
+                    && deadlineAt != nil
+                    ? (
+                        DReportTime
+                            .validTimeZoneIdentifier(
+                                deadlineTimeZoneID
+                            )
+                        ?? currentTimeZoneID
+                    )
+                    : nil,
+                reminderTimeZoneID:
+                    kind == .note
+                    && reminderAt != nil
+                    ? (
+                        DReportTime
+                            .validTimeZoneIdentifier(
+                                reminderTimeZoneID
+                            )
+                        ?? currentTimeZoneID
+                    )
+                    : nil,
+                loggedTimeZoneID:
+                    kind == .activity
+                    ? (
+                        DReportTime
+                            .validTimeZoneIdentifier(
+                                occurredTimeZoneID
+                            )
+                        ?? currentTimeZoneID
+                    )
+                    : nil
             )
 
         data.workItems.append(
@@ -2371,7 +2532,9 @@ extension DReportStore {
                     : "Created \(kind.displayName.lowercased())",
                 actorUserID:
                     currentUserID
-            )
+,
+                timeZoneID:
+                    currentTimeZoneID            )
         )
 
         if
@@ -2391,7 +2554,13 @@ extension DReportStore {
                     DReportTime
                         .utcString(
                             deadlineAt
+                        ),
+                valueTimeZoneID:
+                    DReportTime
+                        .validTimeZoneIdentifier(
+                            deadlineTimeZoneID
                         )
+                    ?? currentTimeZoneID
             )
         }
 
@@ -2440,7 +2609,8 @@ extension DReportStore {
         timestamp: Date,
         text: String,
         previousValue: String? = nil,
-        newValue: String? = nil
+        newValue: String? = nil,
+        valueTimeZoneID: String? = nil
     ) {
         data.historyEvents.append(
             HistoryEvent(
@@ -2457,8 +2627,270 @@ extension DReportStore {
                 newValue:
                     newValue,
                 actorUserID:
-                    currentUserID
+                    currentUserID,
+                timeZoneID:
+                    DReportTime
+                        .deviceTimeZoneID,
+                valueTimeZoneID:
+                    valueTimeZoneID
             )
         )
+    }
+}
+
+extension DReportStore {
+    func updateThemeDetails(
+        themeID: UUID,
+        name: String,
+        parentThemeID: UUID?,
+        notes: String
+    ) -> String? {
+        guard
+            let index =
+                data.themes.firstIndex(
+                    where: {
+                        $0.id == themeID
+                    }
+                )
+        else {
+            return "Theme not found."
+        }
+
+        let cleanedName =
+            name.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanedName.isEmpty
+        else {
+            return "Theme name cannot be empty."
+        }
+
+        if let parentThemeID {
+            guard parentThemeID != themeID
+            else {
+                return "A Theme cannot be its own parent."
+            }
+
+            let descendants =
+                Set(
+                    themeDescendantIDs(
+                        of: themeID
+                    )
+                )
+
+            guard
+                !descendants.contains(
+                    parentThemeID
+                )
+            else {
+                return "A Theme cannot be moved inside one of its descendants."
+            }
+
+            guard
+                data.themes.contains(
+                    where: {
+                        $0.id
+                            == parentThemeID
+                    }
+                )
+            else {
+                return "Parent Theme not found."
+            }
+        }
+
+        data.themes[index].name =
+            cleanedName
+
+        data.themes[index].parentThemeID =
+            parentThemeID
+
+        data.themes[index].notes =
+            notes.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        data.themes[index].updatedAt =
+            Date()
+
+        save()
+
+        return nil
+    }
+
+    func updateEntityDetails(
+        entityID: UUID,
+        name: String,
+        notes: String
+    ) -> String? {
+        guard
+            let index =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id == entityID
+                    }
+                )
+        else {
+            return "Entity not found."
+        }
+
+        let cleanedName =
+            name.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanedName.isEmpty
+        else {
+            return "Name cannot be empty."
+        }
+
+        data.entities[index].name =
+            cleanedName
+
+        data.entities[index].notes =
+            notes.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        data.entities[index].updatedAt =
+            Date()
+
+        save()
+
+        return nil
+    }
+
+    func entityDescendantIDs(
+        of containerID: UUID
+    ) -> [UUID] {
+        let direct =
+            data.memberships
+                .filter {
+                    $0.containerEntityID
+                        == containerID
+                }
+                .map(
+                    \.memberEntityID
+                )
+
+        var result =
+            direct
+
+        for childID in direct {
+            result.append(
+                contentsOf:
+                    entityDescendantIDs(
+                        of: childID
+                    )
+            )
+        }
+
+        return Array(
+            Set(result)
+        )
+    }
+
+    func updateEntityMemberships(
+        entityID: UUID,
+        containerIDs: Set<UUID>
+    ) -> String? {
+        guard
+            let entity =
+                data.entities.first(
+                    where: {
+                        $0.id == entityID
+                    }
+                )
+        else {
+            return "Entity not found."
+        }
+
+        let allowed =
+            Set(
+                possibleContainers(
+                    for: entity.kind
+                )
+                .map(
+                    \.id
+                )
+            )
+
+        let descendants =
+            Set(
+                entityDescendantIDs(
+                    of: entityID
+                )
+            )
+
+        for containerID in
+            containerIDs
+        {
+            guard
+                containerID
+                    != entityID
+            else {
+                return "An item cannot contain itself."
+            }
+
+            guard
+                allowed.contains(
+                    containerID
+                )
+            else {
+                return "Invalid container."
+            }
+
+            guard
+                !descendants.contains(
+                    containerID
+                )
+            else {
+                return "That relationship would create a cycle."
+            }
+        }
+
+        data.memberships.removeAll {
+            $0.memberEntityID
+                == entityID
+        }
+
+        let ordered =
+            containerIDs.sorted {
+                $0.uuidString
+                    < $1.uuidString
+            }
+
+        for (
+            index,
+            containerID
+        ) in ordered.enumerated() {
+            data.memberships.append(
+                EntityMembership(
+                    memberEntityID:
+                        entityID,
+                    containerEntityID:
+                        containerID,
+                    isPrimary:
+                        index == 0
+                )
+            )
+        }
+
+        if
+            let index =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id == entityID
+                    }
+                )
+        {
+            data.entities[index]
+                .updatedAt =
+                Date()
+        }
+
+        save()
+
+        return nil
     }
 }

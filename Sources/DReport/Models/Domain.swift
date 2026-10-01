@@ -75,6 +75,22 @@ struct WorkItem: Identifiable, Codable, Hashable {
 
     var createdByUserID: UUID?
     var updatedByUserID: UUID?
+
+    // IANA time-zone identifiers describing the zone
+    // in which each timestamp was originally entered
+    // or automatically recorded.
+    //
+    // Date itself remains an absolute instant.
+    var createdTimeZoneID: String? = nil
+    var updatedTimeZoneID: String? = nil
+
+    var scheduledTimeZoneID: String? = nil
+    var deadlineTimeZoneID: String? = nil
+    var reminderTimeZoneID: String? = nil
+
+    var startedTimeZoneID: String? = nil
+    var completedTimeZoneID: String? = nil
+    var loggedTimeZoneID: String? = nil
 }
 
 enum EntityKind: String, Codable, CaseIterable, Identifiable {
@@ -182,4 +198,11 @@ struct HistoryEvent: Identifiable, Codable, Hashable {
     var newValue: String?
 
     var actorUserID: UUID?
+
+    // Zone where the history action happened.
+    var timeZoneID: String? = nil
+
+    // Optional source zone of a date/time value
+    // described by this history event.
+    var valueTimeZoneID: String? = nil
 }

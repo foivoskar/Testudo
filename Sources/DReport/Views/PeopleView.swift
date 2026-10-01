@@ -915,7 +915,7 @@ private struct RelatedWorkRow: View {
                             item.deadlineAt
                     {
                         Text(
-                            "Due \(deadline.formatted(date: .abbreviated, time: .shortened))"
+                            "Due \(DReportTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))"
                         )
                     }
                 }

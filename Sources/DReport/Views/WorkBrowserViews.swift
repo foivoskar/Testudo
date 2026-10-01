@@ -533,7 +533,7 @@ struct TodayDashboardView: View {
             }
 
             return
-                "Reminder \(reminder.formatted(date: .omitted, time: .shortened))"
+                "Reminder \(DReportTime.displayTime(reminder, sourceTimeZoneID: item.reminderTimeZoneID))"
         }
 
         if
@@ -763,7 +763,7 @@ struct WorkListView: View {
                 item.reminderAt
         {
             return
-                "Reminder \(reminder.formatted(date: .abbreviated, time: .shortened))"
+                "Reminder \(DReportTime.displayDateTime(reminder, sourceTimeZoneID: item.reminderTimeZoneID))"
         }
 
         if
@@ -791,7 +791,12 @@ struct WorkColumnHeader: View {
             spacing: 2
         ) {
             Text(title)
-                .font(.headline)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
 
             Text(subtitle)
                 .font(.caption)
@@ -809,11 +814,11 @@ struct WorkColumnHeader: View {
         )
         .padding(
             .top,
-            14
+            2
         )
         .padding(
             .bottom,
-            10
+            4
         )
     }
 }
@@ -854,6 +859,7 @@ struct WorkGuideRow: View {
                     alignment: .firstTextBaseline
                 ) {
                     Text(title)
+                        .font(.body)
                         .fontWeight(.medium)
                         .lineLimit(2)
 
@@ -1003,6 +1009,10 @@ struct WorkItemDetailView: View {
         Date()
 
     @State
+    private var dateTimeZoneDraft =
+        DReportTime.deviceTimeZoneID
+
+    @State
     private var dateEnabledDraft =
         true
 
@@ -1040,6 +1050,10 @@ struct WorkItemDetailView: View {
         Date()
 
     @State
+    private var childDeadlineTimeZoneID =
+        DReportTime.deviceTimeZoneID
+
+    @State
     private var childHasReminder =
         false
 
@@ -1048,8 +1062,16 @@ struct WorkItemDetailView: View {
         Date()
 
     @State
+    private var childReminderTimeZoneID =
+        DReportTime.deviceTimeZoneID
+
+    @State
     private var childOccurredAtDraft =
         Date()
+
+    @State
+    private var childOccurredTimeZoneID =
+        DReportTime.deviceTimeZoneID
 
     @State
     private var childErrorMessage:
@@ -1116,7 +1138,18 @@ struct WorkItemDetailView: View {
                             item
                         )
                     }
-                    .padding(28)
+                    .padding(
+                        .horizontal,
+                        28
+                    )
+                    .padding(
+                        .bottom,
+                        28
+                    )
+                    .padding(
+                        .top,
+                        4
+                    )
                     .frame(
                         maxWidth: 760,
                         alignment: .leading
@@ -1615,13 +1648,22 @@ struct WorkItemDetailView: View {
                 label: "Deadline",
                 value:
                     item.deadlineAt
-                        .map(formatted)
+                        .map {
+                            DReportTime
+                                .displayDateTime(
+                                    $0,
+                                    sourceTimeZoneID:
+                                        item.deadlineTimeZoneID
+                                )
+                        }
                     ?? "None",
                 onEdit: {
                     beginDateEdit(
                         .deadline,
                         date:
-                            item.deadlineAt
+                            item.deadlineAt,
+                        timeZoneID:
+                            item.deadlineTimeZoneID
                     )
                 }
             )
@@ -1646,13 +1688,22 @@ struct WorkItemDetailView: View {
                 label: "Reminder",
                 value:
                     item.reminderAt
-                        .map(formatted)
+                        .map {
+                            DReportTime
+                                .displayDateTime(
+                                    $0,
+                                    sourceTimeZoneID:
+                                        item.reminderTimeZoneID
+                                )
+                        }
                     ?? "None",
                 onEdit: {
                     beginDateEdit(
                         .reminder,
                         date:
-                            item.reminderAt
+                            item.reminderAt,
+                        timeZoneID:
+                            item.reminderTimeZoneID
                     )
                 }
             )
@@ -1677,13 +1728,22 @@ struct WorkItemDetailView: View {
                 label: "Occurred",
                 value:
                     item.loggedAt
-                        .map(formatted)
+                        .map {
+                            DReportTime
+                                .displayDateTime(
+                                    $0,
+                                    sourceTimeZoneID:
+                                        item.loggedTimeZoneID
+                                )
+                        }
                     ?? "Unknown",
                 onEdit: {
                     beginDateEdit(
                         .eventDate,
                         date:
-                            item.loggedAt
+                            item.loggedAt,
+                        timeZoneID:
+                            item.loggedTimeZoneID
                     )
                 }
             )
@@ -1708,17 +1768,16 @@ struct WorkItemDetailView: View {
             )
 
             if dateEnabledDraft {
-                DatePicker(
-                    "",
-                    selection:
+                TimeZoneAwareDateEditor(
+                    label: "",
+                    date:
                         $dateDraft,
-                    displayedComponents:
-                        [
-                            .date,
-                            .hourAndMinute
-                        ]
+                    timeZoneID:
+                        $dateTimeZoneDraft
                 )
-                .labelsHidden()
+                .frame(
+                    maxWidth: 330
+                )
             }
 
             InlineEditActions(
@@ -1913,7 +1972,7 @@ struct WorkItemDetailView: View {
                                                 child.loggedAt
                                         {
                                             Text(
-                                                "Occurred \(formatted(occurred))"
+                                                "Occurred \(DReportTime.displayDateTime(occurred, sourceTimeZoneID: child.loggedTimeZoneID))"
                                             )
                                             .font(
                                                 .caption2
@@ -2029,15 +2088,12 @@ struct WorkItemDetailView: View {
                 )
 
                 if childHasDeadline {
-                    DatePicker(
-                        "Deadline",
-                        selection:
+                    TimeZoneAwareDateEditor(
+                        label: "Deadline",
+                        date:
                             $childDeadlineDraft,
-                        displayedComponents:
-                            [
-                                .date,
-                                .hourAndMinute
-                            ]
+                        timeZoneID:
+                            $childDeadlineTimeZoneID
                     )
                 }
             }
@@ -2053,29 +2109,23 @@ struct WorkItemDetailView: View {
                 )
 
                 if childHasReminder {
-                    DatePicker(
-                        "Reminder",
-                        selection:
+                    TimeZoneAwareDateEditor(
+                        label: "Reminder",
+                        date:
                             $childReminderDraft,
-                        displayedComponents:
-                            [
-                                .date,
-                                .hourAndMinute
-                            ]
+                        timeZoneID:
+                            $childReminderTimeZoneID
                     )
                 }
             }
 
             if childKindDraft == .activity {
-                DatePicker(
-                    "Occurred",
-                    selection:
+                TimeZoneAwareDateEditor(
+                    label: "Occurred",
+                    date:
                         $childOccurredAtDraft,
-                    displayedComponents:
-                        [
-                            .date,
-                            .hourAndMinute
-                        ]
+                    timeZoneID:
+                        $childOccurredTimeZoneID
                 )
 
                 Text(
@@ -2174,6 +2224,15 @@ struct WorkItemDetailView: View {
         childOccurredAtDraft =
             Date()
 
+        childDeadlineTimeZoneID =
+            DReportTime.deviceTimeZoneID
+
+        childReminderTimeZoneID =
+            DReportTime.deviceTimeZoneID
+
+        childOccurredTimeZoneID =
+            DReportTime.deviceTimeZoneID
+
         childErrorMessage =
             nil
 
@@ -2224,6 +2283,23 @@ struct WorkItemDetailView: View {
                     childKindDraft
                         == .activity
                     ? childOccurredAtDraft
+                    : nil,
+                deadlineTimeZoneID:
+                    childKindDraft
+                        == .task
+                    && childHasDeadline
+                    ? childDeadlineTimeZoneID
+                    : nil,
+                reminderTimeZoneID:
+                    childKindDraft
+                        == .note
+                    && childHasReminder
+                    ? childReminderTimeZoneID
+                    : nil,
+                occurredTimeZoneID:
+                    childKindDraft
+                        == .activity
+                    ? childOccurredTimeZoneID
                     : nil
             )
 
@@ -2520,17 +2596,23 @@ struct WorkItemDetailView: View {
                 ReadOnlyInspectorRow(
                     label: "Created",
                     value:
-                        formatted(
-                            item.createdAt
-                        )
+                        DReportTime
+                            .displayDateTime(
+                                item.createdAt,
+                                sourceTimeZoneID:
+                                    item.createdTimeZoneID
+                            )
                 )
 
                 ReadOnlyInspectorRow(
                     label: "Updated",
                     value:
-                        formatted(
-                            item.updatedAt
-                        )
+                        DReportTime
+                            .displayDateTime(
+                                item.updatedAt,
+                                sourceTimeZoneID:
+                                    item.updatedTimeZoneID
+                            )
                 )
 
                 if
@@ -2540,9 +2622,12 @@ struct WorkItemDetailView: View {
                     ReadOnlyInspectorRow(
                         label: "Started",
                         value:
-                            formatted(
-                                started
-                            )
+                            DReportTime
+                                .displayDateTime(
+                                    started,
+                                    sourceTimeZoneID:
+                                        item.startedTimeZoneID
+                                )
                     )
                 }
 
@@ -2554,9 +2639,12 @@ struct WorkItemDetailView: View {
                         label:
                             "Completed",
                         value:
-                            formatted(
-                                completed
-                            )
+                            DReportTime
+                                .displayDateTime(
+                                    completed,
+                                    sourceTimeZoneID:
+                                        item.completedTimeZoneID
+                                )
                     )
                 }
 
@@ -2569,9 +2657,12 @@ struct WorkItemDetailView: View {
                     ReadOnlyInspectorRow(
                         label: "Occurred",
                         value:
-                            formatted(
-                                logged
-                            )
+                            DReportTime
+                                .displayDateTime(
+                                    logged,
+                                    sourceTimeZoneID:
+                                        item.loggedTimeZoneID
+                                )
                     )
                 }
 
@@ -2654,10 +2745,10 @@ struct WorkItemDetailView: View {
 
                                 Text(
                                     DReportTime
-                                        .dateTime(
+                                        .displayDateTime(
                                             entry.timestamp,
-                                            includeTimeZone:
-                                                true
+                                            sourceTimeZoneID:
+                                                entry.timeZoneID
                                         )
                                 )
                                 .font(
@@ -2689,6 +2780,7 @@ struct WorkItemDetailView: View {
         let text: String
         let detail: String?
         let icon: String
+        let timeZoneID: String?
     }
 
     private func taskLogEntries(
@@ -2795,7 +2887,9 @@ struct WorkItemDetailView: View {
                     icon:
                         historyIcon(
                             event.kind
-                        )
+                        ),
+                    timeZoneID:
+                        event.timeZoneID
                 )
             )
         }
@@ -2827,7 +2921,9 @@ struct WorkItemDetailView: View {
                         detail:
                             nil,
                         icon:
-                            "play.circle"
+                            "play.circle",
+                        timeZoneID:
+                            work.startedTimeZoneID
                     )
                 )
             }
@@ -2857,7 +2953,9 @@ struct WorkItemDetailView: View {
                         detail:
                             nil,
                         icon:
-                            "checkmark.circle"
+                            "checkmark.circle",
+                        timeZoneID:
+                            work.completedTimeZoneID
                     )
                 )
             }
@@ -2892,7 +2990,9 @@ struct WorkItemDetailView: View {
                         ? nil
                         : work.body,
                     icon:
-                        "clock.arrow.circlepath"
+                        "clock.arrow.circlepath",
+                    timeZoneID:
+                        work.loggedTimeZoneID
                 )
             )
         }
@@ -3014,7 +3114,7 @@ struct WorkItemDetailView: View {
                         )
             {
                 return
-                    "Deadline: \(DReportTime.dateTime(date, includeTimeZone: true))"
+                    "Deadline: \(DReportTime.displayDateTime(date, sourceTimeZoneID: event.valueTimeZoneID))"
             }
         }
 
@@ -3193,9 +3293,18 @@ struct WorkItemDetailView: View {
 
     private func beginDateEdit(
         _ field: EditableField,
-        date: Date?
+        date: Date?,
+        timeZoneID: String?
     ) {
         editingField = field
+
+        dateTimeZoneDraft =
+            DReportTime
+                .validTimeZoneIdentifier(
+                    timeZoneID
+                )
+            ?? DReportTime
+                .deviceTimeZoneID
 
         dateEnabledDraft =
             date != nil
@@ -3298,6 +3407,10 @@ struct WorkItemDetailView: View {
                     item,
                     deadline:
                         value,
+                    deadlineTimeZoneID:
+                        dateEnabledDraft
+                        ? dateTimeZoneDraft
+                        : nil,
                     deadlineWasEdited:
                         true
                 )
@@ -3309,6 +3422,10 @@ struct WorkItemDetailView: View {
                     item,
                     reminder:
                         value,
+                    reminderTimeZoneID:
+                        dateEnabledDraft
+                        ? dateTimeZoneDraft
+                        : nil,
                     reminderWasEdited:
                         true
                 )
@@ -3320,6 +3437,10 @@ struct WorkItemDetailView: View {
                     item,
                     loggedAt:
                         value,
+                    loggedTimeZoneID:
+                        dateEnabledDraft
+                        ? dateTimeZoneDraft
+                        : nil,
                     loggedAtWasEdited:
                         true
                 )
@@ -3377,10 +3498,13 @@ struct WorkItemDetailView: View {
         parentWasEdited: Bool = false,
         status: TaskStatus? = nil,
         deadline: Date? = nil,
+        deadlineTimeZoneID: String? = nil,
         deadlineWasEdited: Bool = false,
         reminder: Date? = nil,
+        reminderTimeZoneID: String? = nil,
         reminderWasEdited: Bool = false,
         loggedAt: Date? = nil,
+        loggedTimeZoneID: String? = nil,
         loggedAtWasEdited: Bool = false
     ) -> String? {
         store.updateWorkItemDetails(
@@ -3434,7 +3558,19 @@ struct WorkItemDetailView: View {
                     ? loggedAt
                     : item.loggedAt
                 )
-                : item.loggedAt
+                : item.loggedAt,
+            deadlineTimeZoneID:
+                deadlineWasEdited
+                ? deadlineTimeZoneID
+                : item.deadlineTimeZoneID,
+            reminderTimeZoneID:
+                reminderWasEdited
+                ? reminderTimeZoneID
+                : item.reminderTimeZoneID,
+            loggedTimeZoneID:
+                loggedAtWasEdited
+                ? loggedTimeZoneID
+                : item.loggedTimeZoneID
         )
     }
 
@@ -3836,8 +3972,981 @@ private struct DetailValueRow: View {
     }
 }
 
+
+struct ThemeDetailView: View {
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let themeID: UUID
+
+    @State
+    private var editingField:
+        EditableField?
+
+    @State
+    private var textDraft =
+        ""
+
+    @State
+    private var parentDraft:
+        UUID?
+
+    @State
+    private var errorMessage:
+        String?
+
+    private enum EditableField:
+        Hashable
+    {
+        case name
+        case notes
+        case parent
+    }
+
+    var body: some View {
+        ZStack {
+            DReportStyle
+                .contentBackground
+                .ignoresSafeArea()
+
+            if
+                let theme =
+                    store.theme(
+                        id: themeID
+                    )
+            {
+                ScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 24
+                    ) {
+                        header(theme)
+
+                        InspectorSection(
+                            title: "Details"
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 10
+                            ) {
+                                parentRow(theme)
+
+                                notesRow(theme)
+                            }
+                        }
+
+                        InspectorSection(
+                            title: "History"
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 9
+                            ) {
+                                ReadOnlyInspectorRow(
+                                    label: "Created",
+                                    value:
+                                        DReportTime
+                                            .dateTime(
+                                                theme.createdAt
+                                            )
+                                )
+
+                                ReadOnlyInspectorRow(
+                                    label: "Updated",
+                                    value:
+                                        DReportTime
+                                            .dateTime(
+                                                theme.updatedAt
+                                            )
+                                )
+                            }
+                        }
+                    }
+                    .padding(
+                        .horizontal,
+                        28
+                    )
+                    .padding(
+                        .top,
+                        8
+                    )
+                    .padding(
+                        .bottom,
+                        28
+                    )
+                    .frame(
+                        maxWidth: 760,
+                        alignment: .leading
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .center
+                    )
+                }
+            } else {
+                ContentUnavailableView(
+                    "Theme Not Found",
+                    systemImage:
+                        "folder.badge.questionmark"
+                )
+            }
+        }
+    }
+
+    private func header(
+        _ theme: Theme
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: 14
+        ) {
+            Image(
+                systemName:
+                    "folder"
+            )
+            .font(.title2)
+            .frame(width: 28)
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                if
+                    editingField
+                        == .name
+                {
+                    TextField(
+                        "Theme name",
+                        text:
+                            $textDraft
+                    )
+                    .font(.title2)
+
+                    InlineEditActions(
+                        onCancel:
+                            cancelEdit,
+                        onSave: {
+                            saveName(
+                                theme
+                            )
+                        }
+                    )
+                } else {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline,
+                        spacing: 8
+                    ) {
+                        Text(
+                            theme.name
+                        )
+                        .font(.title2)
+                        .fontWeight(
+                            .semibold
+                        )
+
+                        InlineEditButton {
+                            textDraft =
+                                theme.name
+
+                            editingField =
+                                .name
+                        }
+                    }
+                }
+
+                Text("Theme")
+                    .font(.callout)
+                    .foregroundStyle(
+                        .secondary
+                    )
+            }
+
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func parentRow(
+        _ theme: Theme
+    ) -> some View {
+        if
+            editingField
+                == .parent
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                HStack {
+                    Text("Parent")
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .frame(
+                            width: 100,
+                            alignment: .leading
+                        )
+
+                    Picker(
+                        "",
+                        selection:
+                            $parentDraft
+                    ) {
+                        Text("None")
+                            .tag(
+                                Optional<UUID>
+                                    .none
+                            )
+
+                        ForEach(
+                            availableParents(
+                                theme
+                            )
+                        ) { candidate in
+                            Text(
+                                candidate.name
+                            )
+                            .tag(
+                                Optional(
+                                    candidate.id
+                                )
+                            )
+                        }
+                    }
+                    .labelsHidden()
+
+                    Spacer()
+                }
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveParent(
+                            theme
+                        )
+                    }
+                )
+            }
+        } else {
+            EditableValueRow(
+                label: "Parent",
+                value:
+                    store.theme(
+                        id:
+                            theme
+                                .parentThemeID
+                    )?.name
+                    ?? "None",
+                onEdit: {
+                    parentDraft =
+                        theme
+                            .parentThemeID
+
+                    editingField =
+                        .parent
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func notesRow(
+        _ theme: Theme
+    ) -> some View {
+        if
+            editingField
+                == .notes
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                Text("Notes")
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                TextEditor(
+                    text:
+                        $textDraft
+                )
+                .frame(
+                    minHeight: 90
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 6
+                    )
+                    .stroke(
+                        Color.secondary
+                            .opacity(0.15)
+                    )
+                }
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveNotes(
+                            theme
+                        )
+                    }
+                )
+            }
+        } else {
+            EditableValueRow(
+                label: "Notes",
+                value:
+                    theme.notes
+                        .isEmpty
+                    ? "None"
+                    : theme.notes,
+                onEdit: {
+                    textDraft =
+                        theme.notes
+
+                    editingField =
+                        .notes
+                }
+            )
+        }
+    }
+
+    private func availableParents(
+        _ theme: Theme
+    ) -> [Theme] {
+        let descendants =
+            Set(
+                store
+                    .themeDescendantIDs(
+                        of: theme.id
+                    )
+            )
+
+        return store.data.themes
+            .filter {
+                $0.id != theme.id
+                && !descendants
+                    .contains(
+                        $0.id
+                    )
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    private func saveName(
+        _ theme: Theme
+    ) {
+        finish(
+            store
+                .updateThemeDetails(
+                    themeID:
+                        theme.id,
+                    name:
+                        textDraft,
+                    parentThemeID:
+                        theme
+                            .parentThemeID,
+                    notes:
+                        theme.notes
+                )
+        )
+    }
+
+    private func saveParent(
+        _ theme: Theme
+    ) {
+        finish(
+            store
+                .updateThemeDetails(
+                    themeID:
+                        theme.id,
+                    name:
+                        theme.name,
+                    parentThemeID:
+                        parentDraft,
+                    notes:
+                        theme.notes
+                )
+        )
+    }
+
+    private func saveNotes(
+        _ theme: Theme
+    ) {
+        finish(
+            store
+                .updateThemeDetails(
+                    themeID:
+                        theme.id,
+                    name:
+                        theme.name,
+                    parentThemeID:
+                        theme
+                            .parentThemeID,
+                    notes:
+                        textDraft
+                )
+        )
+    }
+
+    private func finish(
+        _ error: String?
+    ) {
+        errorMessage =
+            error
+
+        if error == nil {
+            cancelEdit()
+        }
+    }
+
+    private func cancelEdit() {
+        editingField =
+            nil
+
+        errorMessage =
+            nil
+    }
+}
+
+
+struct StructureEntityDetailView:
+    View
+{
+    @EnvironmentObject
+    private var store: DReportStore
+
+    let entityID: UUID
+
+    @State
+    private var editingField:
+        EditableField?
+
+    @State
+    private var textDraft =
+        ""
+
+    @State
+    private var containerIDsDraft:
+        Set<UUID> = []
+
+    @State
+    private var errorMessage:
+        String?
+
+    private enum EditableField:
+        Hashable
+    {
+        case name
+        case notes
+        case memberships
+    }
+
+    var body: some View {
+        ZStack {
+            DReportStyle
+                .contentBackground
+                .ignoresSafeArea()
+
+            if
+                let entity =
+                    store.entity(
+                        id: entityID
+                    )
+            {
+                ScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 24
+                    ) {
+                        header(entity)
+
+                        InspectorSection(
+                            title: "Details"
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 10
+                            ) {
+                                ReadOnlyInspectorRow(
+                                    label: "Type",
+                                    value:
+                                        entity
+                                            .kind
+                                            .displayName
+                                )
+
+                                notesRow(
+                                    entity
+                                )
+                            }
+                        }
+
+                        membershipsSection(
+                            entity
+                        )
+
+                        InspectorSection(
+                            title: "History"
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 9
+                            ) {
+                                ReadOnlyInspectorRow(
+                                    label: "Created",
+                                    value:
+                                        DReportTime
+                                            .dateTime(
+                                                entity
+                                                    .createdAt
+                                            )
+                                )
+
+                                ReadOnlyInspectorRow(
+                                    label: "Updated",
+                                    value:
+                                        DReportTime
+                                            .dateTime(
+                                                entity
+                                                    .updatedAt
+                                            )
+                                )
+                            }
+                        }
+                    }
+                    .padding(
+                        .horizontal,
+                        28
+                    )
+                    .padding(
+                        .top,
+                        8
+                    )
+                    .padding(
+                        .bottom,
+                        28
+                    )
+                    .frame(
+                        maxWidth: 760,
+                        alignment: .leading
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .center
+                    )
+                }
+            } else {
+                ContentUnavailableView(
+                    "Item Not Found",
+                    systemImage:
+                        "questionmark.circle"
+                )
+            }
+        }
+    }
+
+    private func header(
+        _ entity: Entity
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: 14
+        ) {
+            Image(
+                systemName:
+                    entityIcon(
+                        entity
+                    )
+            )
+            .font(.title2)
+            .frame(width: 28)
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                if
+                    editingField
+                        == .name
+                {
+                    TextField(
+                        "Name",
+                        text:
+                            $textDraft
+                    )
+                    .font(.title2)
+
+                    InlineEditActions(
+                        onCancel:
+                            cancelEdit,
+                        onSave: {
+                            saveName(
+                                entity
+                            )
+                        }
+                    )
+                } else {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline,
+                        spacing: 8
+                    ) {
+                        Text(
+                            entity.name
+                        )
+                        .font(.title2)
+                        .fontWeight(
+                            .semibold
+                        )
+
+                        InlineEditButton {
+                            textDraft =
+                                entity.name
+
+                            editingField =
+                                .name
+                        }
+                    }
+                }
+
+                Text(
+                    entity
+                        .kind
+                        .displayName
+                )
+                .font(.callout)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func notesRow(
+        _ entity: Entity
+    ) -> some View {
+        if
+            editingField
+                == .notes
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                Text("Notes")
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                TextEditor(
+                    text:
+                        $textDraft
+                )
+                .frame(
+                    minHeight: 90
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 6
+                    )
+                    .stroke(
+                        Color.secondary
+                            .opacity(0.15)
+                    )
+                }
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveNotes(
+                            entity
+                        )
+                    }
+                )
+            }
+        } else {
+            EditableValueRow(
+                label: "Notes",
+                value:
+                    entity.notes
+                        .isEmpty
+                    ? "None"
+                    : entity.notes,
+                onEdit: {
+                    textDraft =
+                        entity.notes
+
+                    editingField =
+                        .notes
+                }
+            )
+        }
+    }
+
+    private func membershipsSection(
+        _ entity: Entity
+    ) -> some View {
+        let current =
+            store.containers(
+                for: entity.id
+            )
+
+        return InspectorSection(
+            title: "Structure"
+        ) {
+            if
+                editingField
+                    == .memberships
+            {
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    if
+                        availableContainers(
+                            entity
+                        )
+                        .isEmpty
+                    {
+                        Text(
+                            "No compatible containers."
+                        )
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    } else {
+                        ForEach(
+                            availableContainers(
+                                entity
+                            )
+                        ) { candidate in
+                            Toggle(
+                                candidate.name,
+                                isOn:
+                                    membershipBinding(
+                                        candidate.id
+                                    )
+                            )
+                            .toggleStyle(
+                                .checkbox
+                            )
+                        }
+                    }
+
+                    InlineEditActions(
+                        onCancel:
+                            cancelEdit,
+                        onSave: {
+                            saveMemberships(
+                                entity
+                            )
+                        }
+                    )
+                }
+            } else {
+                EditableValueRow(
+                    label:
+                        membershipLabel(
+                            entity
+                        ),
+                    value:
+                        current.isEmpty
+                        ? "Independent"
+                        : current
+                            .map(
+                                \.name
+                            )
+                            .joined(
+                                separator: " · "
+                            ),
+                    onEdit: {
+                        containerIDsDraft =
+                            Set(
+                                current.map(
+                                    \.id
+                                )
+                            )
+
+                        editingField =
+                            .memberships
+                    }
+                )
+            }
+        }
+    }
+
+    private func availableContainers(
+        _ entity: Entity
+    ) -> [Entity] {
+        let descendants =
+            Set(
+                store
+                    .entityDescendantIDs(
+                        of: entity.id
+                    )
+            )
+
+        return store
+            .possibleContainers(
+                for: entity.kind
+            )
+            .filter {
+                $0.id
+                    != entity.id
+                && !descendants
+                    .contains(
+                        $0.id
+                    )
+            }
+    }
+
+    private func membershipBinding(
+        _ id: UUID
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                containerIDsDraft
+                    .contains(id)
+            },
+            set: {
+                enabled in
+
+                if enabled {
+                    containerIDsDraft
+                        .insert(id)
+                } else {
+                    containerIDsDraft
+                        .remove(id)
+                }
+            }
+        )
+    }
+
+    private func saveName(
+        _ entity: Entity
+    ) {
+        finish(
+            store
+                .updateEntityDetails(
+                    entityID:
+                        entity.id,
+                    name:
+                        textDraft,
+                    notes:
+                        entity.notes
+                )
+        )
+    }
+
+    private func saveNotes(
+        _ entity: Entity
+    ) {
+        finish(
+            store
+                .updateEntityDetails(
+                    entityID:
+                        entity.id,
+                    name:
+                        entity.name,
+                    notes:
+                        textDraft
+                )
+        )
+    }
+
+    private func saveMemberships(
+        _ entity: Entity
+    ) {
+        finish(
+            store
+                .updateEntityMemberships(
+                    entityID:
+                        entity.id,
+                    containerIDs:
+                        containerIDsDraft
+                )
+        )
+    }
+
+    private func finish(
+        _ error: String?
+    ) {
+        errorMessage =
+            error
+
+        if error == nil {
+            cancelEdit()
+        }
+    }
+
+    private func cancelEdit() {
+        editingField =
+            nil
+
+        errorMessage =
+            nil
+    }
+
+    private func entityIcon(
+        _ entity: Entity
+    ) -> String {
+        switch entity.kind {
+        case .organization:
+            return "building.2"
+
+        case .group:
+            return "person.3"
+
+        case .person:
+            return "person.crop.circle"
+        }
+    }
+
+    private func membershipLabel(
+        _ entity: Entity
+    ) -> String {
+        switch entity.kind {
+        case .organization:
+            return "Parent"
+
+        case .group:
+            return "Containers"
+
+        case .person:
+            return "Affiliations"
+        }
+    }
+}
+
+
 struct WorkDetailRouterView: View {
     let section: SidebarSection
+
+    @Binding
+    var selectedThemeID: UUID?
+
+    @Binding
+    var selectedOrganizationID: UUID?
+
+    @Binding
+    var selectedGroupID: UUID?
 
     @Binding
     var selectedWorkItemID: UUID?
@@ -3853,6 +4962,32 @@ struct WorkDetailRouterView: View {
 
             Group {
                 if
+                    section == .themes,
+                    let selectedThemeID
+                {
+                    ThemeDetailView(
+                        themeID:
+                            selectedThemeID
+                    )
+                } else if
+                    section
+                        == .organizations,
+                    let selectedOrganizationID
+                {
+                    StructureEntityDetailView(
+                        entityID:
+                            selectedOrganizationID
+                    )
+                } else if
+                    section
+                        == .groups,
+                    let selectedGroupID
+                {
+                    StructureEntityDetailView(
+                        entityID:
+                            selectedGroupID
+                    )
+                } else if
                     section == .people,
                     let selectedPersonID
                 {
