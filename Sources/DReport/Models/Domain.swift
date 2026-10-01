@@ -68,6 +68,7 @@ struct WorkItem: Identifiable, Codable, Hashable {
 
     var scheduledAt: Date?
     var deadlineAt: Date?
+    var reminderAt: Date? = nil
     var startedAt: Date?
     var completedAt: Date?
     var loggedAt: Date?

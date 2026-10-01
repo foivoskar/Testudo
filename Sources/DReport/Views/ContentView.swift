@@ -80,6 +80,10 @@ struct ContentView: View {
     private var selectedPersonID:
         UUID?
 
+    @State
+    private var selectedWorkItemID:
+        UUID?
+
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
@@ -141,7 +145,9 @@ struct ContentView: View {
                 section:
                     selection ?? .today,
                 selectedPersonID:
-                    $selectedPersonID
+                    $selectedPersonID,
+                selectedWorkItemID:
+                    $selectedWorkItemID
             )
             .background(
                 DReportStyle.contentBackground
@@ -152,19 +158,14 @@ struct ContentView: View {
                 max: 560
             )
         } detail: {
-            Group {
-                if
-                    selection == .people,
-                    let selectedPersonID
-                {
-                    PersonDetailView(
-                        personID:
-                            selectedPersonID
-                    )
-                } else {
-                    DetailPlaceholderView()
-                }
-            }
+            WorkDetailRouterView(
+                section:
+                    selection ?? .today,
+                selectedWorkItemID:
+                    $selectedWorkItemID,
+                selectedPersonID:
+                    $selectedPersonID
+            )
             .background(
                 DReportStyle.contentBackground
             )
@@ -185,6 +186,9 @@ private struct SectionContentView: View {
 
     @Binding
     var selectedPersonID: UUID?
+
+    @Binding
+    var selectedWorkItemID: UUID?
 
     @State
     private var showingCreateSheet = false
@@ -267,29 +271,40 @@ private struct SectionContentView: View {
     private var sectionBody: some View {
         switch section {
         case .today:
-            TodayView()
-
+            TodayDashboardView(
+                selection:
+                    $selectedWorkItemID
+            )
         case .allTasks:
-            AllTasksView()
-
+            WorkListView(
+                mode: .all,
+                selection:
+                    $selectedWorkItemID
+            )
         case .todo:
-            StatusTaskListView(
-                status: .todo
+            WorkListView(
+                mode: .todo,
+                selection:
+                    $selectedWorkItemID
             )
-
         case .inProgress:
-            StatusTaskListView(
-                status: .inProgress
+            WorkListView(
+                mode: .inProgress,
+                selection:
+                    $selectedWorkItemID
             )
-
         case .completed:
-            StatusTaskListView(
-                status: .completed
+            WorkListView(
+                mode: .completed,
+                selection:
+                    $selectedWorkItemID
             )
-
         case .timeline:
-            TimelineView()
-
+            WorkListView(
+                mode: .timeline,
+                selection:
+                    $selectedWorkItemID
+            )
         case .themes:
             ThemeListView()
 
@@ -1876,7 +1891,7 @@ private struct CreateEntityView: View {
     }
 }
 
-private struct DetailPlaceholderView: View {
+struct DetailPlaceholderView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
