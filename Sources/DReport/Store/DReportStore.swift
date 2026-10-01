@@ -1804,3 +1804,222 @@ extension DReportStore {
         save()
     }
 }
+
+extension DReportStore {
+    func updateWorkItemDetails(
+        itemID: UUID,
+        title: String,
+        body: String,
+        themeID: UUID,
+        parentWorkItemID: UUID?,
+        status: TaskStatus?,
+        deadlineAt: Date?,
+        reminderAt: Date?,
+        scheduledAt: Date?
+    ) -> String? {
+        guard
+            let index =
+                data.workItems.firstIndex(
+                    where: {
+                        $0.id == itemID
+                    }
+                )
+        else {
+            return "Work item not found."
+        }
+
+        guard
+            data.themes.contains(
+                where: {
+                    $0.id == themeID
+                }
+            )
+        else {
+            return "Theme not found."
+        }
+
+        if let parentWorkItemID {
+            guard
+                parentWorkItemID
+                    != itemID
+            else {
+                return
+                    "An item cannot be its own parent."
+            }
+
+            guard
+                let parent =
+                    data.workItems.first(
+                        where: {
+                            $0.id
+                                == parentWorkItemID
+                        }
+                    ),
+                parent.kind == .task
+            else {
+                return
+                    "The parent must be a Task."
+            }
+
+            var current =
+                parent.parentWorkItemID
+
+            var visited =
+                Set<UUID>()
+
+            while let currentID =
+                current
+            {
+                if currentID == itemID {
+                    return
+                        "This parent would create a circular hierarchy."
+                }
+
+                if visited.contains(
+                    currentID
+                ) {
+                    break
+                }
+
+                visited.insert(
+                    currentID
+                )
+
+                current =
+                    data.workItems.first(
+                        where: {
+                            $0.id
+                                == currentID
+                        }
+                    )?
+                    .parentWorkItemID
+            }
+        }
+
+        let now = Date()
+
+        let oldStatus =
+            data.workItems[index]
+                .status
+
+        let cleanedTitle =
+            title.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        data.workItems[index].title =
+            cleanedTitle.isEmpty
+            ? nil
+            : cleanedTitle
+
+        data.workItems[index].body =
+            body
+
+        data.workItems[index].themeID =
+            themeID
+
+        data.workItems[index]
+            .parentWorkItemID =
+            parentWorkItemID
+
+        switch
+            data.workItems[index].kind
+        {
+        case .task:
+            let newStatus =
+                status ?? .todo
+
+            data.workItems[index].status =
+                newStatus
+
+            data.workItems[index]
+                .deadlineAt =
+                deadlineAt
+
+            data.workItems[index]
+                .reminderAt =
+                nil
+
+            data.workItems[index]
+                .scheduledAt =
+                nil
+
+            if
+                newStatus
+                    == .inProgress,
+                data.workItems[index]
+                    .startedAt == nil
+            {
+                data.workItems[index]
+                    .startedAt =
+                    now
+            }
+
+            if
+                newStatus
+                    == .completed,
+                oldStatus
+                    != .completed
+            {
+                data.workItems[index]
+                    .completedAt =
+                    now
+            }
+
+            if
+                newStatus
+                    != .completed,
+                oldStatus
+                    == .completed
+            {
+                data.workItems[index]
+                    .completedAt =
+                    nil
+            }
+
+        case .note:
+            data.workItems[index].status =
+                nil
+
+            data.workItems[index]
+                .deadlineAt =
+                nil
+
+            data.workItems[index]
+                .scheduledAt =
+                nil
+
+            data.workItems[index]
+                .reminderAt =
+                reminderAt
+
+        case .activity:
+            data.workItems[index].status =
+                nil
+
+            data.workItems[index]
+                .deadlineAt =
+                nil
+
+            data.workItems[index]
+                .scheduledAt =
+                scheduledAt
+
+            data.workItems[index]
+                .reminderAt =
+                reminderAt
+        }
+
+        data.workItems[index].updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedByUserID =
+            currentUserID
+
+        save()
+
+        return nil
+    }
+}

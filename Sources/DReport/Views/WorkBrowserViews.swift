@@ -983,6 +983,9 @@ struct WorkItemDetailView: View {
     var selectedWorkItemID:
         UUID?
 
+    @State
+    private var showingEditor = false
+
     var body: some View {
         if
             let item =
@@ -1037,6 +1040,15 @@ struct WorkItemDetailView: View {
             .background(
                 DReportStyle.contentBackground
             )
+            .sheet(
+                isPresented:
+                    $showingEditor
+            ) {
+                WorkItemEditView(
+                    itemID:
+                        itemID
+                )
+            }
         } else {
             ContentUnavailableView(
                 "Item Not Found",
@@ -1115,6 +1127,16 @@ struct WorkItemDetailView: View {
             }
 
             Spacer()
+
+            Button {
+                showingEditor = true
+            } label: {
+                Label(
+                    "Edit",
+                    systemImage:
+                        "pencil"
+                )
+            }
         }
     }
 
