@@ -55,6 +55,7 @@ final class DReportStore: ObservableObject {
         }
 
         migrateUsersToPeopleIfNeeded()
+        ensureAllPeopleHaveProfiles()
         restorePersistentSessionIfPossible()
     }
 
@@ -537,6 +538,15 @@ final class DReportStore: ObservableObject {
 
         data.entities.append(entity)
 
+        if kind == .person {
+            data.personProfiles.append(
+                PersonProfile(
+                    entityID: entity.id,
+                    firstName: cleaned
+                )
+            )
+        }
+
         if let initialContainerID {
             data.memberships.append(
                 EntityMembership(
@@ -547,6 +557,18 @@ final class DReportStore: ObservableObject {
                     isPrimary: true
                 )
             )
+        }
+
+        save()
+    }
+
+    func removeMembership(
+        memberID: UUID,
+        containerID: UUID
+    ) {
+        data.memberships.removeAll {
+            $0.memberEntityID == memberID
+            && $0.containerEntityID == containerID
         }
 
         save()
@@ -787,6 +809,232 @@ extension DReportStore {
         )
 
         return entity.id
+    }
+
+    func savePersonProfile(
+        _ profile: PersonProfile
+    ) {
+        guard
+            let entityIndex =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id == profile.entityID
+                        && $0.kind == .person
+                    }
+                )
+        else {
+            return
+        }
+
+        var updated = profile
+        updated.updatedAt = Date()
+
+        let cleanedName =
+            updated.displayName
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        if !cleanedName.isEmpty {
+            data.entities[entityIndex].name =
+                cleanedName
+
+            data.entities[entityIndex].updatedAt =
+                Date()
+        }
+
+        if let index =
+            data.personProfiles.firstIndex(
+                where: {
+                    $0.entityID
+                        == updated.entityID
+                }
+            )
+        {
+            data.personProfiles[index] =
+                updated
+        } else {
+            data.personProfiles.append(
+                updated
+            )
+        }
+
+        if let userIndex =
+            data.users.firstIndex(
+                where: {
+                    $0.personEntityID
+                        == updated.entityID
+                }
+            )
+        {
+            data.users[userIndex].firstName =
+                updated.firstName
+
+            data.users[userIndex].lastName =
+                updated.lastName
+
+            data.users[userIndex].avatarData =
+                updated.avatarData
+        }
+
+        save()
+    }
+
+    private func ensureAllPeopleHaveProfiles() {
+        var changed = false
+
+        let people =
+            data.entities.filter {
+                $0.kind == .person
+            }
+
+        for person in people {
+            let exists =
+                data.personProfiles.contains {
+                    $0.entityID == person.id
+                }
+
+            if !exists {
+                data.personProfiles.append(
+                    PersonProfile(
+                        entityID: person.id,
+                        firstName: person.name
+                    )
+                )
+
+                changed = true
+            }
+        }
+
+        if changed {
+            save()
+        }
+    }
+
+    func addMemberLinkedToExistingPerson(
+        username: String,
+        password: String,
+        personEntityID: UUID
+    ) -> String? {
+        guard currentUserIsAdministrator else {
+            return "Administrator rights are required."
+        }
+
+        let cleanedUsername =
+            username.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanedUsername.isEmpty else {
+            return "Username is required."
+        }
+
+        guard
+            cleanedUsername.rangeOfCharacter(
+                from: .whitespacesAndNewlines
+            ) == nil
+        else {
+            return "Username cannot contain spaces."
+        }
+
+        guard password.count >= 8 else {
+            return "Password must contain at least 8 characters."
+        }
+
+        guard
+            let person =
+                data.entities.first(
+                    where: {
+                        $0.id == personEntityID
+                        && $0.kind == .person
+                    }
+                )
+        else {
+            return "The selected Person no longer exists."
+        }
+
+        guard
+            !data.users.contains(
+                where: {
+                    $0.personEntityID
+                        == personEntityID
+                }
+            )
+        else {
+            return "This Person already has a user account."
+        }
+
+        guard
+            !data.users.contains(
+                where: {
+                    $0.username
+                        .caseInsensitiveCompare(
+                            cleanedUsername
+                        )
+                        == .orderedSame
+                }
+            )
+        else {
+            return "That username already exists."
+        }
+
+        let hash:
+            (
+                saltBase64: String,
+                hashBase64: String,
+                iterations: Int
+            )
+
+        do {
+            hash =
+                try PasswordHasher
+                    .createHash(
+                        password: password
+                    )
+        } catch {
+            return "The password could not be secured."
+        }
+
+        let profile =
+            personProfile(
+                for: personEntityID
+            )
+
+        let user =
+            DReportUser(
+                personEntityID:
+                    personEntityID,
+                username:
+                    cleanedUsername,
+                firstName:
+                    profile?.firstName
+                    ?? person.name,
+                lastName:
+                    profile?.lastName
+                    ?? "",
+                role:
+                    .member,
+                passwordSaltBase64:
+                    hash.saltBase64,
+                passwordHashBase64:
+                    hash.hashBase64,
+                passwordIterations:
+                    hash.iterations,
+                avatarData:
+                    profile?.avatarData
+            )
+
+        data.users.append(user)
+
+        data.schemaVersion =
+            max(
+                data.schemaVersion,
+                4
+            )
+
+        save()
+
+        return nil
     }
 
     private func migrateUsersToPeopleIfNeeded() {

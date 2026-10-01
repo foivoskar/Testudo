@@ -76,6 +76,10 @@ struct ContentView: View {
     private var selection:
         SidebarSection? = .today
 
+    @State
+    private var selectedPersonID:
+        UUID?
+
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
@@ -135,7 +139,9 @@ struct ContentView: View {
         } content: {
             SectionContentView(
                 section:
-                    selection ?? .today
+                    selection ?? .today,
+                selectedPersonID:
+                    $selectedPersonID
             )
             .background(
                 DReportStyle.contentBackground
@@ -146,10 +152,22 @@ struct ContentView: View {
                 max: 560
             )
         } detail: {
-            DetailPlaceholderView()
-                .background(
-                    DReportStyle.contentBackground
-                )
+            Group {
+                if
+                    selection == .people,
+                    let selectedPersonID
+                {
+                    PersonDetailView(
+                        personID:
+                            selectedPersonID
+                    )
+                } else {
+                    DetailPlaceholderView()
+                }
+            }
+            .background(
+                DReportStyle.contentBackground
+            )
                 .navigationSplitViewColumnWidth(
                     min: 420,
                     ideal: 650
@@ -164,6 +182,9 @@ private struct SectionContentView: View {
     private var store: DReportStore
 
     let section: SidebarSection
+
+    @Binding
+    var selectedPersonID: UUID?
 
     @State
     private var showingCreateSheet = false
@@ -283,8 +304,9 @@ private struct SectionContentView: View {
             )
 
         case .people:
-            EntityListView(
-                kind: .person
+            PeopleListView(
+                selection:
+                    $selectedPersonID
             )
         }
     }

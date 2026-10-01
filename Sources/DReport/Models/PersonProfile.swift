@@ -36,6 +36,24 @@ struct PersonProfile:
 
     var avatarData: Data?
 
+    var academicTitle: String?
+    var secondaryPhone: String?
+
+    var professionalAddress: String?
+    var city: String?
+    var postalCode: String?
+    var country: String?
+
+    var researcherID: String?
+    var scopusAuthorID: String?
+    var googleScholarURL: String?
+
+    var preferredLanguage: String?
+    var timeZone: String?
+
+    var assistantContact: String?
+    var tags: String?
+
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 

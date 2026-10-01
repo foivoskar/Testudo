@@ -19,12 +19,10 @@ struct UserManagementView: View {
                 ) {
                     Text("Users")
                         .font(.title2)
-                        .fontWeight(
-                            .semibold
-                        )
+                        .fontWeight(.semibold)
 
                     Text(
-                        "Accounts that can use this DReport installation."
+                        "Every DReport user is linked to a Person."
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -39,17 +37,13 @@ struct UserManagementView: View {
                 } label: {
                     Label(
                         "Add User",
-                        systemImage:
-                            "plus"
+                        systemImage: "plus"
                     )
                 }
 
                 Button("Done") {
                     dismiss()
                 }
-                .keyboardShortcut(
-                    .cancelAction
-                )
             }
             .padding()
 
@@ -69,9 +63,7 @@ struct UserManagementView: View {
                         Text(
                             user.displayName
                         )
-                        .fontWeight(
-                            .medium
-                        )
+                        .fontWeight(.medium)
 
                         Text(
                             "@\(user.username)"
@@ -93,14 +85,11 @@ struct UserManagementView: View {
                         .secondary
                     )
                 }
-                .padding(
-                    .vertical,
-                    3
-                )
+                .padding(.vertical, 3)
             }
         }
         .frame(
-            width: 600,
+            width: 620,
             height: 440
         )
         .sheet(
@@ -115,12 +104,42 @@ struct UserManagementView: View {
     }
 }
 
+private enum NewUserPersonMode:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case create
+    case existing
+
+    var id: String {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .create:
+            return "Create New Person"
+        case .existing:
+            return "Link Existing Person"
+        }
+    }
+}
+
 private struct AddUserView: View {
     @EnvironmentObject
     private var store: DReportStore
 
     @Binding
     var isPresented: Bool
+
+    @State
+    private var mode:
+        NewUserPersonMode = .create
+
+    @State
+    private var selectedPersonID:
+        UUID?
 
     @State
     private var firstName = ""
@@ -152,24 +171,82 @@ private struct AddUserView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            AvatarPicker(
-                avatarData:
-                    $avatarData
-            )
-
-            HStack(spacing: 12) {
-                TextField(
-                    "First name",
-                    text:
-                        $firstName
-                )
-
-                TextField(
-                    "Last name",
-                    text:
-                        $lastName
-                )
+            Picker(
+                "Person",
+                selection: $mode
+            ) {
+                ForEach(
+                    NewUserPersonMode
+                        .allCases
+                ) { option in
+                    Text(option.label)
+                        .tag(option)
+                }
             }
+            .pickerStyle(.segmented)
+
+            if mode == .create {
+                AvatarPicker(
+                    avatarData:
+                        $avatarData
+                )
+
+                HStack(spacing: 12) {
+                    TextField(
+                        "First name",
+                        text:
+                            $firstName
+                    )
+
+                    TextField(
+                        "Last name",
+                        text:
+                            $lastName
+                    )
+                }
+            } else {
+                if
+                    store
+                        .peopleWithoutUserAccounts
+                        .isEmpty
+                {
+                    Text(
+                        "There are no People without a user account."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                } else {
+                    Picker(
+                        "Person",
+                        selection:
+                            $selectedPersonID
+                    ) {
+                        Text(
+                            "Select a person…"
+                        )
+                        .tag(
+                            Optional<UUID>.none
+                        )
+
+                        ForEach(
+                            store
+                                .peopleWithoutUserAccounts
+                        ) { person in
+                            Text(
+                                person.name
+                            )
+                            .tag(
+                                Optional(
+                                    person.id
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Divider()
 
             TextField(
                 "Username",
@@ -190,7 +267,7 @@ private struct AddUserView: View {
             )
 
             Text(
-                "New accounts are created as Members. Detailed permissions will be added later."
+                "New accounts are currently created as Members. Permissions will be refined later."
             )
             .font(.caption)
             .foregroundStyle(
@@ -200,9 +277,7 @@ private struct AddUserView: View {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.callout)
-                    .foregroundStyle(
-                        .red
-                    )
+                    .foregroundStyle(.red)
             }
 
             HStack {
@@ -221,7 +296,7 @@ private struct AddUserView: View {
             }
         }
         .padding(24)
-        .frame(width: 500)
+        .frame(width: 520)
     }
 
     private func addUser() {
@@ -233,19 +308,44 @@ private struct AddUserView: View {
             return
         }
 
-        let error =
-            store.addMember(
-                username:
-                    username,
-                firstName:
-                    firstName,
-                lastName:
-                    lastName,
-                password:
-                    password,
-                avatarData:
-                    avatarData
-            )
+        let error: String?
+
+        switch mode {
+        case .create:
+            error =
+                store.addMember(
+                    username:
+                        username,
+                    firstName:
+                        firstName,
+                    lastName:
+                        lastName,
+                    password:
+                        password,
+                    avatarData:
+                        avatarData
+                )
+
+        case .existing:
+            guard
+                let selectedPersonID
+            else {
+                errorMessage =
+                    "Select a Person first."
+                return
+            }
+
+            error =
+                store
+                    .addMemberLinkedToExistingPerson(
+                        username:
+                            username,
+                        password:
+                            password,
+                        personEntityID:
+                            selectedPersonID
+                    )
+        }
 
         if let error {
             errorMessage = error
