@@ -7,11 +7,32 @@ struct WorkCalendarView: View {
     @Binding
     var selectedWorkItemID: UUID?
 
+
+    @Binding
+    var selectedCalendarEventID: UUID?
+
+    @Binding
+    var calendarEventCreationRequest:
+        CalendarEventCreationRequest?
+
     @State
     private var selectedDate = Date()
 
     @State
     private var visibleMonth = Date()
+
+
+    @State
+    private var showingICalSetup =
+        false
+
+    @State
+    private var isSyncingICal =
+        false
+
+    @State
+    private var iCalSyncError:
+        String?
 
     private var calendar: Calendar {
         Calendar.autoupdatingCurrent
@@ -43,7 +64,10 @@ struct WorkCalendarView: View {
 
             selectedDayHeader
 
-            if selectedDayOccurrences.isEmpty {
+            if
+                selectedDayOccurrences.isEmpty
+                && selectedDayCalendarEvents.isEmpty
+            {
                 ContentUnavailableView {
                     Label(
                         "Nothing Scheduled",
@@ -75,6 +99,15 @@ struct WorkCalendarView: View {
             visibleMonth =
                 startOfMonth(
                     Date()
+                )
+        }
+        .sheet(
+            isPresented:
+                $showingICalSetup
+        ) {
+            ICalSubscriptionView()
+                .environmentObject(
+                    store
                 )
         }
     }
@@ -125,6 +158,70 @@ struct WorkCalendarView: View {
                 goToToday()
             }
             .buttonStyle(.borderless)
+
+
+            Button {
+                showingICalSetup =
+                    true
+            } label: {
+                Image(
+                    systemName:
+                        "link.badge.plus"
+                )
+            }
+            .buttonStyle(.plain)
+            .help(
+                "Connect iCal Calendar"
+            )
+
+            Button {
+                syncICal()
+            } label: {
+                if isSyncingICal {
+                    ProgressView()
+                        .controlSize(
+                            .small
+                        )
+                } else {
+                    Image(
+                        systemName:
+                            "arrow.triangle.2.circlepath"
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                isSyncingICal
+                || subscribedCalendars
+                    .isEmpty
+            )
+            .help(
+                "Sync subscribed calendars"
+            )
+
+
+            Button {
+                selectedWorkItemID =
+                    nil
+
+                selectedCalendarEventID =
+                    nil
+
+                calendarEventCreationRequest =
+                    CalendarEventCreationRequest(
+                        date:
+                            selectedDate
+                    )
+            } label: {
+                Image(
+                    systemName:
+                        "plus"
+                )
+            }
+            .buttonStyle(.plain)
+            .help(
+                "New Calendar Event"
+            )
 
             Button {
                 moveMonth(
@@ -393,10 +490,35 @@ struct WorkCalendarView: View {
     private var agenda:
         some View
     {
-        List(
-            selection:
-                $selectedWorkItemID
-        ) {
+        List {
+            if
+                !selectedDayCalendarEvents
+                    .isEmpty
+            {
+                Section("Events") {
+                    ForEach(
+                        selectedDayCalendarEvents
+                    ) { event in
+                        Button {
+                            calendarEventCreationRequest =
+                                nil
+
+                            selectedWorkItemID =
+                                nil
+
+                            selectedCalendarEventID =
+                                event.id
+                        } label: {
+                            CalendarEventAgendaRow(
+                                event:
+                                    event
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             agendaSection(
                 title: "Deadlines",
                 occurrences:
@@ -412,6 +534,7 @@ struct WorkCalendarView: View {
         .listStyle(.inset)
     }
 
+
     @ViewBuilder
     private func agendaSection(
         title: String,
@@ -423,19 +546,39 @@ struct WorkCalendarView: View {
                 ForEach(
                     occurrences
                 ) { occurrence in
-                    WorkGuideRow(
-                        item:
-                            occurrence.item,
-                        context:
-                            occurrence.context
-                    )
-                    .tag(
-                        occurrence.item.id
-                    )
+                    Button {
+                        calendarEventCreationRequest =
+                            nil
+
+                        selectedCalendarEventID =
+                            nil
+
+                        selectedWorkItemID =
+                            occurrence.item.id
+                    } label: {
+                        WorkGuideRow(
+                            item:
+                                occurrence.item,
+                            context:
+                                occurrence.context
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
+
+
+    private var selectedDayCalendarEvents:
+        [CalendarEvent]
+    {
+        store.calendarEvents(
+            on:
+                selectedDate
+        )
+    }
+
 
     private var selectedDayOccurrences:
         [CalendarOccurrence]
@@ -470,20 +613,19 @@ struct WorkCalendarView: View {
     {
         let count =
             selectedDayOccurrences.count
+            + selectedDayCalendarEvents.count
 
         if count == 0 {
-            return
-                "No scheduled items"
+            return "No scheduled items"
         }
 
         if count == 1 {
-            return
-                "1 scheduled item"
+            return "1 scheduled item"
         }
 
-        return
-            "\(count) scheduled items"
+        return "\(count) scheduled items"
     }
+
 
     private var monthTitle:
         String
@@ -672,9 +814,50 @@ struct WorkCalendarView: View {
             reminders:
                 items.filter {
                     $0.kind == .reminder
-                }.count
+                }.count,
+            events:
+                store.calendarEvents(
+                    on: date
+                ).count
         )
     }
+
+    private var subscribedCalendars:
+        [DReportCalendar]
+    {
+        store.data.calendars
+            .filter {
+                $0.sourceKind
+                    == .iCalSubscription
+            }
+    }
+
+
+    private func syncICal() {
+        guard !isSyncingICal
+        else {
+            return
+        }
+
+        isSyncingICal =
+            true
+
+        iCalSyncError =
+            nil
+
+        Task {
+            let errors =
+                await store
+                    .syncAllICalCalendars()
+
+            isSyncingICal =
+                false
+
+            iCalSyncError =
+                errors.first
+        }
+    }
+
 
     private func startOfMonth(
         _ date: Date
@@ -780,10 +963,12 @@ struct WorkCalendarView: View {
 private struct CalendarDaySummary {
     let deadlines: Int
     let reminders: Int
+    let events: Int
 
     var total: Int {
         deadlines
         + reminders
+        + events
     }
 }
 

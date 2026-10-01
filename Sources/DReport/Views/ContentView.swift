@@ -334,12 +334,22 @@ private enum DetailNavigationEntry:
     case person(
         id: UUID
     )
+
+
+    case calendarEvent(
+        id: UUID
+    )
 }
 
 struct ContentView: View {
     @State
     private var selection:
         SidebarSection? = .today
+
+    @State
+    private var columnVisibility:
+        NavigationSplitViewVisibility =
+        .all
 
     @State
     private var selectedThemeID:
@@ -361,6 +371,15 @@ struct ContentView: View {
     private var selectedWorkItemID:
         UUID?
 
+
+    @State
+    private var selectedCalendarEventID:
+        UUID?
+
+    @State
+    private var calendarEventCreationRequest:
+        CalendarEventCreationRequest?
+
     @State
     private var workCreationRequest:
         WorkCreationRequest?
@@ -378,9 +397,56 @@ struct ContentView: View {
         DetailNavigationEntry?
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(
+            columnVisibility:
+                $columnVisibility
+        ) {
             VStack(spacing: 0) {
                 List(selection: $selection) {
+                    Button {
+                        selection =
+                            .allTasks
+
+                        workCreationRequest =
+                            WorkCreationRequest(
+                                initialKind:
+                                    .task,
+                                themeID:
+                                    nil,
+                                parentWorkItemID:
+                                    nil
+                            )
+                    } label: {
+                        Label(
+                            "New entry",
+                            systemImage:
+                                "square.and.pencil"
+                        )
+                        .fontWeight(
+                            .medium
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity,
+                            alignment:
+                                .leading
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(
+                        .vertical,
+                        3
+                    )
+                    .help("New Work Entry")
+                    .keyboardShortcut(
+                        "n",
+                        modifiers:
+                            .command
+                    )
+
                     Section {
                         sidebarRow(
                             .today
@@ -417,43 +483,6 @@ struct ContentView: View {
 
                             Spacer()
 
-                            Button {
-                                workCreationRequest =
-                                    WorkCreationRequest(
-                                        initialKind:
-                                            .task,
-                                        themeID:
-                                            nil,
-                                        parentWorkItemID:
-                                            nil
-                                    )
-                            } label: {
-                                Image(
-                                    systemName:
-                                        "plus"
-                                )
-                                .font(
-                                    .system(
-                                        size: 10,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .frame(
-                                    width: 18,
-                                    height: 18
-                                )
-                                .contentShape(
-                                    Rectangle()
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .help("New Task")
-                            .keyboardShortcut(
-                                "n",
-                                modifiers:
-                                    .command
-                            )
                         }
                     }
 
@@ -501,10 +530,17 @@ struct ContentView: View {
                     $selectedPersonID,
                 selectedWorkItemID:
                     $selectedWorkItemID,
+                selectedCalendarEventID:
+                    $selectedCalendarEventID,
+                calendarEventCreationRequest:
+                    $calendarEventCreationRequest,
                 workCreationRequest:
                     $workCreationRequest
             )
-            .padding(.top, 12)
+            .padding(
+                .top,
+                middleColumnTopPadding
+            )
             .background(
                 DReportStyle.contentBackground
             )
@@ -534,8 +570,12 @@ struct ContentView: View {
                         $selectedGroupID,
                     selectedWorkItemID:
                         $selectedWorkItemID,
+                    selectedCalendarEventID:
+                        $selectedCalendarEventID,
                     selectedPersonID:
                         $selectedPersonID,
+                    calendarEventCreationRequest:
+                        $calendarEventCreationRequest,
                     workCreationRequest:
                         $workCreationRequest
                 )
@@ -573,6 +613,16 @@ struct ContentView: View {
             newValue in
 
             registerWorkSelection(
+                newValue
+            )
+        }
+        .onChange(
+            of: selectedCalendarEventID
+        ) {
+            _,
+            newValue in
+
+            registerCalendarEventSelection(
                 newValue
             )
         }
@@ -628,6 +678,17 @@ struct ContentView: View {
         }
     }
 
+    private var middleColumnTopPadding:
+        CGFloat
+    {
+        if columnVisibility == .doubleColumn {
+            return 38
+        }
+
+        return 12
+    }
+
+
     // ========================================================
     // Browser-style detail navigation
     // ========================================================
@@ -678,11 +739,12 @@ struct ContentView: View {
         some View
     {
         HStack(
-            spacing: 2
+            spacing: 4
         ) {
-            Button {
-                navigateDetailBack()
-            } label: {
+            Button(
+                action:
+                    navigateDetailBack
+            ) {
                 Image(
                     systemName:
                         "chevron.left"
@@ -690,7 +752,8 @@ struct ContentView: View {
                 .font(
                     .system(
                         size: 12,
-                        weight: .semibold
+                        weight:
+                            .semibold
                     )
                 )
                 .frame(
@@ -708,9 +771,10 @@ struct ContentView: View {
             )
             .help("Back")
 
-            Button {
-                navigateDetailForward()
-            } label: {
+            Button(
+                action:
+                    navigateDetailForward
+            ) {
                 Image(
                     systemName:
                         "chevron.right"
@@ -718,7 +782,8 @@ struct ContentView: View {
                 .font(
                     .system(
                         size: 12,
-                        weight: .semibold
+                        weight:
+                            .semibold
                     )
                 )
                 .frame(
@@ -737,14 +802,15 @@ struct ContentView: View {
             .help("Forward")
 
             Spacer()
+
         }
         .padding(
             .leading,
-            10
+            8
         )
         .padding(
             .trailing,
-            8
+            10
         )
         .padding(
             .top,
@@ -763,6 +829,7 @@ struct ContentView: View {
         )
     }
 
+
     private func registerWorkSelection(
         _ id: UUID?
     ) {
@@ -770,11 +837,22 @@ struct ContentView: View {
             let id,
             let section =
                 selection,
-            isWorkSection(
-                section
+            (
+                isWorkSection(
+                    section
+                )
+                || section == .themes
             )
         else {
             return
+        }
+
+        workCreationRequest =
+            nil
+
+        if section == .themes {
+            selectedThemeID =
+                nil
         }
 
         registerDetailNavigation(
@@ -787,6 +865,33 @@ struct ContentView: View {
         )
     }
 
+    private func registerCalendarEventSelection(
+        _ id: UUID?
+    ) {
+        guard
+            let id,
+            selection == .calendar
+        else {
+            return
+        }
+
+        workCreationRequest =
+            nil
+
+        calendarEventCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
+
+        registerDetailNavigation(
+            .calendarEvent(
+                id: id
+            )
+        )
+    }
+
+
     private func registerThemeSelection(
         _ id: UUID?
     ) {
@@ -796,6 +901,12 @@ struct ContentView: View {
         else {
             return
         }
+
+        workCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
 
         registerDetailNavigation(
             .theme(
@@ -814,6 +925,12 @@ struct ContentView: View {
             return
         }
 
+        workCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
+
         registerDetailNavigation(
             .organization(
                 id: id
@@ -831,6 +948,12 @@ struct ContentView: View {
             return
         }
 
+        workCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
+
         registerDetailNavigation(
             .group(
                 id: id
@@ -847,6 +970,12 @@ struct ContentView: View {
         else {
             return
         }
+
+        workCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
 
         registerDetailNavigation(
             .person(
@@ -1068,20 +1197,45 @@ struct ContentView: View {
                 let id
             ):
 
-            // Set the item first. If the section is currently
-            // People, its onChange is deliberately ignored.
+            workCreationRequest =
+                nil
+
+            selection =
+                section
+
             selectedWorkItemID =
                 id
 
-            // Changing the section then synchronises both
-            // sidebar and middle column.
+        case
+            .calendarEvent(
+                let id
+            ):
+
+            workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            selectedCalendarEventID =
+                id
+
             selection =
-                section
+                .calendar
 
         case
             .theme(
                 let id
             ):
+
+            workCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
 
             selectedThemeID =
                 id
@@ -1094,6 +1248,12 @@ struct ContentView: View {
                 let id
             ):
 
+            workCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
+
             selectedOrganizationID =
                 id
 
@@ -1105,6 +1265,12 @@ struct ContentView: View {
                 let id
             ):
 
+            workCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
+
             selectedGroupID =
                 id
 
@@ -1115,6 +1281,12 @@ struct ContentView: View {
             .person(
                 let id
             ):
+
+            workCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
 
             selectedPersonID =
                 id
@@ -1167,6 +1339,13 @@ private struct SectionContentView: View {
 
     @Binding
     var selectedWorkItemID: UUID?
+
+    @Binding
+    var selectedCalendarEventID: UUID?
+
+    @Binding
+    var calendarEventCreationRequest:
+        CalendarEventCreationRequest?
 
     @Binding
     var workCreationRequest:
@@ -1281,7 +1460,11 @@ private struct SectionContentView: View {
         case .calendar:
             WorkCalendarView(
                 selectedWorkItemID:
-                    $selectedWorkItemID
+                    $selectedWorkItemID,
+                selectedCalendarEventID:
+                    $selectedCalendarEventID,
+                calendarEventCreationRequest:
+                    $calendarEventCreationRequest
             )
 
         case .allTasks:
@@ -1587,7 +1770,11 @@ private struct ThemeListView: View {
                     ThemeNodeView(
                         theme: theme,
                         selection:
-                            $selection
+                            $selection,
+                        selectedWorkItemID:
+                            $selectedWorkItemID,
+                        workCreationRequest:
+                            $workCreationRequest
                     )
                 }
             }
@@ -1603,6 +1790,14 @@ private struct ThemeNodeView: View {
 
     @Binding
     var selection: UUID?
+
+    @Binding
+    var selectedWorkItemID:
+        UUID?
+
+    @Binding
+    var workCreationRequest:
+        WorkCreationRequest?
 
     @State
     private var isExpanded = true
@@ -1621,7 +1816,11 @@ private struct ThemeNodeView: View {
                 )
             ) { item in
                 WorkItemNodeView(
-                    item: item
+                    item: item,
+                    selectedWorkItemID:
+                        $selectedWorkItemID,
+                    workCreationRequest:
+                        $workCreationRequest
                 )
             }
 
@@ -1633,7 +1832,11 @@ private struct ThemeNodeView: View {
                 ThemeNodeView(
                     theme: child,
                     selection:
-                        $selection
+                        $selection,
+                    selectedWorkItemID:
+                        $selectedWorkItemID,
+                    workCreationRequest:
+                        $workCreationRequest
                 )
             }
         } label: {
@@ -1667,10 +1870,20 @@ private struct ThemeNodeView: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
+            .frame(
+                height: 46,
+                alignment: .center
+            )
             .contentShape(
                 Rectangle()
             )
             .onTapGesture {
+                workCreationRequest =
+                    nil
+
+                selectedWorkItemID =
+                    nil
+
                 selection =
                     theme.id
             }
@@ -1695,16 +1908,6 @@ private struct ThemeNodeView: View {
                     )
             )
         }
-        .contextMenu {
-            Button(
-                "Delete Theme",
-                role: .destructive
-            ) {
-                store.deleteTheme(
-                    id: theme.id
-                )
-            }
-        }
     }
 }
 
@@ -1713,6 +1916,33 @@ private struct WorkItemNodeView: View {
     private var store: DReportStore
 
     let item: WorkItem
+
+    @Binding
+    var selectedWorkItemID:
+        UUID?
+
+    @Binding
+    var workCreationRequest:
+        WorkCreationRequest?
+
+    init(
+        item: WorkItem,
+        selectedWorkItemID:
+            Binding<UUID?> =
+                .constant(nil),
+        workCreationRequest:
+            Binding<WorkCreationRequest?> =
+                .constant(nil)
+    ) {
+        self.item =
+            item
+
+        self._selectedWorkItemID =
+            selectedWorkItemID
+
+        self._workCreationRequest =
+            workCreationRequest
+    }
 
     @State
     private var isExpanded = true
@@ -1728,7 +1958,7 @@ private struct WorkItemNodeView: View {
             )
 
         if children.isEmpty {
-            label
+            selectableLabel
                 .sheet(
                     item: $createKind
                 ) { kind in
@@ -1743,11 +1973,15 @@ private struct WorkItemNodeView: View {
             ) {
                 ForEach(children) { child in
                     WorkItemNodeView(
-                        item: child
+                        item: child,
+                        selectedWorkItemID:
+                            $selectedWorkItemID,
+                        workCreationRequest:
+                            $workCreationRequest
                     )
                 }
             } label: {
-                label
+                selectableLabel
             }
             .sheet(
                 item: $createKind
@@ -1759,6 +1993,39 @@ private struct WorkItemNodeView: View {
             }
         }
     }
+
+    private var selectableLabel:
+        some View
+    {
+        label
+            .contentShape(
+                Rectangle()
+            )
+            .onTapGesture {
+                selectItem()
+            }
+            .background(
+                selectedWorkItemID
+                    == item.id
+                ? Color.accentColor
+                    .opacity(0.12)
+                : Color.clear
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 5
+                )
+            )
+    }
+
+    private func selectItem() {
+        workCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            item.id
+    }
+
 
     private var label: some View {
         HStack(spacing: 8) {
@@ -1839,6 +2106,10 @@ private struct WorkItemNodeView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
         }
+        .frame(
+            height: 46,
+            alignment: .center
+        )
     }
 
     @ViewBuilder
@@ -1877,16 +2148,6 @@ private struct WorkItemNodeView: View {
             createKind = .activity
         }
 
-        Divider()
-
-        Button(
-            "Delete",
-            role: .destructive
-        ) {
-            store.deleteWorkItem(
-                id: item.id
-            )
-        }
     }
 
     private func createSheet(
@@ -2673,16 +2934,6 @@ private struct EntityListView: View {
                             .foregroundStyle(
                                 .tertiary
                             )
-                    }
-                }
-                .contextMenu {
-                    Button(
-                        "Delete",
-                        role: .destructive
-                    ) {
-                        store.deleteEntity(
-                            id: entity.id
-                        )
                     }
                 }
             }

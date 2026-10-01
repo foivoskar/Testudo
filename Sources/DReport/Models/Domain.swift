@@ -38,6 +38,68 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum StructureStatus:
+    String,
+    Codable,
+    CaseIterable,
+    Identifiable
+{
+    case active
+    case onHold
+    case archived
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .active:
+            return "Active"
+
+        case .onHold:
+            return "On Hold"
+
+        case .archived:
+            return "Archived"
+        }
+    }
+}
+
+
+enum StructurePriority:
+    String,
+    Codable,
+    CaseIterable,
+    Identifiable
+{
+    case low
+    case normal
+    case high
+    case critical
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .low:
+            return "Low"
+
+        case .normal:
+            return "Normal"
+
+        case .high:
+            return "High"
+
+        case .critical:
+            return "Critical"
+        }
+    }
+}
+
+
 struct Theme: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
 
@@ -45,6 +107,22 @@ struct Theme: Identifiable, Codable, Hashable {
 
     var name: String
     var notes: String = ""
+
+    var summary: String? = nil
+    var code: String? = nil
+
+    var status: StructureStatus? = nil
+    var priority: StructurePriority? = nil
+
+    var ownerEntityID: UUID? = nil
+
+    var startDate: Date? = nil
+    var targetDate: Date? = nil
+
+    var tags: String? = nil
+    var url: String? = nil
+
+    var symbolName: String? = nil
 
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
@@ -118,6 +196,29 @@ struct Entity: Identifiable, Codable, Hashable {
     var kind: EntityKind
     var name: String
     var notes: String = ""
+
+    var shortName: String? = nil
+    var code: String? = nil
+
+    var status: StructureStatus? = nil
+    var priority: StructurePriority? = nil
+
+    var ownerEntityID: UUID? = nil
+
+    var startDate: Date? = nil
+    var targetDate: Date? = nil
+
+    var website: String? = nil
+    var email: String? = nil
+    var phone: String? = nil
+
+    var address: String? = nil
+    var city: String? = nil
+    var postalCode: String? = nil
+    var country: String? = nil
+
+    var tags: String? = nil
+    var symbolName: String? = nil
 
     var createdAt: Date = Date()
     var updatedAt: Date = Date()

@@ -597,6 +597,11 @@ struct WorkListView: View {
     @Binding
     var selection: UUID?
 
+
+    @State
+    private var expandedTaskIDs:
+        Set<UUID> = []
+
     var body: some View {
         VStack(spacing: 0) {
             WorkColumnHeader(
@@ -615,6 +620,90 @@ struct WorkListView: View {
                     maxWidth: .infinity,
                     maxHeight: .infinity
                 )
+            } else if showsTaskHierarchy {
+                List(
+                    selection: $selection
+                ) {
+                    ForEach(
+                        visibleTaskEntries
+                    ) { entry in
+                        HStack(
+                            alignment: .top,
+                            spacing: 4
+                        ) {
+                            if entry.hasChildren {
+                                Button {
+                                    toggleExpansion(
+                                        entry.item.id
+                                    )
+                                } label: {
+                                    Image(
+                                        systemName:
+                                            expandedTaskIDs
+                                                .contains(
+                                                    entry.item.id
+                                                )
+                                            ? "chevron.down"
+                                            : "chevron.right"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 10,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .frame(
+                                        width: 14,
+                                        height: 18
+                                    )
+                                    .contentShape(
+                                        Rectangle()
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .help(
+                                    expandedTaskIDs
+                                        .contains(
+                                            entry.item.id
+                                        )
+                                    ? "Collapse"
+                                    : "Expand"
+                                )
+                            } else {
+                                Color.clear
+                                    .frame(
+                                        width: 14,
+                                        height: 18
+                                    )
+                            }
+
+                            WorkGuideRow(
+                                item:
+                                    entry.item,
+                                context:
+                                    genericContext(
+                                        entry.item
+                                    )
+                            )
+                        }
+                        .padding(
+                            .leading,
+                            indentation(
+                                for:
+                                    entry.depth
+                            )
+                        )
+                        .tag(
+                            entry.item.id
+                        )
+                    }
+                }
+                .listStyle(.inset)
+
             } else {
                 List(
                     selection: $selection
@@ -637,6 +726,182 @@ struct WorkListView: View {
             DReportStyle.contentBackground
         )
     }
+
+    private struct TaskOutlineEntry:
+        Identifiable
+    {
+        let item: WorkItem
+        let depth: Int
+        let hasChildren: Bool
+
+        var id: UUID {
+            item.id
+        }
+    }
+
+
+    private var showsTaskHierarchy:
+        Bool
+    {
+        switch mode {
+        case .all:
+            return true
+
+        default:
+            return false
+        }
+    }
+
+
+    private var allTasks:
+        [WorkItem]
+    {
+        store.data.workItems
+            .filter {
+                $0.kind == .task
+            }
+    }
+
+
+    private var rootTasks:
+        [WorkItem]
+    {
+        allTasks
+            .filter {
+                task in
+
+                guard
+                    let parentID =
+                        task.parentWorkItemID
+                else {
+                    return true
+                }
+
+                // A task whose parent no longer exists, or whose
+                // parent is not itself a Task, is treated as a root
+                // so that it can never disappear from All Tasks.
+                guard
+                    let parent =
+                        store.workItem(
+                            id:
+                                parentID
+                        )
+                else {
+                    return true
+                }
+
+                return
+                    parent.kind
+                    != .task
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+
+
+    private var visibleTaskEntries:
+        [TaskOutlineEntry]
+    {
+        var result:
+            [TaskOutlineEntry] = []
+
+        for task in rootTasks {
+            appendVisibleTask(
+                task,
+                depth:
+                    0,
+                to:
+                    &result
+            )
+        }
+
+        return result
+    }
+
+
+    private func appendVisibleTask(
+        _ task: WorkItem,
+        depth: Int,
+        to result:
+            inout [TaskOutlineEntry]
+    ) {
+        let children =
+            childTasks(
+                of:
+                    task.id
+            )
+
+        result.append(
+            TaskOutlineEntry(
+                item:
+                    task,
+                depth:
+                    depth,
+                hasChildren:
+                    !children.isEmpty
+            )
+        )
+
+        guard
+            expandedTaskIDs
+                .contains(
+                    task.id
+                )
+        else {
+            return
+        }
+
+        for child in children {
+            appendVisibleTask(
+                child,
+                depth:
+                    depth + 1,
+                to:
+                    &result
+            )
+        }
+    }
+
+
+    private func childTasks(
+        of parentID: UUID
+    ) -> [WorkItem] {
+        allTasks
+            .filter {
+                $0.parentWorkItemID
+                    == parentID
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+
+
+    private func toggleExpansion(
+        _ id: UUID
+    ) {
+        if expandedTaskIDs.contains(id) {
+            expandedTaskIDs.remove(id)
+        } else {
+            expandedTaskIDs.insert(id)
+        }
+    }
+
+
+    private func indentation(
+        for depth: Int
+    ) -> CGFloat {
+        // Small incremental indentation.
+        // Cap the total so deeply nested tasks retain useful width.
+        min(
+            CGFloat(depth) * 12,
+            84
+        )
+    }
+
 
     private var items:
         [WorkItem]
@@ -1024,6 +1289,24 @@ struct WorkItemDetailView: View {
     @State
     private var relationshipEntityDraft:
         UUID?
+
+
+    @State
+    private var showingRelationshipComposer =
+        false
+
+    @State
+    private var newRelationshipRoleDraft:
+        WorkRelationshipRole =
+        .relatedTo
+
+    @State
+    private var newRelationshipEntityDraft:
+        UUID?
+
+    @State
+    private var newRelationshipInheritedByChildren =
+        true
 
     @State
     private var showingChildComposer =
@@ -2386,34 +2669,506 @@ struct WorkItemDetailView: View {
     private func relationshipsSection(
         _ item: WorkItem
     ) -> some View {
-        let relationships =
-            store.data
-                .workEntityRelationships
-                .filter {
-                    $0.workItemID
-                        == item.id
-                }
-
-        if !relationships.isEmpty {
-            InspectorSection(
-                title:
-                    "Related People & Organizations"
+        InspectorSection(
+            title:
+                "Related People & Organizations"
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: 11
             ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 9
-                ) {
-                    ForEach(
-                        relationships
-                    ) { relationship in
-                        relationshipRow(
-                            relationship
-                        )
-                    }
+                ForEach(
+                    WorkRelationshipRole
+                        .allCases
+                ) { role in
+                    relationshipGroupRow(
+                        item:
+                            item,
+                        role:
+                            role
+                    )
                 }
             }
         }
     }
+
+
+    @ViewBuilder
+    private func relationshipGroupRow(
+        item: WorkItem,
+        role: WorkRelationshipRole
+    ) -> some View {
+        let relationships =
+            relationships(
+                for:
+                    item.id,
+                role:
+                    role
+            )
+
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 12
+            ) {
+                HStack(
+                    spacing: 5
+                ) {
+                    Text(
+                        role.displayName
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    Button {
+                        beginAddingRelationship(
+                            role:
+                                role
+                        )
+                    } label: {
+                        Image(
+                            systemName:
+                                "plus.circle"
+                        )
+                        .font(
+                            .system(
+                                size: 12,
+                                weight:
+                                    .regular
+                            )
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .frame(
+                            width: 17,
+                            height: 17
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                    .help(
+                        "Add \(role.displayName)"
+                    )
+                }
+                .frame(
+                    width: 145,
+                    alignment: .leading
+                )
+
+                if relationships.isEmpty {
+                    Text("—")
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                } else {
+                    Text(
+                        relationshipNames(
+                            relationships
+                        )
+                    )
+                    .textSelection(
+                        .enabled
+                    )
+                }
+
+                Spacer()
+
+                if !relationships.isEmpty {
+                    Menu {
+                        ForEach(
+                            relationships
+                        ) { relationship in
+
+                            Menu(
+                                entityName(
+                                    for:
+                                        relationship
+                                )
+                            ) {
+                                Button(
+                                    "Edit"
+                                ) {
+                                    beginEditingRelationship(
+                                        relationship
+                                    )
+                                }
+
+                                Divider()
+
+                                Button(
+                                    "Remove",
+                                    role:
+                                        .destructive
+                                ) {
+                                    store
+                                        .removeWorkRelationship(
+                                            relationshipID:
+                                                relationship.id
+                                        )
+
+                                    if
+                                        editingField
+                                            == .relationship(
+                                                relationship.id
+                                            )
+                                    {
+                                        cancelEdit()
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "pencil"
+                        )
+                        .font(
+                            .system(
+                                size: 10,
+                                weight:
+                                    .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                        .frame(
+                            width: 20,
+                            height: 20
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                    }
+                    .menuStyle(
+                        .borderlessButton
+                    )
+                    .fixedSize()
+                    .help(
+                        "Edit relationships"
+                    )
+                }
+            }
+            .font(.callout)
+
+            if
+                showingRelationshipComposer,
+                newRelationshipRoleDraft
+                    == role
+            {
+                relationshipAddComposer(
+                    item:
+                        item,
+                    role:
+                        role
+                )
+            }
+
+            ForEach(
+                relationships
+            ) { relationship in
+                if
+                    editingField
+                        == .relationship(
+                            relationship.id
+                        )
+                {
+                    relationshipRow(
+                        relationship
+                    )
+                    .padding(
+                        .leading,
+                        157
+                    )
+                }
+            }
+        }
+    }
+
+
+    @ViewBuilder
+    private func relationshipAddComposer(
+        item: WorkItem,
+        role: WorkRelationshipRole
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 9
+        ) {
+            HStack(
+                spacing: 10
+            ) {
+                Picker(
+                    "",
+                    selection:
+                        $newRelationshipEntityDraft
+                ) {
+                    Text(
+                        "Choose person or organization…"
+                    )
+                    .tag(
+                        Optional<UUID>
+                            .none
+                    )
+
+                    ForEach(
+                        sortedEntities
+                    ) { entity in
+                        Text(
+                            entity.name
+                        )
+                        .tag(
+                            Optional(
+                                entity.id
+                            )
+                        )
+                    }
+                }
+                .labelsHidden()
+                .frame(
+                    maxWidth: 330
+                )
+
+                Spacer()
+            }
+
+            Toggle(
+                "Inherited by child items",
+                isOn:
+                    $newRelationshipInheritedByChildren
+            )
+            .font(.caption)
+
+            if let errorMessage {
+                Text(
+                    errorMessage
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .red
+                )
+            }
+
+            HStack {
+                Spacer()
+
+                Button(
+                    "Cancel"
+                ) {
+                    cancelAddingRelationship()
+                }
+                .buttonStyle(
+                    .borderless
+                )
+
+                Button(
+                    "Add"
+                ) {
+                    addRelationship(
+                        to:
+                            item,
+                        role:
+                            role
+                    )
+                }
+                .buttonStyle(
+                    .borderless
+                )
+                .fontWeight(
+                    .medium
+                )
+                .disabled(
+                    newRelationshipEntityDraft
+                        == nil
+                )
+            }
+        }
+        .padding(
+            .leading,
+            157
+        )
+        .padding(
+            .vertical,
+            3
+        )
+    }
+
+
+    private func relationships(
+        for workItemID: UUID,
+        role: WorkRelationshipRole
+    ) -> [WorkEntityRelationship] {
+        store.data
+            .workEntityRelationships
+            .filter {
+                $0.workItemID
+                    == workItemID
+                && $0.role
+                    == role
+            }
+            .sorted {
+                entityName(
+                    for:
+                        $0
+                )
+                .localizedCaseInsensitiveCompare(
+                    entityName(
+                        for:
+                            $1
+                    )
+                )
+                == .orderedAscending
+            }
+    }
+
+
+    private func relationshipNames(
+        _ relationships:
+            [WorkEntityRelationship]
+    ) -> String {
+        relationships
+            .map {
+                entityName(
+                    for:
+                        $0
+                )
+            }
+            .joined(
+                separator:
+                    ", "
+            )
+    }
+
+
+    private func entityName(
+        for relationship:
+            WorkEntityRelationship
+    ) -> String {
+        store.entity(
+            id:
+                relationship.entityID
+        )?.name
+        ?? "Unknown"
+    }
+
+
+    private func beginAddingRelationship(
+        role:
+            WorkRelationshipRole
+    ) {
+        cancelEdit()
+
+        newRelationshipRoleDraft =
+            role
+
+        newRelationshipEntityDraft =
+            nil
+
+        newRelationshipInheritedByChildren =
+            true
+
+        errorMessage =
+            nil
+
+        showingRelationshipComposer =
+            true
+    }
+
+
+    private func cancelAddingRelationship() {
+        showingRelationshipComposer =
+            false
+
+        newRelationshipEntityDraft =
+            nil
+
+        newRelationshipInheritedByChildren =
+            true
+
+        errorMessage =
+            nil
+    }
+
+
+    private func addRelationship(
+        to item:
+            WorkItem,
+        role:
+            WorkRelationshipRole
+    ) {
+        guard
+            let entityID =
+                newRelationshipEntityDraft
+        else {
+            errorMessage =
+                "Select a person or organization."
+            return
+        }
+
+        let error =
+            store.addWorkRelationship(
+                workItemID:
+                    item.id,
+                entityID:
+                    entityID,
+                role:
+                    role,
+                inheritedByChildren:
+                    newRelationshipInheritedByChildren
+            )
+
+        if let error {
+            errorMessage =
+                error
+            return
+        }
+
+        showingRelationshipComposer =
+            false
+
+        newRelationshipEntityDraft =
+            nil
+
+        newRelationshipInheritedByChildren =
+            true
+
+        errorMessage =
+            nil
+    }
+
+
+    private func beginEditingRelationship(
+        _ relationship:
+            WorkEntityRelationship
+    ) {
+        showingRelationshipComposer =
+            false
+
+        errorMessage =
+            nil
+
+        relationshipRoleDraft =
+            relationship.role
+
+        relationshipEntityDraft =
+            relationship.entityID
+
+        editingField =
+            .relationship(
+                relationship.id
+            )
+    }
+
 
     @ViewBuilder
     private func relationshipRow(
@@ -2526,6 +3281,12 @@ struct WorkItemDetailView: View {
                 Spacer()
 
                 InlineEditButton {
+                    showingRelationshipComposer =
+                        false
+
+                    errorMessage =
+                        nil
+
                     relationshipRoleDraft =
                         relationship.role
 
@@ -4937,6 +5698,10 @@ struct StructureEntityDetailView:
 
 
 struct WorkDetailRouterView: View {
+
+    @EnvironmentObject
+    private var store: DReportStore
+
     let section: SidebarSection
 
     @Binding
@@ -4952,7 +5717,14 @@ struct WorkDetailRouterView: View {
     var selectedWorkItemID: UUID?
 
     @Binding
+    var selectedCalendarEventID: UUID?
+
+    @Binding
     var selectedPersonID: UUID?
+
+    @Binding
+    var calendarEventCreationRequest:
+        CalendarEventCreationRequest?
 
     @Binding
     var workCreationRequest:
@@ -4967,10 +5739,59 @@ struct WorkDetailRouterView: View {
 
             Group {
                 if
+                    section == .calendar,
+                    let request =
+                        calendarEventCreationRequest
+                {
+                    CalendarEventCreationView(
+                        request:
+                            request,
+                        creationRequest:
+                            $calendarEventCreationRequest,
+                        selectedCalendarEventID:
+                            $selectedCalendarEventID
+                    )
+                    .id(request.id)
+
+                } else if
+                    section == .calendar,
+                    let selectedCalendarEventID
+                {
+                    CalendarEventDetailView(
+                        eventID:
+                            selectedCalendarEventID
+                    )
+
+                } else if
+                    let request =
+                        workCreationRequest
+                {
+                    WorkEntryCreationView(
+                        request:
+                            request,
+                        workCreationRequest:
+                            $workCreationRequest,
+                        selectedWorkItemID:
+                            $selectedWorkItemID
+                    )
+                    .id(request.id)
+
+                } else if
+                    section == .themes,
+                    let selectedWorkItemID
+                {
+                    WorkItemDetailView(
+                        itemID:
+                            selectedWorkItemID,
+                        selectedWorkItemID:
+                            $selectedWorkItemID
+                    )
+
+                } else if
                     section == .themes,
                     let selectedThemeID
                 {
-                    ThemeDetailView(
+                    RichThemeDetailView(
                         themeID:
                             selectedThemeID
                     )
@@ -4979,7 +5800,7 @@ struct WorkDetailRouterView: View {
                         == .organizations,
                     let selectedOrganizationID
                 {
-                    StructureEntityDetailView(
+                    RichStructureEntityDetailView(
                         entityID:
                             selectedOrganizationID
                     )
@@ -4988,7 +5809,7 @@ struct WorkDetailRouterView: View {
                         == .groups,
                     let selectedGroupID
                 {
-                    StructureEntityDetailView(
+                    RichStructureEntityDetailView(
                         entityID:
                             selectedGroupID
                     )
@@ -5027,7 +5848,16 @@ struct WorkDetailRouterView: View {
             DReportStyle
                 .contentBackground
         )
-    }
+    
+        .safeAreaInset(
+            edge:
+                .bottom,
+            spacing:
+                0
+        ) {
+            deleteFooter
+        }
+}
 
     private var isWorkSection: Bool {
         switch section {
@@ -5038,6 +5868,310 @@ struct WorkDetailRouterView: View {
              .inProgress,
              .completed,
              .timeline:
+            return true
+
+        default:
+            return false
+        }
+    }
+
+
+    @ViewBuilder
+    private var deleteFooter:
+        some View
+    {
+        if
+            workCreationRequest
+                == nil
+        {
+            if
+                section == .calendar,
+                let id =
+                    selectedCalendarEventID,
+                let event =
+                    store.calendarEvent(
+                        id: id
+                    ),
+                !store
+                    .isReadOnlyCalendarEvent(
+                        event
+                    )
+            {
+                ProtectedDeleteButton(
+                    objectType:
+                        "Calendar Event",
+                    objectName:
+                        event.title,
+                    warning:
+                        "This permanently deletes this Calendar Event from DReport. If it belongs to a synchronized external calendar, the deletion will be queued for synchronization.",
+                    deleteAction: {
+                        store.deleteCalendarEvent(
+                            id: id
+                        )
+
+                        return nil
+                    },
+                    onDeleted: {
+                        selectedCalendarEventID =
+                            nil
+                    }
+                )
+
+            } else if
+                section == .themes,
+                let id =
+                    selectedWorkItemID,
+                let item =
+                    store.workItem(
+                        id:
+                            id
+                    )
+            {
+                protectedWorkDelete(
+                    item
+                )
+
+            } else if
+                section == .themes,
+                let id =
+                    selectedThemeID,
+                let theme =
+                    store.theme(
+                        id:
+                            id
+                    )
+            {
+                ProtectedDeleteButton(
+                    objectType:
+                        "Theme",
+                    objectName:
+                        theme.name,
+                    warning:
+                        "This permanently deletes this Theme, all of its descendant Themes, and every Work entry assigned anywhere inside that Theme hierarchy.",
+                    deleteAction: {
+                        store.deleteTheme(
+                            id:
+                                id
+                        )
+
+                        return nil
+                    },
+                    onDeleted: {
+                        selectedThemeID =
+                            nil
+
+                        selectedWorkItemID =
+                            nil
+                    }
+                )
+
+            } else if
+                section
+                    == .organizations,
+                let id =
+                    selectedOrganizationID,
+                let entity =
+                    store.entity(
+                        id:
+                            id
+                    )
+            {
+                protectedEntityDelete(
+                    entity
+                ) {
+                    selectedOrganizationID =
+                        nil
+                }
+
+            } else if
+                section
+                    == .groups,
+                let id =
+                    selectedGroupID,
+                let entity =
+                    store.entity(
+                        id:
+                            id
+                    )
+            {
+                protectedEntityDelete(
+                    entity
+                ) {
+                    selectedGroupID =
+                        nil
+                }
+
+            } else if
+                section
+                    == .people,
+                let id =
+                    selectedPersonID,
+                let entity =
+                    store.entity(
+                        id:
+                            id
+                    )
+            {
+                protectedEntityDelete(
+                    entity
+                ) {
+                    selectedPersonID =
+                        nil
+                }
+
+            } else if
+                deleteWorkSection,
+                let id =
+                    selectedWorkItemID,
+                let item =
+                    store.workItem(
+                        id:
+                            id
+                    )
+            {
+                protectedWorkDelete(
+                    item
+                )
+            }
+        }
+    }
+
+
+    private func protectedWorkDelete(
+        _ item: WorkItem
+    ) -> some View {
+        ProtectedDeleteButton(
+            objectType:
+                item.kind
+                    .displayName,
+            objectName:
+                deletionName(
+                    item
+                ),
+            warning:
+                "This permanently deletes this \(item.kind.displayName) and every child item beneath it. Relationships and history belonging to those deleted items are also removed.",
+            deleteAction: {
+                store.deleteWorkItem(
+                    id:
+                        item.id
+                )
+
+                return nil
+            },
+            onDeleted: {
+                selectedWorkItemID =
+                    nil
+            }
+        )
+    }
+
+
+    private func protectedEntityDelete(
+        _ entity: Entity,
+        onDeleted:
+            @escaping () -> Void
+    ) -> some View {
+        ProtectedDeleteButton(
+            objectType:
+                entity.kind
+                    .displayName,
+            objectName:
+                entity.name,
+            warning:
+                entityDeleteWarning(
+                    entity
+                ),
+            deleteAction: {
+                store
+                    .deleteEntityProtected(
+                        id:
+                            entity.id
+                    )
+            },
+            onDeleted:
+                onDeleted
+        )
+    }
+
+
+    private func entityDeleteWarning(
+        _ entity: Entity
+    ) -> String {
+        if
+            entity.kind
+                == .person,
+            let user =
+                store.user(
+                    linkedToPerson:
+                        entity.id
+                )
+        {
+            return
+                "This Person is linked to the DReport account @\(user.username). The account must be unlinked or removed before this Person can be deleted."
+        }
+
+        switch entity.kind {
+        case .organization:
+            return
+                "This permanently deletes this Organization and removes its structural memberships and Work relationships. Entities that belonged to it are kept."
+
+        case .group:
+            return
+                "This permanently deletes this Group and removes its structural memberships and Work relationships. People and other entities inside it are kept."
+
+        case .person:
+            return
+                "This permanently deletes this Person, their Person profile, structural memberships and Work relationships."
+        }
+    }
+
+
+    private func deletionName(
+        _ item: WorkItem
+    ) -> String {
+        if
+            let title =
+                item.title?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !title.isEmpty
+        {
+            return title
+        }
+
+        let body =
+            item.body
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !body.isEmpty {
+            return String(
+                body.prefix(80)
+            )
+        }
+
+        return
+            item.kind
+                .displayName
+    }
+
+
+    private var deleteWorkSection:
+        Bool
+    {
+        switch section {
+        case .today,
+             .calendar,
+             .allTasks,
+             .todo,
+             .inProgress,
+             .completed,
+             .timeline:
+
             return true
 
         default:

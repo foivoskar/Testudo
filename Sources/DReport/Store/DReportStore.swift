@@ -213,6 +213,7 @@ final class DReportStore: ObservableObject {
         return result
     }
 
+    @discardableResult
     func createWorkItem(
         themeID: UUID?,
         parentWorkItemID: UUID?,
@@ -221,7 +222,7 @@ final class DReportStore: ObservableObject {
         body: String,
         deadlineAt: Date?,
         deadlineTimeZoneID: String? = nil
-    ) {
+    ) -> UUID? {
         let cleanedTitle =
             title.trimmingCharacters(
                 in: .whitespacesAndNewlines
@@ -236,7 +237,7 @@ final class DReportStore: ObservableObject {
             !cleanedTitle.isEmpty
             || !cleanedBody.isEmpty
         else {
-            return
+            return nil
         }
 
         let now = Date()
@@ -339,6 +340,8 @@ final class DReportStore: ObservableObject {
         }
 
         save()
+
+        return item.id
     }
 
     func workItem(
@@ -2312,6 +2315,112 @@ extension DReportStore {
 
 
 extension DReportStore {
+    @discardableResult
+    func addWorkRelationship(
+        workItemID: UUID,
+        entityID: UUID,
+        role: WorkRelationshipRole,
+        inheritedByChildren: Bool = true
+    ) -> String? {
+        guard
+            let workIndex =
+                data.workItems.firstIndex(
+                    where: {
+                        $0.id == workItemID
+                    }
+                )
+        else {
+            return "Work item not found."
+        }
+
+        guard
+            let entity =
+                data.entities.first(
+                    where: {
+                        $0.id == entityID
+                    }
+                )
+        else {
+            return "Related entity not found."
+        }
+
+        let duplicate =
+            data.workEntityRelationships
+                .contains {
+                    $0.workItemID
+                        == workItemID
+                    && $0.entityID
+                        == entityID
+                    && $0.role
+                        == role
+                }
+
+        guard !duplicate else {
+            return
+                "That relationship already exists."
+        }
+
+        let now =
+            Date()
+
+        let timeZoneID =
+            DReportTime
+                .deviceTimeZoneID
+
+        let relationship =
+            WorkEntityRelationship(
+                workItemID:
+                    workItemID,
+                entityID:
+                    entityID,
+                role:
+                    role,
+                inheritedByChildren:
+                    inheritedByChildren,
+                createdAt:
+                    now
+            )
+
+        data.workEntityRelationships
+            .append(
+                relationship
+            )
+
+        data.workItems[workIndex]
+            .updatedAt =
+            now
+
+        data.workItems[workIndex]
+            .updatedTimeZoneID =
+            timeZoneID
+
+        data.workItems[workIndex]
+            .updatedByUserID =
+            currentUserID
+
+        data.historyEvents
+            .append(
+                HistoryEvent(
+                    workItemID:
+                        workItemID,
+                    kind:
+                        .relationshipAdded,
+                    timestamp:
+                        now,
+                    text:
+                        "\(role.displayName): \(entity.name)",
+                    actorUserID:
+                        currentUserID,
+                    timeZoneID:
+                        timeZoneID
+                )
+            )
+
+        save()
+
+        return nil
+    }
+
     func updateWorkRelationshipDetails(
         relationshipID: UUID,
         entityID: UUID,
@@ -2892,5 +3001,2244 @@ extension DReportStore {
         save()
 
         return nil
+    }
+}
+
+
+// ============================================================
+// MARK: - Rich Structure Metadata
+// ============================================================
+
+extension DReportStore {
+    func saveThemeMetadata(
+        _ theme: Theme
+    ) -> String? {
+        guard
+            let index =
+                data.themes.firstIndex(
+                    where: {
+                        $0.id == theme.id
+                    }
+                )
+        else {
+            return "Theme not found."
+        }
+
+        var updated =
+            theme
+
+        updated.name =
+            updated.name
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard
+            !updated.name.isEmpty
+        else {
+            return "Theme name cannot be empty."
+        }
+
+        if
+            let parentID =
+                updated.parentThemeID
+        {
+            guard
+                parentID != updated.id
+            else {
+                return
+                    "A Theme cannot be its own parent."
+            }
+
+            guard
+                data.themes.contains(
+                    where: {
+                        $0.id == parentID
+                    }
+                )
+            else {
+                return
+                    "Parent Theme not found."
+            }
+
+            let descendants =
+                Set(
+                    themeDescendantIDs(
+                        of:
+                            updated.id
+                    )
+                )
+
+            guard
+                !descendants.contains(
+                    parentID
+                )
+            else {
+                return
+                    "A Theme cannot be moved inside one of its descendants."
+            }
+        }
+
+        if
+            let ownerID =
+                updated.ownerEntityID,
+            !data.entities.contains(
+                where: {
+                    $0.id == ownerID
+                }
+            )
+        {
+            return "Owner not found."
+        }
+
+        if
+            let start =
+                updated.startDate,
+            let target =
+                updated.targetDate,
+            target < start
+        {
+            return
+                "Target date cannot be earlier than start date."
+        }
+
+        updated.summary =
+            cleanedOptional(
+                updated.summary
+            )
+
+        updated.code =
+            cleanedOptional(
+                updated.code
+            )
+
+        updated.tags =
+            cleanedOptional(
+                updated.tags
+            )
+
+        updated.url =
+            cleanedOptional(
+                updated.url
+            )
+
+        updated.symbolName =
+            cleanedOptional(
+                updated.symbolName
+            )
+
+        updated.notes =
+            updated.notes
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        updated.updatedAt =
+            Date()
+
+        data.themes[index] =
+            updated
+
+        save()
+
+        return nil
+    }
+
+
+    func saveEntityMetadata(
+        _ entity: Entity
+    ) -> String? {
+        guard
+            let index =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id == entity.id
+                    }
+                )
+        else {
+            return "Entity not found."
+        }
+
+        var updated =
+            entity
+
+        updated.name =
+            updated.name
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard
+            !updated.name.isEmpty
+        else {
+            return "Name cannot be empty."
+        }
+
+        // Entity kind is structural identity, not editable metadata.
+        updated.kind =
+            data.entities[index]
+                .kind
+
+        if
+            let ownerID =
+                updated.ownerEntityID,
+            !data.entities.contains(
+                where: {
+                    $0.id == ownerID
+                }
+            )
+        {
+            return "Owner not found."
+        }
+
+        if
+            let start =
+                updated.startDate,
+            let target =
+                updated.targetDate,
+            target < start
+        {
+            return
+                "Target date cannot be earlier than start date."
+        }
+
+        updated.shortName =
+            cleanedOptional(
+                updated.shortName
+            )
+
+        updated.code =
+            cleanedOptional(
+                updated.code
+            )
+
+        updated.website =
+            cleanedOptional(
+                updated.website
+            )
+
+        updated.email =
+            cleanedOptional(
+                updated.email
+            )
+
+        updated.phone =
+            cleanedOptional(
+                updated.phone
+            )
+
+        updated.address =
+            cleanedOptional(
+                updated.address
+            )
+
+        updated.city =
+            cleanedOptional(
+                updated.city
+            )
+
+        updated.postalCode =
+            cleanedOptional(
+                updated.postalCode
+            )
+
+        updated.country =
+            cleanedOptional(
+                updated.country
+            )
+
+        updated.tags =
+            cleanedOptional(
+                updated.tags
+            )
+
+        updated.symbolName =
+            cleanedOptional(
+                updated.symbolName
+            )
+
+        updated.notes =
+            updated.notes
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        updated.updatedAt =
+            Date()
+
+        data.entities[index] =
+            updated
+
+        save()
+
+        return nil
+    }
+
+
+    private func cleanedOptional(
+        _ value: String?
+    ) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        let cleaned =
+            value.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        return
+            cleaned.isEmpty
+            ? nil
+            : cleaned
+    }
+}
+
+
+
+extension DReportStore {
+    func verifyCurrentUserPassword(
+        _ password: String
+    ) -> Bool {
+        guard
+            let user =
+                currentUser,
+            user.isActive
+        else {
+            return false
+        }
+
+        return PasswordHasher.verify(
+            password:
+                password,
+            saltBase64:
+                user.passwordSaltBase64,
+            expectedHashBase64:
+                user.passwordHashBase64,
+            iterations:
+                user.passwordIterations
+        )
+    }
+}
+
+
+
+extension DReportStore {
+    @discardableResult
+    func deleteEntityProtected(
+        id: UUID
+    ) -> String? {
+        guard
+            let entity =
+                data.entities.first(
+                    where: {
+                        $0.id == id
+                    }
+                )
+        else {
+            return "Item not found."
+        }
+
+        if
+            entity.kind == .person,
+            let linkedUser =
+                user(
+                    linkedToPerson:
+                        id
+                )
+        {
+            return
+                "This Person is linked to the DReport account @\(linkedUser.username). Remove or unlink that account before deleting the Person."
+        }
+
+        let now =
+            Date()
+
+        // Remove a Person's extended profile as well.
+        data.personProfiles.removeAll {
+            $0.entityID == id
+        }
+
+        // Remove the entity itself.
+        data.entities.removeAll {
+            $0.id == id
+        }
+
+        // Remove all structural memberships involving it.
+        data.memberships.removeAll {
+            $0.memberEntityID == id
+            || $0.containerEntityID == id
+        }
+
+        // Remove Work relationships involving it.
+        data.workEntityRelationships.removeAll {
+            $0.entityID == id
+        }
+
+        // Clear Theme ownership references.
+        for index in data.themes.indices {
+            if
+                data.themes[index]
+                    .ownerEntityID
+                    == id
+            {
+                data.themes[index]
+                    .ownerEntityID =
+                    nil
+
+                data.themes[index]
+                    .updatedAt =
+                    now
+            }
+        }
+
+        // Clear ownership references from remaining
+        // Organizations / Groups / People.
+        for index in data.entities.indices {
+            if
+                data.entities[index]
+                    .ownerEntityID
+                    == id
+            {
+                data.entities[index]
+                    .ownerEntityID =
+                    nil
+
+                data.entities[index]
+                    .updatedAt =
+                    now
+            }
+        }
+
+        save()
+
+        return nil
+    }
+}
+
+
+// ============================================================
+// MARK: - Organization / Group ↔ People affiliations
+// ============================================================
+
+extension DReportStore {
+    func affiliatedPeople(
+        to containerID: UUID
+    ) -> [Entity] {
+        let personIDs =
+            Set(
+                data.memberships
+                    .filter {
+                        $0.containerEntityID
+                            == containerID
+                    }
+                    .map(
+                        \.memberEntityID
+                    )
+            )
+
+        return data.entities
+            .filter {
+                $0.kind == .person
+                && personIDs.contains(
+                    $0.id
+                )
+            }
+            .sorted {
+                personSurnameSort(
+                    $0,
+                    $1
+                )
+            }
+    }
+
+
+    private func personSurnameSort(
+        _ lhs: Entity,
+        _ rhs: Entity
+    ) -> Bool {
+        let lhsProfile =
+            personProfile(
+                for:
+                    lhs.id
+            )
+
+        let rhsProfile =
+            personProfile(
+                for:
+                    rhs.id
+            )
+
+        let lhsLast =
+            lhsProfile?
+                .lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        let rhsLast =
+            rhsProfile?
+                .lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        if
+            !lhsLast.isEmpty
+            || !rhsLast.isEmpty
+        {
+            let comparison =
+                lhsLast
+                    .localizedCaseInsensitiveCompare(
+                        rhsLast
+                    )
+
+            if comparison != .orderedSame {
+                return comparison
+                    == .orderedAscending
+            }
+        }
+
+        let lhsFirst =
+            lhsProfile?
+                .firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        let rhsFirst =
+            rhsProfile?
+                .firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        if
+            !lhsFirst.isEmpty
+            || !rhsFirst.isEmpty
+        {
+            let comparison =
+                lhsFirst
+                    .localizedCaseInsensitiveCompare(
+                        rhsFirst
+                    )
+
+            if comparison != .orderedSame {
+                return comparison
+                    == .orderedAscending
+            }
+        }
+
+        return lhs.name
+            .localizedCaseInsensitiveCompare(
+                rhs.name
+            )
+            == .orderedAscending
+    }
+
+
+    func updateAffiliatedPeople(
+        containerID: UUID,
+        personIDs: Set<UUID>
+    ) -> String? {
+        guard
+            let container =
+                data.entities.first(
+                    where: {
+                        $0.id == containerID
+                    }
+                )
+        else {
+            return "Organization or Group not found."
+        }
+
+        guard
+            container.kind == .organization
+            || container.kind == .group
+        else {
+            return
+                "People can only be affiliated with Organizations or Groups."
+        }
+
+        let validPeople =
+            Set(
+                data.entities
+                    .filter {
+                        $0.kind == .person
+                    }
+                    .map(\.id)
+            )
+
+        guard
+            personIDs.isSubset(
+                of:
+                    validPeople
+            )
+        else {
+            return "One or more People could not be found."
+        }
+
+        let oldPersonIDs =
+            Set(
+                data.memberships
+                    .filter {
+                        membership in
+
+                        guard
+                            membership
+                                .containerEntityID
+                                == containerID
+                        else {
+                            return false
+                        }
+
+                        return validPeople
+                            .contains(
+                                membership
+                                    .memberEntityID
+                            )
+                    }
+                    .map(
+                        \.memberEntityID
+                    )
+            )
+
+        let removed =
+            oldPersonIDs
+                .subtracting(
+                    personIDs
+                )
+
+        let added =
+            personIDs
+                .subtracting(
+                    oldPersonIDs
+                )
+
+        // Remove only Person affiliations to this container.
+        // Group / Organization structure memberships are untouched.
+        data.memberships.removeAll {
+            membership in
+
+            removed.contains(
+                membership.memberEntityID
+            )
+            && membership.containerEntityID
+                == containerID
+        }
+
+        for personID in added {
+            let alreadyExists =
+                data.memberships.contains {
+                    $0.memberEntityID
+                        == personID
+                    && $0.containerEntityID
+                        == containerID
+                }
+
+            if !alreadyExists {
+                let hasAnyAffiliation =
+                    data.memberships.contains {
+                        $0.memberEntityID
+                            == personID
+                    }
+
+                data.memberships.append(
+                    EntityMembership(
+                        memberEntityID:
+                            personID,
+                        containerEntityID:
+                            containerID,
+                        isPrimary:
+                            !hasAnyAffiliation
+                    )
+                )
+            }
+        }
+
+        let changedPeople =
+            removed.union(
+                added
+            )
+
+        for personID in changedPeople {
+            normalizePrimaryMembership(
+                for:
+                    personID
+            )
+
+            if
+                let index =
+                    data.entities.firstIndex(
+                        where: {
+                            $0.id
+                                == personID
+                        }
+                    )
+            {
+                data.entities[index]
+                    .updatedAt =
+                    Date()
+            }
+        }
+
+        if
+            let index =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id
+                            == containerID
+                    }
+                )
+        {
+            data.entities[index]
+                .updatedAt =
+                Date()
+        }
+
+        save()
+
+        return nil
+    }
+
+
+    func updatePersonAffiliations(
+        personID: UUID,
+        containerKind: EntityKind,
+        containerIDs: Set<UUID>
+    ) -> String? {
+        guard
+            data.entities.contains(
+                where: {
+                    $0.id == personID
+                    && $0.kind == .person
+                }
+            )
+        else {
+            return "Person not found."
+        }
+
+        guard
+            containerKind == .organization
+            || containerKind == .group
+        else {
+            return "Invalid affiliation type."
+        }
+
+        let validContainerIDs =
+            Set(
+                data.entities
+                    .filter {
+                        $0.kind
+                            == containerKind
+                    }
+                    .map(\.id)
+            )
+
+        guard
+            containerIDs.isSubset(
+                of:
+                    validContainerIDs
+            )
+        else {
+            return
+                "One or more affiliations could not be found."
+        }
+
+        // Remove only affiliations of the requested kind.
+        // The other kind remains untouched.
+        data.memberships.removeAll {
+            membership in
+
+            guard
+                membership.memberEntityID
+                    == personID,
+                let container =
+                    data.entities.first(
+                        where: {
+                            $0.id
+                                == membership
+                                    .containerEntityID
+                        }
+                    )
+            else {
+                return false
+            }
+
+            return
+                container.kind
+                == containerKind
+        }
+
+        let ordered =
+            containerIDs.sorted {
+                $0.uuidString
+                    < $1.uuidString
+            }
+
+        for containerID in ordered {
+            data.memberships.append(
+                EntityMembership(
+                    memberEntityID:
+                        personID,
+                    containerEntityID:
+                        containerID,
+                    isPrimary:
+                        false
+                )
+            )
+        }
+
+        normalizePrimaryMembership(
+            for:
+                personID
+        )
+
+        if
+            let index =
+                data.entities.firstIndex(
+                    where: {
+                        $0.id
+                            == personID
+                    }
+                )
+        {
+            data.entities[index]
+                .updatedAt =
+                Date()
+        }
+
+        save()
+
+        return nil
+    }
+
+
+    private func normalizePrimaryMembership(
+        for memberID: UUID
+    ) {
+        let indices =
+            data.memberships.indices
+                .filter {
+                    data.memberships[$0]
+                        .memberEntityID
+                        == memberID
+                }
+
+        guard
+            !indices.isEmpty
+        else {
+            return
+        }
+
+        if
+            let firstPrimary =
+                indices.first(
+                    where: {
+                        data.memberships[$0]
+                            .isPrimary
+                    }
+                )
+        {
+            for index in indices {
+                data.memberships[index]
+                    .isPrimary =
+                    index
+                    == firstPrimary
+            }
+
+        } else if
+            let first =
+                indices.first
+        {
+            data.memberships[first]
+                .isPrimary =
+                true
+        }
+    }
+}
+
+
+// MARK: - Calendar Domain
+
+extension DReportStore {
+
+    func calendarAccount(
+        id: UUID?
+    ) -> CalendarAccount? {
+        guard let id else {
+            return nil
+        }
+
+        return data.calendarAccounts.first {
+            $0.id == id
+        }
+    }
+
+
+    func dReportCalendar(
+        id: UUID?
+    ) -> DReportCalendar? {
+        guard let id else {
+            return nil
+        }
+
+        return data.calendars.first {
+            $0.id == id
+        }
+    }
+
+
+    func calendarEvent(
+        id: UUID?
+    ) -> CalendarEvent? {
+        guard let id else {
+            return nil
+        }
+
+        return data.calendarEvents.first {
+            $0.id == id
+        }
+    }
+
+
+    func calendarEvents(
+        overlapping start: Date,
+        end: Date
+    ) -> [CalendarEvent] {
+        guard end > start else {
+            return []
+        }
+
+        return data.calendarEvents
+            .filter { event in
+                guard
+                    event.syncState != .pendingDelete,
+                    event.status != .cancelled
+                else {
+                    return false
+                }
+
+                let effectiveEnd =
+                    max(
+                        event.endAt,
+                        event.startAt
+                            .addingTimeInterval(1)
+                    )
+
+                return
+                    event.startAt < end
+                    && effectiveEnd > start
+            }
+            .sorted {
+                if $0.startAt != $1.startAt {
+                    return $0.startAt < $1.startAt
+                }
+
+                return
+                    $0.title
+                        .localizedCaseInsensitiveCompare(
+                            $1.title
+                        )
+                        == .orderedAscending
+            }
+    }
+
+
+    func calendarEvents(
+        on date: Date
+    ) -> [CalendarEvent] {
+        let calendar =
+            Calendar.autoupdatingCurrent
+
+        let start =
+            calendar.startOfDay(
+                for: date
+            )
+
+        guard
+            let end =
+                calendar.date(
+                    byAdding: .day,
+                    value: 1,
+                    to: start
+                )
+        else {
+            return []
+        }
+
+        return calendarEvents(
+            overlapping: start,
+            end: end
+        )
+    }
+
+
+    func calendarEvents(
+        forWorkItemID workItemID: UUID
+    ) -> [CalendarEvent] {
+        let eventIDs =
+            Set(
+                data.calendarEventWorkLinks
+                    .filter {
+                        $0.workItemID
+                            == workItemID
+                    }
+                    .map(\.calendarEventID)
+            )
+
+        return data.calendarEvents
+            .filter {
+                eventIDs.contains($0.id)
+                && $0.syncState
+                    != .pendingDelete
+            }
+            .sorted {
+                $0.startAt < $1.startAt
+            }
+    }
+
+
+    func calendarEvents(
+        forThemeID themeID: UUID
+    ) -> [CalendarEvent] {
+        let eventIDs =
+            Set(
+                data.calendarEventThemeLinks
+                    .filter {
+                        $0.themeID
+                            == themeID
+                    }
+                    .map(\.calendarEventID)
+            )
+
+        return data.calendarEvents
+            .filter {
+                eventIDs.contains($0.id)
+                && $0.syncState
+                    != .pendingDelete
+            }
+            .sorted {
+                $0.startAt < $1.startAt
+            }
+    }
+
+
+    func linkedWorkItems(
+        forCalendarEventID eventID: UUID
+    ) -> [WorkItem] {
+        let ids =
+            Set(
+                data.calendarEventWorkLinks
+                    .filter {
+                        $0.calendarEventID
+                            == eventID
+                    }
+                    .map(\.workItemID)
+            )
+
+        return data.workItems
+            .filter {
+                ids.contains($0.id)
+            }
+    }
+
+
+    func linkedThemes(
+        forCalendarEventID eventID: UUID
+    ) -> [Theme] {
+        let ids =
+            Set(
+                data.calendarEventThemeLinks
+                    .filter {
+                        $0.calendarEventID
+                            == eventID
+                    }
+                    .map(\.themeID)
+            )
+
+        return data.themes
+            .filter {
+                ids.contains($0.id)
+            }
+    }
+
+
+    @discardableResult
+    func createCalendarAccount(
+        provider: CalendarProvider,
+        displayName: String,
+        email: String? = nil
+    ) -> UUID? {
+        let name =
+            displayName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard !name.isEmpty else {
+            return nil
+        }
+
+        let account =
+            CalendarAccount(
+                provider: provider,
+                displayName: name,
+                email: email
+            )
+
+        data.calendarAccounts.append(
+            account
+        )
+
+        save()
+
+        return account.id
+    }
+
+
+    @discardableResult
+    func createCalendar(
+        name: String,
+        accountID: UUID? = nil,
+        externalID: String? = nil,
+        timeZoneID: String? = nil
+    ) -> UUID? {
+        let cleaned =
+            name
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard !cleaned.isEmpty else {
+            return nil
+        }
+
+        if
+            let accountID,
+            !data.calendarAccounts.contains(
+                where: {
+                    $0.id == accountID
+                }
+            )
+        {
+            return nil
+        }
+
+        let calendar =
+            DReportCalendar(
+                accountID: accountID,
+                externalID: externalID,
+                name: cleaned,
+                timeZoneID: timeZoneID
+            )
+
+        data.calendars.append(
+            calendar
+        )
+
+        save()
+
+        return calendar.id
+    }
+
+
+    @discardableResult
+    func createCalendarEvent(
+        calendarID: UUID? = nil,
+        title: String,
+        notes: String = "",
+        location: String? = nil,
+        startAt: Date,
+        endAt: Date,
+        isAllDay: Bool = false,
+        startTimeZoneID: String? = nil,
+        endTimeZoneID: String? = nil
+    ) -> UUID? {
+        let cleanedTitle =
+            title
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard
+            !cleanedTitle.isEmpty,
+            endAt >= startAt
+        else {
+            return nil
+        }
+
+        if let calendarID {
+            guard
+                let targetCalendar =
+                    data.calendars.first(
+                        where: {
+                            $0.id
+                                == calendarID
+                        }
+                    ),
+                !targetCalendar.isReadOnly
+            else {
+                return nil
+            }
+        }
+
+        let syncState:
+            CalendarSyncState
+
+        if
+            let calendarID,
+            let calendar =
+                dReportCalendar(
+                    id: calendarID
+                ),
+            calendar.accountID != nil
+        {
+            syncState = .pendingCreate
+        } else {
+            syncState = .localOnly
+        }
+
+        let event =
+            CalendarEvent(
+                calendarID: calendarID,
+                title: cleanedTitle,
+                notes: notes,
+                location: location,
+                startAt: startAt,
+                endAt: endAt,
+                isAllDay: isAllDay,
+                startTimeZoneID:
+                    startTimeZoneID,
+                endTimeZoneID:
+                    endTimeZoneID,
+                syncState: syncState
+            )
+
+        data.calendarEvents.append(
+            event
+        )
+
+        save()
+
+        return event.id
+    }
+
+
+    @discardableResult
+    func updateCalendarEvent(
+        _ event: CalendarEvent
+    ) -> String? {
+        guard
+            let index =
+                data.calendarEvents
+                    .firstIndex(
+                        where: {
+                            $0.id == event.id
+                        }
+                    )
+        else {
+            return "Calendar Event not found."
+        }
+
+        var updated = event
+
+        updated.title =
+            updated.title
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard !updated.title.isEmpty else {
+            return "Calendar Event title cannot be empty."
+        }
+
+        guard
+            updated.endAt >= updated.startAt
+        else {
+            return "End time cannot be earlier than start time."
+        }
+
+        if
+            let calendarID =
+                updated.calendarID,
+            !data.calendars.contains(
+                where: {
+                    $0.id == calendarID
+                }
+            )
+        {
+            return "Calendar not found."
+        }
+
+        let existing =
+            data.calendarEvents[index]
+
+
+        if
+            let calendarID =
+                existing.calendarID,
+            let calendar =
+                dReportCalendar(
+                    id:
+                        calendarID
+                ),
+            calendar.isReadOnly
+        {
+            return
+                "This Calendar Event comes from a read-only calendar."
+        }
+
+        guard
+            existing.syncState
+                != .pendingDelete
+        else {
+            return "This Calendar Event is pending deletion."
+        }
+
+        if updated.externalID != nil {
+            updated.syncState =
+                .pendingUpdate
+        } else if
+            let calendarID =
+                updated.calendarID,
+            let calendar =
+                dReportCalendar(
+                    id: calendarID
+                ),
+            calendar.accountID != nil
+        {
+            updated.syncState =
+                .pendingCreate
+        } else {
+            updated.syncState =
+                .localOnly
+        }
+
+        updated.updatedAt =
+            Date()
+
+        data.calendarEvents[index] =
+            updated
+
+        save()
+
+        return nil
+    }
+
+
+    func deleteCalendarEvent(
+        id: UUID
+    ) {
+        guard
+            let index =
+                data.calendarEvents
+                    .firstIndex(
+                        where: {
+                            $0.id == id
+                        }
+                    )
+        else {
+            return
+        }
+
+        let event =
+            data.calendarEvents[index]
+
+
+        if
+            let calendarID =
+                event.calendarID,
+            let calendar =
+                dReportCalendar(
+                    id:
+                        calendarID
+                ),
+            calendar.isReadOnly
+        {
+            return
+        }
+
+        let remoteCalendar =
+            event.calendarID
+                .flatMap {
+                    dReportCalendar(
+                        id: $0
+                    )
+                }
+
+        if
+            event.externalID != nil,
+            remoteCalendar?.accountID != nil
+        {
+            data.calendarEvents[index]
+                .syncState =
+                .pendingDelete
+
+            data.calendarEvents[index]
+                .updatedAt =
+                Date()
+        } else {
+            data.calendarEvents.remove(
+                at: index
+            )
+
+            data.calendarEventWorkLinks
+                .removeAll {
+                    $0.calendarEventID == id
+                }
+
+            data.calendarEventThemeLinks
+                .removeAll {
+                    $0.calendarEventID == id
+                }
+        }
+
+        save()
+    }
+
+
+    @discardableResult
+    func addCalendarEventWorkLink(
+        calendarEventID: UUID,
+        workItemID: UUID
+    ) -> String? {
+        guard
+            calendarEvent(
+                id: calendarEventID
+            ) != nil
+        else {
+            return "Calendar Event not found."
+        }
+
+        guard
+            workItem(
+                id: workItemID
+            ) != nil
+        else {
+            return "Work item not found."
+        }
+
+        let duplicate =
+            data.calendarEventWorkLinks
+                .contains {
+                    $0.calendarEventID
+                        == calendarEventID
+                    && $0.workItemID
+                        == workItemID
+                }
+
+        guard !duplicate else {
+            return nil
+        }
+
+        data.calendarEventWorkLinks
+            .append(
+                CalendarEventWorkLink(
+                    calendarEventID:
+                        calendarEventID,
+                    workItemID:
+                        workItemID
+                )
+            )
+
+        save()
+
+        return nil
+    }
+
+
+    func removeCalendarEventWorkLink(
+        calendarEventID: UUID,
+        workItemID: UUID
+    ) {
+        data.calendarEventWorkLinks
+            .removeAll {
+                $0.calendarEventID
+                    == calendarEventID
+                && $0.workItemID
+                    == workItemID
+            }
+
+        save()
+    }
+
+
+    @discardableResult
+    func addCalendarEventThemeLink(
+        calendarEventID: UUID,
+        themeID: UUID
+    ) -> String? {
+        guard
+            calendarEvent(
+                id: calendarEventID
+            ) != nil
+        else {
+            return "Calendar Event not found."
+        }
+
+        guard
+            theme(
+                id: themeID
+            ) != nil
+        else {
+            return "Theme not found."
+        }
+
+        let duplicate =
+            data.calendarEventThemeLinks
+                .contains {
+                    $0.calendarEventID
+                        == calendarEventID
+                    && $0.themeID
+                        == themeID
+                }
+
+        guard !duplicate else {
+            return nil
+        }
+
+        data.calendarEventThemeLinks
+            .append(
+                CalendarEventThemeLink(
+                    calendarEventID:
+                        calendarEventID,
+                    themeID:
+                        themeID
+                )
+            )
+
+        save()
+
+        return nil
+    }
+
+
+    func removeCalendarEventThemeLink(
+        calendarEventID: UUID,
+        themeID: UUID
+    ) {
+        data.calendarEventThemeLinks
+            .removeAll {
+                $0.calendarEventID
+                    == calendarEventID
+                && $0.themeID
+                    == themeID
+            }
+
+        save()
+    }
+}
+
+
+// MARK: - Calendar Event batch links
+
+extension DReportStore {
+    @discardableResult
+    func setCalendarEventWorkLinks(
+        calendarEventID: UUID,
+        workItemIDs: Set<UUID>
+    ) -> String? {
+        guard
+            calendarEvent(
+                id: calendarEventID
+            ) != nil
+        else {
+            return "Calendar Event not found."
+        }
+
+        let validIDs =
+            Set(
+                data.workItems
+                    .map(\.id)
+            )
+
+        guard
+            workItemIDs.isSubset(
+                of: validIDs
+            )
+        else {
+            return "One or more Work items could not be found."
+        }
+
+        data.calendarEventWorkLinks
+            .removeAll {
+                $0.calendarEventID
+                    == calendarEventID
+            }
+
+        for id in workItemIDs {
+            data.calendarEventWorkLinks
+                .append(
+                    CalendarEventWorkLink(
+                        calendarEventID:
+                            calendarEventID,
+                        workItemID:
+                            id
+                    )
+                )
+        }
+
+        save()
+
+        return nil
+    }
+
+
+    @discardableResult
+    func setCalendarEventThemeLinks(
+        calendarEventID: UUID,
+        themeIDs: Set<UUID>
+    ) -> String? {
+        guard
+            calendarEvent(
+                id: calendarEventID
+            ) != nil
+        else {
+            return "Calendar Event not found."
+        }
+
+        let validIDs =
+            Set(
+                data.themes
+                    .map(\.id)
+            )
+
+        guard
+            themeIDs.isSubset(
+                of: validIDs
+            )
+        else {
+            return "One or more Themes could not be found."
+        }
+
+        data.calendarEventThemeLinks
+            .removeAll {
+                $0.calendarEventID
+                    == calendarEventID
+            }
+
+        for id in themeIDs {
+            data.calendarEventThemeLinks
+                .append(
+                    CalendarEventThemeLink(
+                        calendarEventID:
+                            calendarEventID,
+                        themeID:
+                            id
+                    )
+                )
+        }
+
+        save()
+
+        return nil
+    }
+}
+
+
+// ============================================================
+// MARK: - Read-only iCal subscriptions
+// ============================================================
+
+@MainActor
+extension DReportStore {
+
+    func isReadOnlyCalendarEvent(
+        _ event: CalendarEvent
+    ) -> Bool {
+        guard
+            let calendar =
+                dReportCalendar(
+                    id:
+                        event.calendarID
+                )
+        else {
+            return false
+        }
+
+        return calendar.isReadOnly
+    }
+
+
+    func connectICalSubscription(
+        name: String,
+        secretAddress: String
+    ) async -> (
+        calendarID: UUID?,
+        error: String?
+    ) {
+        let cleanedAddress =
+            secretAddress
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard
+            let url =
+                URL(
+                    string:
+                        cleanedAddress
+                ),
+            let scheme =
+                url.scheme?
+                    .lowercased(),
+            scheme == "https"
+                || scheme == "http"
+        else {
+            return (
+                nil,
+                "Please enter a valid iCal URL."
+            )
+        }
+
+        do {
+            let (
+                downloadedData,
+                response
+            ) =
+                try await URLSession
+                    .shared
+                    .data(
+                        from: url
+                    )
+
+            if
+                let http =
+                    response
+                        as? HTTPURLResponse,
+                !(200..<300)
+                    .contains(
+                        http.statusCode
+                    )
+            {
+                return (
+                    nil,
+                    "The calendar server returned HTTP \(http.statusCode)."
+                )
+            }
+
+            let parsed =
+                try ICalendarParser
+                    .parse(
+                        data:
+                            downloadedData
+                    )
+
+            let suppliedName =
+                name
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+
+            let calendarName =
+                !suppliedName.isEmpty
+                ? suppliedName
+                : (
+                    parsed.calendarName?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .nonEmpty
+                    ?? "Subscribed Calendar"
+                )
+
+            let id =
+                UUID()
+
+            let keychainAccount =
+                "ical-\(id.uuidString)"
+
+            try CalendarSecretStore
+                .save(
+                    secret:
+                        cleanedAddress,
+                    account:
+                        keychainAccount
+                )
+
+            let subscribedCalendar =
+                DReportCalendar(
+                    id:
+                        id,
+                    sourceKind:
+                        .iCalSubscription,
+                    secretURLKeychainAccount:
+                        keychainAccount,
+                    name:
+                        calendarName,
+                    isEnabled:
+                        true,
+                    isReadOnly:
+                        true,
+                    lastSyncAt:
+                        Date()
+                )
+
+            data.calendars.append(
+                subscribedCalendar
+            )
+
+            mergeICalEvents(
+                parsed.events,
+                into:
+                    id
+            )
+
+            save()
+
+            return (
+                id,
+                nil
+            )
+
+        } catch {
+            return (
+                nil,
+                error.localizedDescription
+            )
+        }
+    }
+
+
+    func syncICalCalendar(
+        id: UUID
+    ) async -> String? {
+        guard
+            let index =
+                data.calendars
+                    .firstIndex(
+                        where: {
+                            $0.id == id
+                        }
+                    )
+        else {
+            return "Calendar not found."
+        }
+
+        let calendar =
+            data.calendars[index]
+
+        guard
+            calendar.sourceKind
+                == .iCalSubscription,
+            calendar.isReadOnly,
+            let keychainAccount =
+                calendar
+                    .secretURLKeychainAccount
+        else {
+            return "This is not an iCal subscription."
+        }
+
+        guard
+            let secretAddress =
+                CalendarSecretStore
+                    .read(
+                        account:
+                            keychainAccount
+                    ),
+            let url =
+                URL(
+                    string:
+                        secretAddress
+                )
+        else {
+            data.calendars[index]
+                .lastSyncError =
+                "The Secret iCal address is missing from Keychain."
+
+            save()
+
+            return
+                data.calendars[index]
+                    .lastSyncError
+        }
+
+        do {
+            let (
+                downloaded,
+                response
+            ) =
+                try await URLSession
+                    .shared
+                    .data(
+                        from: url
+                    )
+
+            if
+                let http =
+                    response
+                        as? HTTPURLResponse,
+                !(200..<300)
+                    .contains(
+                        http.statusCode
+                    )
+            {
+                throw NSError(
+                    domain:
+                        "DReport.iCal",
+                    code:
+                        http.statusCode,
+                    userInfo:
+                        [
+                            NSLocalizedDescriptionKey:
+                                "Calendar server returned HTTP \(http.statusCode)."
+                        ]
+                )
+            }
+
+            let parsed =
+                try ICalendarParser
+                    .parse(
+                        data:
+                            downloaded
+                    )
+
+            mergeICalEvents(
+                parsed.events,
+                into:
+                    id
+            )
+
+            if
+                let freshIndex =
+                    data.calendars
+                        .firstIndex(
+                            where: {
+                                $0.id == id
+                            }
+                        )
+            {
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncAt =
+                    Date()
+
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncError =
+                    nil
+            }
+
+            save()
+
+            return nil
+
+        } catch {
+            if
+                let freshIndex =
+                    data.calendars
+                        .firstIndex(
+                            where: {
+                                $0.id == id
+                            }
+                        )
+            {
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncError =
+                    error.localizedDescription
+            }
+
+            save()
+
+            return error.localizedDescription
+        }
+    }
+
+
+    func syncAllICalCalendars()
+        async -> [String]
+    {
+        let ids =
+            data.calendars
+                .filter {
+                    $0.sourceKind
+                        == .iCalSubscription
+                    && $0.isEnabled
+                }
+                .map(\.id)
+
+        var errors:
+            [String] = []
+
+        for id in ids {
+            if
+                let error =
+                    await syncICalCalendar(
+                        id: id
+                    )
+            {
+                errors.append(
+                    error
+                )
+            }
+        }
+
+        return errors
+    }
+
+
+    func disconnectICalCalendar(
+        id: UUID
+    ) {
+        guard
+            let calendar =
+                dReportCalendar(
+                    id: id
+                ),
+            calendar.sourceKind
+                == .iCalSubscription
+        else {
+            return
+        }
+
+        if
+            let key =
+                calendar
+                    .secretURLKeychainAccount
+        {
+            CalendarSecretStore
+                .delete(
+                    account: key
+                )
+        }
+
+        let eventIDs =
+            Set(
+                data.calendarEvents
+                    .filter {
+                        $0.calendarID
+                            == id
+                    }
+                    .map(\.id)
+            )
+
+        data.calendarEventWorkLinks
+            .removeAll {
+                eventIDs.contains(
+                    $0.calendarEventID
+                )
+            }
+
+        data.calendarEventThemeLinks
+            .removeAll {
+                eventIDs.contains(
+                    $0.calendarEventID
+                )
+            }
+
+        data.calendarEvents
+            .removeAll {
+                $0.calendarID == id
+            }
+
+        data.calendars
+            .removeAll {
+                $0.id == id
+            }
+
+        save()
+    }
+
+
+    private func mergeICalEvents(
+        _ imported:
+            [ParsedICalendarEvent],
+        into calendarID:
+            UUID
+    ) {
+        let incomingIDs =
+            Set(
+                imported.map {
+                    $0.externalIdentity
+                }
+            )
+
+        let staleEvents =
+            data.calendarEvents
+                .filter {
+                    $0.calendarID
+                        == calendarID
+                    && $0.externalID
+                        != nil
+                    && !incomingIDs
+                        .contains(
+                            $0.externalID!
+                        )
+                }
+
+        let staleIDs =
+            Set(
+                staleEvents.map(\.id)
+            )
+
+        if !staleIDs.isEmpty {
+            data.calendarEventWorkLinks
+                .removeAll {
+                    staleIDs.contains(
+                        $0.calendarEventID
+                    )
+                }
+
+            data.calendarEventThemeLinks
+                .removeAll {
+                    staleIDs.contains(
+                        $0.calendarEventID
+                    )
+                }
+
+            data.calendarEvents
+                .removeAll {
+                    staleIDs.contains(
+                        $0.id
+                    )
+                }
+        }
+
+        for source in imported {
+            if
+                let index =
+                    data.calendarEvents
+                        .firstIndex(
+                            where: {
+                                $0.calendarID
+                                    == calendarID
+                                && $0.externalID
+                                    == source
+                                        .externalIdentity
+                            }
+                        )
+            {
+                var existing =
+                    data.calendarEvents[index]
+
+                existing.iCalUID =
+                    source.uid
+
+                existing.title =
+                    source.title
+
+                existing.notes =
+                    source.notes
+
+                existing.location =
+                    source.location
+
+                existing.startAt =
+                    source.startAt
+
+                existing.endAt =
+                    source.endAt
+
+                existing.isAllDay =
+                    source.isAllDay
+
+                existing.startTimeZoneID =
+                    source
+                        .startTimeZoneID
+
+                existing.endTimeZoneID =
+                    source
+                        .endTimeZoneID
+
+                existing.status =
+                    source.status
+
+                existing.recurrenceRules =
+                    source.recurrenceRules
+
+                existing.externalURL =
+                    source.externalURL
+
+                existing.externalCreatedAt =
+                    source.createdAt
+
+                existing.externalUpdatedAt =
+                    source.updatedAt
+
+                existing.syncState =
+                    .synced
+
+                existing.lastSyncedAt =
+                    Date()
+
+                existing.updatedAt =
+                    Date()
+
+                data.calendarEvents[index] =
+                    existing
+
+            } else {
+                data.calendarEvents
+                    .append(
+                        CalendarEvent(
+                            calendarID:
+                                calendarID,
+                            externalID:
+                                source
+                                    .externalIdentity,
+                            iCalUID:
+                                source.uid,
+                            externalURL:
+                                source.externalURL,
+                            title:
+                                source.title,
+                            notes:
+                                source.notes,
+                            location:
+                                source.location,
+                            startAt:
+                                source.startAt,
+                            endAt:
+                                source.endAt,
+                            isAllDay:
+                                source.isAllDay,
+                            startTimeZoneID:
+                                source
+                                    .startTimeZoneID,
+                            endTimeZoneID:
+                                source
+                                    .endTimeZoneID,
+                            status:
+                                source.status,
+                            recurrenceRules:
+                                source
+                                    .recurrenceRules,
+                            syncState:
+                                .synced,
+                            externalCreatedAt:
+                                source.createdAt,
+                            externalUpdatedAt:
+                                source.updatedAt,
+                            lastSyncedAt:
+                                Date()
+                        )
+                    )
+            }
+        }
     }
 }

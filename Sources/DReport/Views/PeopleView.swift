@@ -223,6 +223,19 @@ struct PersonDetailView: View {
     @State
     private var showingAccountManager = false
 
+
+    @State
+    private var editingAffiliationKind:
+        EntityKind?
+
+    @State
+    private var affiliationIDsDraft:
+        Set<UUID> = []
+
+    @State
+    private var affiliationError:
+        String?
+
     var body: some View {
         if
             let person =
@@ -667,44 +680,181 @@ struct PersonDetailView: View {
     private var affiliationsSection:
         some View
     {
-        let affiliations =
-            store.containers(
-                for: personID
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                18
+        ) {
+            Text("Affiliations")
+                .font(.headline)
+
+            affiliationGroup(
+                title:
+                    "Organizations",
+                icon:
+                    "building.2",
+                kind:
+                    .organization
             )
 
-        return Group {
-            if !affiliations.isEmpty {
-                VStack(
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    Text("Affiliations")
-                        .font(.headline)
+            affiliationGroup(
+                title:
+                    "Groups",
+                icon:
+                    "person.3",
+                kind:
+                    .group
+            )
 
-                    ForEach(
-                        affiliations
-                    ) { affiliation in
-                        HStack(spacing: 8) {
-                            Image(
-                                systemName:
-                                    affiliation.kind
-                                        == .organization
-                                    ? "building.2"
-                                    : "person.3"
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
-
-                            Text(
-                                affiliation.name
-                            )
-                        }
-                    }
-                }
+            if let affiliationError {
+                Text(affiliationError)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .red
+                    )
             }
         }
     }
+
+
+    @ViewBuilder
+    private func affiliationGroup(
+        title: String,
+        icon: String,
+        kind: EntityKind
+    ) -> some View {
+        let current =
+            store.containers(
+                for:
+                    personID
+            )
+            .filter {
+                $0.kind == kind
+            }
+
+        let candidates =
+            store.entities(
+                of:
+                    kind
+            )
+
+        HierarchicalSelectionSummaryRow(
+            label:
+                title,
+            selectedTitles:
+                current.map(\.name),
+            selectorTitle:
+                title,
+            selectorMessage:
+                kind == .organization
+                ? "Organizations are shown as Organization → Sub-organization → deeper levels."
+                : "Groups are shown according to their structural hierarchy.",
+            nodes:
+                HierarchySelectionData
+                    .entityNodes(
+                        store:
+                            store,
+                        candidates:
+                            candidates
+                    ),
+            initialSelection:
+                Set(
+                    current.map(\.id)
+                ),
+            buttonSystemImage:
+                "plus.circle",
+            onSave: {
+                selection in
+
+                store
+                    .updatePersonAffiliations(
+                        personID:
+                            personID,
+                        containerKind:
+                            kind,
+                        containerIDs:
+                            selection
+                    )
+            }
+        )
+    }
+
+
+    private func beginAffiliationEdit(
+        kind: EntityKind,
+        current: [Entity]
+    ) {
+        affiliationIDsDraft =
+            Set(
+                current.map(\.id)
+            )
+
+        affiliationError =
+            nil
+
+        editingAffiliationKind =
+            kind
+    }
+
+
+    private func cancelAffiliationEdit() {
+        affiliationIDsDraft =
+            []
+
+        affiliationError =
+            nil
+
+        editingAffiliationKind =
+            nil
+    }
+
+
+    private func saveAffiliations(
+        kind: EntityKind
+    ) {
+        let error =
+            store
+                .updatePersonAffiliations(
+                    personID:
+                        personID,
+                    containerKind:
+                        kind,
+                    containerIDs:
+                        affiliationIDsDraft
+                )
+
+        affiliationError =
+            error
+
+        if error == nil {
+            cancelAffiliationEdit()
+        }
+    }
+
+
+    private func personAffiliationBinding(
+        _ id: UUID
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                affiliationIDsDraft
+                    .contains(id)
+            },
+            set: {
+                enabled in
+
+                if enabled {
+                    affiliationIDsDraft
+                        .insert(id)
+                } else {
+                    affiliationIDsDraft
+                        .remove(id)
+                }
+            }
+        )
+    }
+
 
     private var accountSection:
         some View
@@ -1484,75 +1634,91 @@ private struct PersonEditView: View {
         editSection(
             "Affiliations"
         ) {
-            let affiliations =
-                store.containers(
-                    for: personID
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    14
+            ) {
+                editorAffiliationSelector(
+                    title:
+                        "Organizations",
+                    kind:
+                        .organization
                 )
 
-            if affiliations.isEmpty {
-                Text(
-                    "No organization or group affiliations."
+                editorAffiliationSelector(
+                    title:
+                        "Groups",
+                    kind:
+                        .group
                 )
-                .foregroundStyle(
-                    .secondary
-                )
-            } else {
-                ForEach(
-                    affiliations
-                ) { affiliation in
-                    HStack {
-                        Image(
-                            systemName:
-                                affiliation.kind
-                                    == .organization
-                                ? "building.2"
-                                : "person.3"
-                        )
-
-                        Text(
-                            affiliation.name
-                        )
-
-                        Spacer()
-
-                        Button {
-                            store.removeMembership(
-                                memberID:
-                                    personID,
-                                containerID:
-                                    affiliation.id
-                            )
-                        } label: {
-                            Image(
-                                systemName:
-                                    "minus.circle"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
             }
-
-            Menu("Add Affiliation") {
-                ForEach(
-                    availableAffiliations
-                ) { entity in
-                    Button(entity.name) {
-                        store.addMembership(
-                            memberID:
-                                personID,
-                            containerID:
-                                entity.id
-                        )
-                    }
-                }
-            }
-            .disabled(
-                availableAffiliations
-                    .isEmpty
-            )
         }
     }
+
+
+    @ViewBuilder
+    private func editorAffiliationSelector(
+        title: String,
+        kind: EntityKind
+    ) -> some View {
+        let current =
+            store.containers(
+                for:
+                    personID
+            )
+            .filter {
+                $0.kind == kind
+            }
+
+        let candidates =
+            store.entities(
+                of:
+                    kind
+            )
+
+        HierarchicalSelectionSummaryRow(
+            label:
+                title,
+            selectedTitles:
+                current.map(\.name),
+            selectorTitle:
+                title,
+            selectorMessage:
+                kind == .organization
+                ? "Organizations are shown as Organization → Sub-organization → deeper levels."
+                : "Groups are shown according to their structural hierarchy.",
+            nodes:
+                HierarchySelectionData
+                    .entityNodes(
+                        store:
+                            store,
+                        candidates:
+                            candidates
+                    ),
+            initialSelection:
+                Set(
+                    current.map(\.id)
+                ),
+            buttonSystemImage:
+                "plus.circle",
+            onSave: {
+                selection in
+
+                store
+                    .updatePersonAffiliations(
+                        personID:
+                            personID,
+                        containerKind:
+                            kind,
+                        containerIDs:
+                            selection
+                    )
+            }
+        )
+    }
+
 
     private var availableAffiliations:
         [Entity]

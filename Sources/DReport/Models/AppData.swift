@@ -1,7 +1,7 @@
 import Foundation
 
 struct DReportData: Codable {
-    var schemaVersion: Int = 3
+    var schemaVersion: Int = 5
 
     var themes: [Theme] = []
     var workItems: [WorkItem] = []
@@ -20,6 +20,21 @@ struct DReportData: Codable {
     var users:
         [DReportUser] = []
 
+    var calendarAccounts:
+        [CalendarAccount] = []
+
+    var calendars:
+        [DReportCalendar] = []
+
+    var calendarEvents:
+        [CalendarEvent] = []
+
+    var calendarEventWorkLinks:
+        [CalendarEventWorkLink] = []
+
+    var calendarEventThemeLinks:
+        [CalendarEventThemeLink] = []
+
     init() {}
 
     enum CodingKeys:
@@ -35,6 +50,11 @@ struct DReportData: Codable {
         case workEntityRelationships
         case historyEvents
         case users
+        case calendarAccounts
+        case calendars
+        case calendarEvents
+        case calendarEventWorkLinks
+        case calendarEventThemeLinks
     }
 
     init(
@@ -99,6 +119,41 @@ struct DReportData: Codable {
             try container.decodeIfPresent(
                 [DReportUser].self,
                 forKey: .users
+            ) ?? []
+
+        calendarAccounts =
+            try container.decodeIfPresent(
+                [CalendarAccount].self,
+                forKey:
+                    .calendarAccounts
+            ) ?? []
+
+        calendars =
+            try container.decodeIfPresent(
+                [DReportCalendar].self,
+                forKey:
+                    .calendars
+            ) ?? []
+
+        calendarEvents =
+            try container.decodeIfPresent(
+                [CalendarEvent].self,
+                forKey:
+                    .calendarEvents
+            ) ?? []
+
+        calendarEventWorkLinks =
+            try container.decodeIfPresent(
+                [CalendarEventWorkLink].self,
+                forKey:
+                    .calendarEventWorkLinks
+            ) ?? []
+
+        calendarEventThemeLinks =
+            try container.decodeIfPresent(
+                [CalendarEventThemeLink].self,
+                forKey:
+                    .calendarEventThemeLinks
             ) ?? []
     }
 }
