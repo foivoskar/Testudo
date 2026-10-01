@@ -984,78 +984,132 @@ struct WorkItemDetailView: View {
         UUID?
 
     @State
-    private var showingEditor = false
+    private var editingField:
+        EditableField?
+
+    @State
+    private var textDraft = ""
+
+    @State
+    private var uuidDraft:
+        UUID?
+
+    @State
+    private var statusDraft:
+        TaskStatus = .todo
+
+    @State
+    private var dateDraft =
+        Date()
+
+    @State
+    private var dateEnabledDraft =
+        true
+
+    @State
+    private var relationshipRoleDraft:
+        WorkRelationshipRole =
+        .relatedTo
+
+    @State
+    private var relationshipEntityDraft:
+        UUID?
+
+    @State
+    private var errorMessage:
+        String?
+
+    private enum EditableField:
+        Hashable
+    {
+        case title
+        case body
+        case theme
+        case parent
+        case status
+        case deadline
+        case reminder
+        case eventDate
+        case relationship(UUID)
+    }
 
     var body: some View {
-        if
-            let item =
-                store.workItem(
-                    id: itemID
-                )
-        {
-            ScrollView {
-                VStack(
-                    alignment: .leading,
-                    spacing: 28
-                ) {
-                    header(item)
+        ZStack {
+            DReportStyle
+                .contentBackground
+                .ignoresSafeArea()
 
-                    if !item.body.isEmpty {
-                        detailSection(
-                            "Description"
-                        ) {
-                            Text(item.body)
-                                .textSelection(
-                                    .enabled
-                                )
-                        }
+            if
+                let item =
+                    store.workItem(
+                        id: itemID
+                    )
+            {
+                ScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 28
+                    ) {
+                        header(item)
+
+                        descriptionSection(
+                            item
+                        )
+
+                        detailsSection(
+                            item
+                        )
+
+                        hierarchySection(
+                            item
+                        )
+
+                        childrenSection(
+                            item
+                        )
+
+                        relationshipsSection(
+                            item
+                        )
+
+                        historySection(
+                            item
+                        )
                     }
-
-                    keyInformation(
-                        item
+                    .padding(28)
+                    .frame(
+                        maxWidth: 760,
+                        alignment: .leading
                     )
-
-                    hierarchySection(
-                        item
-                    )
-
-                    childrenSection(
-                        item
-                    )
-
-                    relationshipsSection(
-                        item
-                    )
-
-                    historySection(
-                        item
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .center
                     )
                 }
-                .padding(28)
                 .frame(
-                    maxWidth: 760,
-                    alignment: .leading
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+                .background(
+                    DReportStyle
+                        .contentBackground
+                )
+            } else {
+                ContentUnavailableView(
+                    "Item Not Found",
+                    systemImage:
+                        "questionmark.circle"
                 )
             }
-            .background(
-                DReportStyle.contentBackground
-            )
-            .sheet(
-                isPresented:
-                    $showingEditor
-            ) {
-                WorkItemEditView(
-                    itemID:
-                        itemID
-                )
-            }
-        } else {
-            ContentUnavailableView(
-                "Item Not Found",
-                systemImage:
-                    "questionmark.circle"
-            )
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+        .background(
+            DReportStyle
+                .contentBackground
+        )
     }
 
     private func header(
@@ -1072,24 +1126,60 @@ struct WorkItemDetailView: View {
                     )
             )
             .font(.title2)
-            .frame(
-                width: 28
-            )
+            .frame(width: 28)
 
             VStack(
                 alignment: .leading,
-                spacing: 5
+                spacing: 7
             ) {
-                Text(
-                    displayTitle(
-                        item
+                if
+                    editingField
+                        == .title
+                {
+                    TextField(
+                        "Title",
+                        text:
+                            $textDraft
                     )
-                )
-                .font(.title2)
-                .fontWeight(.semibold)
-                .textSelection(
-                    .enabled
-                )
+                    .font(.title2)
+
+                    InlineEditActions(
+                        onCancel: cancelEdit,
+                        onSave: {
+                            saveTitle(
+                                item
+                            )
+                        }
+                    )
+                } else {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline,
+                        spacing: 8
+                    ) {
+                        Text(
+                            displayTitle(
+                                item
+                            )
+                        )
+                        .font(.title2)
+                        .fontWeight(
+                            .semibold
+                        )
+                        .textSelection(
+                            .enabled
+                        )
+
+                        InlineEditButton {
+                            beginTextEdit(
+                                .title,
+                                value:
+                                    item.title
+                                    ?? ""
+                            )
+                        }
+                    }
+                }
 
                 HStack(spacing: 8) {
                     Text(
@@ -1110,7 +1200,8 @@ struct WorkItemDetailView: View {
                     }
 
                     if
-                        item.kind == .task,
+                        item.kind
+                            == .task,
                         let status =
                             item.status
                     {
@@ -1127,46 +1218,480 @@ struct WorkItemDetailView: View {
             }
 
             Spacer()
+        }
+    }
 
-            Button {
-                showingEditor = true
-            } label: {
-                Label(
-                    "Edit",
-                    systemImage:
-                        "pencil"
+    @ViewBuilder
+    private func descriptionSection(
+        _ item: WorkItem
+    ) -> some View {
+        InspectorSection(
+            title: "Description"
+        ) {
+            if
+                editingField
+                    == .body
+            {
+                TextEditor(
+                    text:
+                        $textDraft
                 )
+                .frame(
+                    minHeight: 130
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 6
+                    )
+                    .stroke(
+                        Color.secondary
+                            .opacity(0.18)
+                    )
+                }
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveBody(
+                            item
+                        )
+                    }
+                )
+            } else {
+                HStack(
+                    alignment: .top,
+                    spacing: 10
+                ) {
+                    Group {
+                        if
+                            item.body
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                                .isEmpty
+                        {
+                            Text(
+                                "No description"
+                            )
+                            .foregroundStyle(
+                                .tertiary
+                            )
+                        } else {
+                            Text(
+                                item.body
+                            )
+                            .textSelection(
+                                .enabled
+                            )
+                        }
+                    }
+
+                    Spacer()
+
+                    InlineEditButton {
+                        beginTextEdit(
+                            .body,
+                            value:
+                                item.body
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func detailsSection(
+        _ item: WorkItem
+    ) -> some View {
+        InspectorSection(
+            title: "Details"
+        ) {
+            VStack(spacing: 9) {
+                themeRow(item)
+
+                parentRow(item)
+
+                if
+                    item.kind
+                        == .task
+                {
+                    statusRow(item)
+                    deadlineRow(item)
+                }
+
+                if
+                    item.kind
+                        == .note
+                {
+                    reminderRow(item)
+                }
+
+                if
+                    item.kind
+                        == .activity
+                {
+                    eventDateRow(item)
+                    reminderRow(item)
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .red
+                    )
+                    .padding(.top, 4)
             }
         }
     }
 
     @ViewBuilder
-    private func keyInformation(
+    private func themeRow(
         _ item: WorkItem
     ) -> some View {
-        let rows =
-            informationRows(
-                item
-            )
-
-        if !rows.isEmpty {
-            detailSection(
-                "Details"
+        if
+            editingField
+                == .theme
+        {
+            InlineEditorRow(
+                label: "Theme"
             ) {
-                VStack(spacing: 9) {
+                Picker(
+                    "",
+                    selection:
+                        $uuidDraft
+                ) {
+                    Text("No Theme")
+                        .tag(
+                            Optional<UUID>.none
+                        )
+
                     ForEach(
-                        Array(
-                            rows.enumerated()
-                        ),
-                        id: \.offset
-                    ) { _, row in
-                        DetailValueRow(
-                            label: row.0,
-                            value: row.1
+                        sortedThemes
+                    ) { theme in
+                        Text(theme.name)
+                            .tag(
+                                Optional(
+                                    theme.id
+                                )
+                            )
+                    }
+                }
+                .labelsHidden()
+                .frame(
+                    maxWidth: 280
+                )
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveTheme(
+                            item
+                        )
+                    }
+                )
+            }
+        } else {
+            EditableValueRow(
+                label: "Theme",
+                value:
+                    item.themeID
+                        .flatMap {
+                            store.theme(
+                                id: $0
+                            )?.name
+                        }
+                    ?? "No Theme",
+                onEdit: {
+                    uuidDraft =
+                        item.themeID
+
+                    editingField =
+                        .theme
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func parentRow(
+        _ item: WorkItem
+    ) -> some View {
+        if
+            editingField
+                == .parent
+        {
+            InlineEditorRow(
+                label: "Parent"
+            ) {
+                Picker(
+                    "",
+                    selection:
+                        $uuidDraft
+                ) {
+                    Text("No Parent")
+                        .tag(
+                            Optional<UUID>
+                                .none
+                        )
+
+                    ForEach(
+                        availableParentTasks(
+                            for:
+                                item.id
+                        )
+                    ) { parent in
+                        Text(
+                            displayTitle(
+                                parent
+                            )
+                        )
+                        .tag(
+                            Optional(
+                                parent.id
+                            )
                         )
                     }
                 }
+                .labelsHidden()
+                .frame(
+                    maxWidth: 300
+                )
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveParent(
+                            item
+                        )
+                    }
+                )
             }
+        } else {
+            EditableValueRow(
+                label: "Parent",
+                value:
+                    parentName(
+                        item
+                    ),
+                onEdit: {
+                    uuidDraft =
+                        item
+                            .parentWorkItemID
+
+                    editingField =
+                        .parent
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func statusRow(
+        _ item: WorkItem
+    ) -> some View {
+        if
+            editingField
+                == .status
+        {
+            InlineEditorRow(
+                label: "Status"
+            ) {
+                Picker(
+                    "",
+                    selection:
+                        $statusDraft
+                ) {
+                    Text("To Do")
+                        .tag(
+                            TaskStatus.todo
+                        )
+
+                    Text("In Progress")
+                        .tag(
+                            TaskStatus
+                                .inProgress
+                        )
+
+                    Text("Completed")
+                        .tag(
+                            TaskStatus
+                                .completed
+                        )
+                }
+                .labelsHidden()
+                .frame(
+                    maxWidth: 220
+                )
+
+                InlineEditActions(
+                    onCancel:
+                        cancelEdit,
+                    onSave: {
+                        saveStatus(
+                            item
+                        )
+                    }
+                )
+            }
+        } else {
+            EditableValueRow(
+                label: "Status",
+                value:
+                    item.status?
+                        .displayName
+                    ?? "To Do",
+                onEdit: {
+                    statusDraft =
+                        item.status
+                        ?? .todo
+
+                    editingField =
+                        .status
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func deadlineRow(
+        _ item: WorkItem
+    ) -> some View {
+        if
+            editingField
+                == .deadline
+        {
+            dateEditorRow(
+                label: "Deadline",
+                field: .deadline,
+                item: item
+            )
+        } else {
+            EditableValueRow(
+                label: "Deadline",
+                value:
+                    item.deadlineAt
+                        .map(formatted)
+                    ?? "None",
+                onEdit: {
+                    beginDateEdit(
+                        .deadline,
+                        date:
+                            item.deadlineAt
+                    )
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func reminderRow(
+        _ item: WorkItem
+    ) -> some View {
+        if
+            editingField
+                == .reminder
+        {
+            dateEditorRow(
+                label: "Reminder",
+                field: .reminder,
+                item: item
+            )
+        } else {
+            EditableValueRow(
+                label: "Reminder",
+                value:
+                    item.reminderAt
+                        .map(formatted)
+                    ?? "None",
+                onEdit: {
+                    beginDateEdit(
+                        .reminder,
+                        date:
+                            item.reminderAt
+                    )
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func eventDateRow(
+        _ item: WorkItem
+    ) -> some View {
+        if
+            editingField
+                == .eventDate
+        {
+            dateEditorRow(
+                label: "Event",
+                field: .eventDate,
+                item: item
+            )
+        } else {
+            EditableValueRow(
+                label: "Event",
+                value:
+                    item.scheduledAt
+                        .map(formatted)
+                    ?? "None",
+                onEdit: {
+                    beginDateEdit(
+                        .eventDate,
+                        date:
+                            item.scheduledAt
+                    )
+                }
+            )
+        }
+    }
+
+    private func dateEditorRow(
+        label: String,
+        field: EditableField,
+        item: WorkItem
+    ) -> some View {
+        InlineEditorRow(
+            label: label
+        ) {
+            Toggle(
+                "Set",
+                isOn:
+                    $dateEnabledDraft
+            )
+            .toggleStyle(
+                .checkbox
+            )
+
+            if dateEnabledDraft {
+                DatePicker(
+                    "",
+                    selection:
+                        $dateDraft,
+                    displayedComponents:
+                        [
+                            .date,
+                            .hourAndMinute
+                        ]
+                )
+                .labelsHidden()
+            }
+
+            InlineEditActions(
+                onCancel:
+                    cancelEdit,
+                onSave: {
+                    saveDate(
+                        field,
+                        item: item
+                    )
+                }
+            )
         }
     }
 
@@ -1180,12 +1705,13 @@ struct WorkItemDetailView: View {
             )
 
         if path.count > 1 {
-            detailSection(
-                "Location"
+            InspectorSection(
+                title: "Location"
             ) {
                 Text(
                     path.joined(
-                        separator: "  ›  "
+                        separator:
+                            "  ›  "
                     )
                 )
                 .foregroundStyle(
@@ -1208,17 +1734,19 @@ struct WorkItemDetailView: View {
             )
 
         if !children.isEmpty {
-            detailSection(
-                "Contains"
+            InspectorSection(
+                title: "Contains"
             ) {
                 VStack(
                     alignment: .leading,
                     spacing: 4
                 ) {
-                    ForEach(children) {
-                        child in
-
+                    ForEach(
+                        children
+                    ) { child in
                         Button {
+                            cancelEdit()
+
                             selectedWorkItemID =
                                 child.id
                         } label: {
@@ -1248,7 +1776,9 @@ struct WorkItemDetailView: View {
                                         child
                                     )
                                 )
-                                .font(.caption)
+                                .font(
+                                    .caption
+                                )
                                 .foregroundStyle(
                                     .secondary
                                 )
@@ -1261,7 +1791,9 @@ struct WorkItemDetailView: View {
                                 Rectangle()
                             )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(
+                            .plain
+                        )
                     }
                 }
             }
@@ -1281,8 +1813,9 @@ struct WorkItemDetailView: View {
                 }
 
         if !relationships.isEmpty {
-            detailSection(
-                "Related People & Organizations"
+            InspectorSection(
+                title:
+                    "Related People & Organizations"
             ) {
                 VStack(
                     alignment: .leading,
@@ -1291,55 +1824,186 @@ struct WorkItemDetailView: View {
                     ForEach(
                         relationships
                     ) { relationship in
-                        if
-                            let entity =
-                                store.entity(
-                                    id:
-                                        relationship
-                                            .entityID
-                                )
-                        {
-                            HStack(
-                                alignment:
-                                    .firstTextBaseline
-                            ) {
-                                Text(
-                                    relationshipLabel(
-                                        relationship
-                                            .role
-                                    )
-                                )
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                                .frame(
-                                    width: 110,
-                                    alignment:
-                                        .leading
-                                )
-
-                                Text(
-                                    entity.name
-                                )
-
-                                Spacer()
-                            }
-                            .font(.callout)
-                        }
+                        relationshipRow(
+                            relationship
+                        )
                     }
                 }
             }
         }
     }
 
+    @ViewBuilder
+    private func relationshipRow(
+        _ relationship:
+            WorkEntityRelationship
+    ) -> some View {
+        if
+            editingField
+                == .relationship(
+                    relationship.id
+                )
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                HStack {
+                    Picker(
+                        "",
+                        selection:
+                            $relationshipRoleDraft
+                    ) {
+                        relationshipRoleOptions
+                    }
+                    .labelsHidden()
+                    .frame(
+                        width: 140
+                    )
+
+                    Picker(
+                        "",
+                        selection:
+                            $relationshipEntityDraft
+                    ) {
+                        ForEach(
+                            sortedEntities
+                        ) { entity in
+                            Text(
+                                entity.name
+                            )
+                            .tag(
+                                Optional(
+                                    entity.id
+                                )
+                            )
+                        }
+                    }
+                    .labelsHidden()
+
+                    Spacer()
+                }
+
+                HStack {
+                    Button(
+                        "Remove",
+                        role:
+                            .destructive
+                    ) {
+                        store
+                            .removeWorkRelationship(
+                                relationshipID:
+                                    relationship.id
+                            )
+
+                        cancelEdit()
+                    }
+
+                    Spacer()
+
+                    InlineEditActions(
+                        onCancel:
+                            cancelEdit,
+                        onSave: {
+                            saveRelationship(
+                                relationship
+                            )
+                        }
+                    )
+                }
+            }
+            .padding(.vertical, 3)
+        } else {
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 16
+            ) {
+                Text(
+                    relationshipLabel(
+                        relationship.role
+                    )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    width: 110,
+                    alignment: .leading
+                )
+
+                Text(
+                    store.entity(
+                        id:
+                            relationship
+                                .entityID
+                    )?.name
+                    ?? "Unknown"
+                )
+
+                Spacer()
+
+                InlineEditButton {
+                    relationshipRoleDraft =
+                        relationship.role
+
+                    relationshipEntityDraft =
+                        relationship.entityID
+
+                    editingField =
+                        .relationship(
+                            relationship.id
+                        )
+                }
+            }
+            .font(.callout)
+        }
+    }
+
+    private var relationshipRoleOptions:
+        some View
+    {
+        Group {
+            Text("For")
+                .tag(
+                    WorkRelationshipRole
+                        .forWhom
+                )
+
+            Text("Requested by")
+                .tag(
+                    WorkRelationshipRole
+                        .requestedBy
+                )
+
+            Text("With")
+                .tag(
+                    WorkRelationshipRole
+                        .with
+                )
+
+            Text("Assigned to")
+                .tag(
+                    WorkRelationshipRole
+                        .assignedTo
+                )
+
+            Text("Related to")
+                .tag(
+                    WorkRelationshipRole
+                        .relatedTo
+                )
+        }
+    }
+
     private func historySection(
         _ item: WorkItem
     ) -> some View {
-        detailSection(
-            "History"
+        InspectorSection(
+            title: "History"
         ) {
             VStack(spacing: 9) {
-                DetailValueRow(
+                ReadOnlyInspectorRow(
                     label: "Created",
                     value:
                         formatted(
@@ -1347,7 +2011,7 @@ struct WorkItemDetailView: View {
                         )
                 )
 
-                DetailValueRow(
+                ReadOnlyInspectorRow(
                     label: "Updated",
                     value:
                         formatted(
@@ -1359,9 +2023,8 @@ struct WorkItemDetailView: View {
                     let started =
                         item.startedAt
                 {
-                    DetailValueRow(
-                        label:
-                            "Started",
+                    ReadOnlyInspectorRow(
+                        label: "Started",
                         value:
                             formatted(
                                 started
@@ -1373,7 +2036,7 @@ struct WorkItemDetailView: View {
                     let completed =
                         item.completedAt
                 {
-                    DetailValueRow(
+                    ReadOnlyInspectorRow(
                         label:
                             "Completed",
                         value:
@@ -1387,9 +2050,8 @@ struct WorkItemDetailView: View {
                     let logged =
                         item.loggedAt
                 {
-                    DetailValueRow(
-                        label:
-                            "Logged",
+                    ReadOnlyInspectorRow(
+                        label: "Logged",
                         value:
                             formatted(
                                 logged
@@ -1400,68 +2062,364 @@ struct WorkItemDetailView: View {
         }
     }
 
-    private func informationRows(
+    private var sortedThemes:
+        [Theme]
+    {
+        store.data.themes
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    private var sortedEntities:
+        [Entity]
+    {
+        store.data.entities
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    private func availableParentTasks(
+        for itemID: UUID
+    ) -> [WorkItem] {
+        let excluded =
+            descendantIDs(
+                of: itemID
+            )
+            .union([itemID])
+
+        return store.data.workItems
+            .filter {
+                $0.kind == .task
+                && !excluded.contains(
+                    $0.id
+                )
+            }
+            .sorted {
+                displayTitle($0)
+                    .localizedCaseInsensitiveCompare(
+                        displayTitle($1)
+                    )
+                    == .orderedAscending
+            }
+    }
+
+    private func descendantIDs(
+        of itemID: UUID
+    ) -> Set<UUID> {
+        var result =
+            Set<UUID>()
+
+        var queue = [itemID]
+
+        while let current =
+            queue.first
+        {
+            queue.removeFirst()
+
+            let children =
+                store.data.workItems
+                    .filter {
+                        $0.parentWorkItemID
+                            == current
+                    }
+
+            for child in children {
+                if
+                    result.insert(
+                        child.id
+                    ).inserted
+                {
+                    queue.append(
+                        child.id
+                    )
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func beginTextEdit(
+        _ field: EditableField,
+        value: String
+    ) {
+        editingField = field
+        textDraft = value
+        errorMessage = nil
+    }
+
+    private func beginDateEdit(
+        _ field: EditableField,
+        date: Date?
+    ) {
+        editingField = field
+
+        dateEnabledDraft =
+            date != nil
+
+        dateDraft =
+            date
+            ?? Calendar.current.date(
+                byAdding: .day,
+                value: 1,
+                to: Date()
+            )
+            ?? Date()
+
+        errorMessage = nil
+    }
+
+    private func cancelEdit() {
+        editingField = nil
+        errorMessage = nil
+    }
+
+    private func saveTitle(
         _ item: WorkItem
-    ) -> [(String, String)] {
-        var rows:
-            [(String, String)] = []
+    ) {
+        finish(
+            update(
+                item,
+                title:
+                    textDraft
+            )
+        )
+    }
 
-        if
-            item.kind == .task,
-            let deadline =
-                item.deadlineAt
-        {
-            rows.append(
-                (
-                    "Deadline",
-                    formatted(deadline)
+    private func saveBody(
+        _ item: WorkItem
+    ) {
+        finish(
+            update(
+                item,
+                body:
+                    textDraft
+            )
+        )
+    }
+
+    private func saveTheme(
+        _ item: WorkItem
+    ) {
+        finish(
+            update(
+                item,
+                themeID:
+                    uuidDraft,
+                themeWasEdited:
+                    true
+            )
+        )
+    }
+
+
+    private func saveParent(
+        _ item: WorkItem
+    ) {
+        finish(
+            update(
+                item,
+                parentID:
+                    uuidDraft,
+                parentWasEdited:
+                    true
+            )
+        )
+    }
+
+    private func saveStatus(
+        _ item: WorkItem
+    ) {
+        finish(
+            update(
+                item,
+                status:
+                    statusDraft
+            )
+        )
+    }
+
+    private func saveDate(
+        _ field: EditableField,
+        item: WorkItem
+    ) {
+        let value =
+            dateEnabledDraft
+            ? dateDraft
+            : nil
+
+        switch field {
+        case .deadline:
+            finish(
+                update(
+                    item,
+                    deadline:
+                        value,
+                    deadlineWasEdited:
+                        true
                 )
             )
-        }
 
-        if
-            item.kind != .task,
-            let reminder =
-                item.reminderAt
-        {
-            rows.append(
-                (
-                    "Reminder",
-                    formatted(reminder)
+        case .reminder:
+            finish(
+                update(
+                    item,
+                    reminder:
+                        value,
+                    reminderWasEdited:
+                        true
                 )
             )
-        }
 
-        if
-            item.kind == .activity,
-            let eventDate =
-                item.scheduledAt
-        {
-            rows.append(
-                (
-                    "Event",
-                    formatted(eventDate)
+        case .eventDate:
+            finish(
+                update(
+                    item,
+                    scheduled:
+                        value,
+                    scheduledWasEdited:
+                        true
                 )
             )
+
+        default:
+            break
+        }
+    }
+
+    private func saveRelationship(
+        _ relationship:
+            WorkEntityRelationship
+    ) {
+        guard
+            let relationshipEntityDraft
+        else {
+            errorMessage =
+                "Select a related entity."
+            return
         }
 
-        if
+        let error =
+            store
+                .updateWorkRelationshipDetails(
+                    relationshipID:
+                        relationship.id,
+                    entityID:
+                        relationshipEntityDraft,
+                    role:
+                        relationshipRoleDraft
+                )
+
+        finish(error)
+    }
+
+    private func finish(
+        _ error: String?
+    ) {
+        if let error {
+            errorMessage = error
+        } else {
+            editingField = nil
+            errorMessage = nil
+        }
+    }
+
+    private func update(
+        _ item: WorkItem,
+        title: String? = nil,
+        body: String? = nil,
+        themeID: UUID? = nil,
+        themeWasEdited: Bool = false,
+        parentID: UUID? = nil,
+        parentWasEdited: Bool = false,
+        status: TaskStatus? = nil,
+        deadline: Date? = nil,
+        deadlineWasEdited: Bool = false,
+        reminder: Date? = nil,
+        reminderWasEdited: Bool = false,
+        scheduled: Date? = nil,
+        scheduledWasEdited: Bool = false
+    ) -> String? {
+        store.updateWorkItemDetails(
+            itemID:
+                item.id,
+            title:
+                title
+                ?? item.title
+                ?? "",
+            body:
+                body
+                ?? item.body,
+            themeID:
+                themeWasEdited
+                ? themeID
+                : item.themeID,
+            parentWorkItemID:
+                parentWasEdited
+                ? parentID
+                : item.parentWorkItemID,
+            status:
+                item.kind == .task
+                ? (
+                    status
+                    ?? item.status
+                    ?? .todo
+                )
+                : nil,
+            deadlineAt:
+                item.kind == .task
+                ? (
+                    deadlineWasEdited
+                    ? deadline
+                    : item.deadlineAt
+                )
+                : nil,
+            reminderAt:
+                item.kind != .task
+                ? (
+                    reminderWasEdited
+                    ? reminder
+                    : item.reminderAt
+                )
+                : nil,
+            scheduledAt:
+                item.kind == .activity
+                ? (
+                    scheduledWasEdited
+                    ? scheduled
+                    : item.scheduledAt
+                )
+                : nil
+        )
+    }
+
+    private func parentName(
+        _ item: WorkItem
+    ) -> String {
+        guard
             let parentID =
                 item.parentWorkItemID,
             let parent =
                 store.workItem(
                     id: parentID
                 )
-        {
-            rows.append(
-                (
-                    "Parent",
-                    displayTitle(parent)
-                )
-            )
+        else {
+            return "None"
         }
 
-        return rows
+        return displayTitle(
+            parent
+        )
     }
 
     private func childItems(
@@ -1518,22 +2476,6 @@ struct WorkItemDetailView: View {
         return path
     }
 
-    private func detailSection<Content: View>(
-        _ title: String,
-        @ViewBuilder content:
-            () -> Content
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
-            Text(title)
-                .font(.headline)
-
-            content()
-        }
-    }
-
     private func displayTitle(
         _ item: WorkItem
     ) -> String {
@@ -1541,7 +2483,8 @@ struct WorkItemDetailView: View {
             let title = item.title,
             !title
                 .trimmingCharacters(
-                    in: .whitespacesAndNewlines
+                    in:
+                        .whitespacesAndNewlines
                 )
                 .isEmpty
         {
@@ -1561,8 +2504,10 @@ struct WorkItemDetailView: View {
         switch item.kind {
         case .task:
             return "Task"
+
         case .note:
             return "Note"
+
         case .activity:
             return "Event"
         }
@@ -1576,9 +2521,12 @@ struct WorkItemDetailView: View {
             switch item.status {
             case .completed:
                 return "checkmark.circle"
+
             case .inProgress:
                 return "clock"
-            case .todo, nil:
+
+            case .todo,
+                 nil:
                 return "circle"
             }
 
@@ -1610,17 +2558,217 @@ struct WorkItemDetailView: View {
         switch role {
         case .forWhom:
             return "For"
+
         case .requestedBy:
             return "Requested by"
+
         case .with:
             return "With"
+
         case .assignedTo:
             return "Assigned to"
+
         case .relatedTo:
             return "Related to"
         }
     }
 }
+
+private struct InspectorSection<
+    Content: View
+>: View {
+    let title: String
+    let content: Content
+
+    init(
+        title: String,
+        @ViewBuilder content:
+            () -> Content
+    ) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(title)
+                .font(.headline)
+
+            content
+        }
+    }
+}
+
+private struct EditableValueRow:
+    View
+{
+    let label: String
+    let value: String
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing: 16
+        ) {
+            Text(label)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    width: 110,
+                    alignment: .leading
+                )
+
+            Text(value)
+                .textSelection(
+                    .enabled
+                )
+
+            Spacer()
+
+            InlineEditButton(
+                action: onEdit
+            )
+        }
+        .font(.callout)
+    }
+}
+
+private struct ReadOnlyInspectorRow:
+    View
+{
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing: 16
+        ) {
+            Text(label)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    width: 110,
+                    alignment: .leading
+                )
+
+            Text(value)
+                .textSelection(
+                    .enabled
+                )
+
+            Spacer()
+        }
+        .font(.callout)
+    }
+}
+
+private struct InlineEditorRow<
+    Content: View
+>: View {
+    let label: String
+    let content: Content
+
+    init(
+        label: String,
+        @ViewBuilder content:
+            () -> Content
+    ) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(
+            alignment: .center,
+            spacing: 12
+        ) {
+            Text(label)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    width: 110,
+                    alignment: .leading
+                )
+
+            content
+        }
+        .font(.callout)
+    }
+}
+
+private struct InlineEditButton:
+    View
+{
+    let action: () -> Void
+
+    var body: some View {
+        Button(
+            action: action
+        ) {
+            Image(
+                systemName: "pencil"
+            )
+            .font(
+                .system(
+                    size: 10,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                .tertiary
+            )
+            .frame(
+                width: 20,
+                height: 20
+            )
+            .contentShape(
+                Rectangle()
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Edit")
+    }
+}
+
+private struct InlineEditActions:
+    View
+{
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button("Cancel") {
+                onCancel()
+            }
+            .buttonStyle(
+                .borderless
+            )
+
+            Button("Save") {
+                onSave()
+            }
+            .buttonStyle(
+                .borderless
+            )
+            .fontWeight(
+                .medium
+            )
+        }
+        .font(.caption)
+    }
+}
+
 
 private struct DetailValueRow: View {
     let label: String
@@ -1661,27 +2809,47 @@ struct WorkDetailRouterView: View {
     var selectedPersonID: UUID?
 
     var body: some View {
-        if
-            section == .people,
-            let selectedPersonID
-        {
-            PersonDetailView(
-                personID:
-                    selectedPersonID
+        ZStack {
+            DReportStyle
+                .contentBackground
+                .ignoresSafeArea()
+
+            Group {
+                if
+                    section == .people,
+                    let selectedPersonID
+                {
+                    PersonDetailView(
+                        personID:
+                            selectedPersonID
+                    )
+                } else if
+                    isWorkSection,
+                    let selectedWorkItemID
+                {
+                    WorkItemDetailView(
+                        itemID:
+                            selectedWorkItemID,
+                        selectedWorkItemID:
+                            $selectedWorkItemID
+                    )
+                } else {
+                    DetailPlaceholderView()
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
             )
-        } else if
-            isWorkSection,
-            let selectedWorkItemID
-        {
-            WorkItemDetailView(
-                itemID:
-                    selectedWorkItemID,
-                selectedWorkItemID:
-                    $selectedWorkItemID
-            )
-        } else {
-            DetailPlaceholderView()
         }
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+        .background(
+            DReportStyle
+                .contentBackground
+        )
     }
 
     private var isWorkSection: Bool {

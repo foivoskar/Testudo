@@ -1810,7 +1810,7 @@ extension DReportStore {
         itemID: UUID,
         title: String,
         body: String,
-        themeID: UUID,
+        themeID: UUID?,
         parentWorkItemID: UUID?,
         status: TaskStatus?,
         deadlineAt: Date?,
@@ -1828,14 +1828,16 @@ extension DReportStore {
             return "Work item not found."
         }
 
-        guard
-            data.themes.contains(
-                where: {
-                    $0.id == themeID
-                }
-            )
-        else {
-            return "Theme not found."
+        if let themeID {
+            guard
+                data.themes.contains(
+                    where: {
+                        $0.id == themeID
+                    }
+                )
+            else {
+                return "Theme not found."
+            }
         }
 
         if let parentWorkItemID {
@@ -2021,5 +2023,61 @@ extension DReportStore {
         save()
 
         return nil
+    }
+}
+
+
+extension DReportStore {
+    func updateWorkRelationshipDetails(
+        relationshipID: UUID,
+        entityID: UUID,
+        role: WorkRelationshipRole
+    ) -> String? {
+        guard
+            let index =
+                data.workEntityRelationships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == relationshipID
+                        }
+                    )
+        else {
+            return "Relationship not found."
+        }
+
+        guard
+            data.entities.contains(
+                where: {
+                    $0.id == entityID
+                }
+            )
+        else {
+            return "Related entity not found."
+        }
+
+        data.workEntityRelationships[index]
+            .entityID =
+            entityID
+
+        data.workEntityRelationships[index]
+            .role =
+            role
+
+        save()
+
+        return nil
+    }
+
+    func removeWorkRelationship(
+        relationshipID: UUID
+    ) {
+        data.workEntityRelationships
+            .removeAll {
+                $0.id
+                    == relationshipID
+            }
+
+        save()
     }
 }
