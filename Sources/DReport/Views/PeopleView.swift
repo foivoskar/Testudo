@@ -97,7 +97,7 @@ private struct PersonListRow: View {
             Spacer()
 
             if
-                store.user(
+                store.environmentMembership(
                     linkedToPerson:
                         person.id
                 ) != nil
@@ -111,7 +111,7 @@ private struct PersonListRow: View {
                     .secondary
                 )
                 .help(
-                    "DReport user account"
+                    "Environment membership"
                 )
             }
         }
@@ -240,7 +240,7 @@ struct PersonDetailView: View {
     private var showingEditor = false
 
     @State
-    private var showingAccountManager = false
+    private var showingMembershipManager = false
 
 
     @State
@@ -307,28 +307,9 @@ struct PersonDetailView: View {
             }
             .sheet(
                 isPresented:
-                    $showingAccountManager
+                    $showingMembershipManager
             ) {
-                if
-                    let user =
-                        store.user(
-                            linkedToPerson:
-                                personID
-                        )
-                {
-                    UserAccountEditorView(
-                        userID:
-                            user.id,
-                        showsCloseButton:
-                            true
-                    )
-                    .frame(
-                        minWidth: 680,
-                        idealWidth: 720,
-                        minHeight: 600,
-                        idealHeight: 650
-                    )
-                }
+                EnvironmentMembershipManagementView()
             }
         } else {
             ContentUnavailableView(
@@ -901,52 +882,97 @@ struct PersonDetailView: View {
     private var accountSection:
         some View
     {
-        Group {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                10
+        ) {
+            Text(
+                "Environment Membership"
+            )
+            .font(
+                .headline
+            )
+
             if
-                let user =
-                    store.user(
+                let membership =
+                    store.environmentMembership(
                         linkedToPerson:
                             personID
                     )
             {
-                VStack(
-                    alignment: .leading,
-                    spacing: 10
+                ReadOnlyValueRow(
+                    label:
+                        "Identity identifier",
+                    value:
+                        membership
+                            .directoryUserIdentifier
+                        ?? "—"
+                )
+
+                ReadOnlyValueRow(
+                    label:
+                        "Role",
+                    value:
+                        membership
+                            .role
+                            .displayName
+                )
+
+                ReadOnlyValueRow(
+                    label:
+                        "Status",
+                    value:
+                        membership.isActive
+                        ? "Active"
+                        : "Inactive"
+                )
+
+                ReadOnlyValueRow(
+                    label:
+                        "Authentication",
+                    value:
+                        store
+                            .environmentMembershipHasPassword(
+                                id:
+                                    membership.id
+                            )
+                        ? "Local password set"
+                        : "No local password"
+                )
+
+            } else {
+                Text(
+                    "This Person is not a member of the active Work Environment."
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            if
+                store
+                    .currentEnvironmentUserIsAdministrator
+            {
+                Button(
+                    "Manage Environment Members…"
                 ) {
-                    Text("DReport Account")
-                        .font(.headline)
-
-                    ReadOnlyValueRow(
-                        label: "Username",
-                        value:
-                            "@\(user.username)"
-                    )
-
-                    ReadOnlyValueRow(
-                        label: "Role",
-                        value:
-                            user.role
-                                .displayName
-                    )
-
-                    ReadOnlyValueRow(
-                        label: "Status",
-                        value:
-                            user.isActive
-                            ? "Active"
-                            : "Disabled"
-                    )
-
-                    if store.currentEnvironmentUserIsAdministrator {
-                        Button("Manage Account…") {
-                            showingAccountManager = true
-                        }
-                        .padding(.top, 4)
-                    }
+                    showingMembershipManager =
+                        true
                 }
+                .padding(
+                    .top,
+                    4
+                )
             }
         }
     }
+
 
     private var relatedWorkItems:
         [WorkItem]

@@ -167,8 +167,17 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var completedAt: Date?
     var loggedAt: Date?
 
+    // Legacy audit identity.
+    //
+    // Existing databases may contain DReportUser UUIDs here.
+    // Keep these fields decode-compatible until the historical
+    // migration is permanently retired.
     var createdByUserID: UUID?
     var updatedByUserID: UUID?
+
+    // Canonical Environment-scoped audit identity.
+    var createdByMembershipID: UUID? = nil
+    var updatedByMembershipID: UUID? = nil
 
     // IANA time-zone identifiers describing the zone
     // in which each timestamp was originally entered
@@ -334,7 +343,11 @@ struct HistoryEvent: Identifiable, Codable, Hashable {
     var previousValue: String?
     var newValue: String?
 
+    // Legacy DReportUser audit reference.
     var actorUserID: UUID?
+
+    // Canonical Environment membership audit reference.
+    var actorMembershipID: UUID? = nil
 
     // Zone where the history action happened.
     var timeZoneID: String? = nil

@@ -2007,39 +2007,36 @@ final class DReportStore: ObservableObject {
             EnvironmentMembership
     ) -> DReportUser? {
 
-        if
-            let personID =
-                membership
-                    .personEntityID,
-            let user =
-                data.users.first(
-                    where: {
-                        $0.personEntityID
-                            == personID
-                    }
-                )
-        {
-            return user
-        }
+        // Legacy credentials are migration material only.
+        //
+        // Do not infer a legacy credential merely because a new
+        // membership links to the same Person.
+        //
+        // Migrated memberships received the old username as their
+        // identity identifier. That identifier is the compatibility
+        // bridge to DReportUser.
 
-
-        if
+        guard
             let identifier =
                 membership
-                    .directoryUserIdentifier
-        {
-            return
-                data.users.first {
-                    $0.username
-                        .caseInsensitiveCompare(
-                            identifier
-                        )
-                        == .orderedSame
-                }
+                    .directoryUserIdentifier?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !identifier.isEmpty
+        else {
+            return nil
         }
 
-
-        return nil
+        return
+            data.users.first {
+                $0.username
+                    .caseInsensitiveCompare(
+                        identifier
+                    )
+                    == .orderedSame
+            }
     }
 
 
@@ -3007,6 +3004,10 @@ final class DReportStore: ObservableObject {
                     currentUserID,
                 updatedByUserID:
                     currentUserID,
+                createdByMembershipID:
+                    currentEnvironmentMembership?.id,
+                updatedByMembershipID:
+                    currentEnvironmentMembership?.id,
                 createdTimeZoneID:
                     currentTimeZoneID,
                 updatedTimeZoneID:
@@ -3039,6 +3040,8 @@ final class DReportStore: ObservableObject {
                     "Created \(kind.displayName.lowercased())",
                 actorUserID:
                     currentUserID,
+                actorMembershipID:
+                    currentEnvironmentMembership?.id,
                 timeZoneID:
                     currentTimeZoneID
             )
@@ -3181,6 +3184,8 @@ final class DReportStore: ObservableObject {
 
         data.workItems[index].updatedByUserID =
             currentUserID
+        data.workItems[index].updatedByMembershipID =
+            currentEnvironmentMembership?.id
 
         data.workItems[index]
             .updatedTimeZoneID =
@@ -3267,8 +3272,9 @@ final class DReportStore: ObservableObject {
                 newValue:
                     status.rawValue,
                 actorUserID:
-                    currentUserID
-,
+                    currentUserID,
+                actorMembershipID:
+                    currentEnvironmentMembership?.id,
                 timeZoneID:
                     currentTimeZoneID            )
         )
@@ -3801,22 +3807,30 @@ extension DReportStore {
             )
         }
 
-        if let userIndex =
-            data.users.firstIndex(
-                where: {
-                    $0.personEntityID
-                        == updated.entityID
-                }
-            )
+        for membershipIndex in
+            data.environmentMemberships.indices
         {
-            data.users[userIndex].firstName =
+            guard
+                data.environmentMemberships[
+                    membershipIndex
+                ]
+                .personEntityID
+                    == updated.entityID
+            else {
+                continue
+            }
+
+            data.environmentMemberships[
+                membershipIndex
+            ]
+            .firstName =
                 updated.firstName
 
-            data.users[userIndex].lastName =
+            data.environmentMemberships[
+                membershipIndex
+            ]
+            .lastName =
                 updated.lastName
-
-            data.users[userIndex].avatarData =
-                updated.avatarData
         }
 
         save()
@@ -5014,6 +5028,9 @@ extension DReportStore {
         data.workItems[index]
             .updatedByUserID =
             currentUserID
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?.id
 
         save()
 
@@ -5105,6 +5122,9 @@ extension DReportStore {
         data.workItems[workIndex]
             .updatedByUserID =
             currentUserID
+        data.workItems[workIndex]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?.id
 
         data.historyEvents
             .append(
@@ -5119,6 +5139,8 @@ extension DReportStore {
                         "\(role.displayName): \(entity.name)",
                     actorUserID:
                         currentUserID,
+                    actorMembershipID:
+                        currentEnvironmentMembership?.id,
                     timeZoneID:
                         timeZoneID
                 )
@@ -5293,6 +5315,10 @@ extension DReportStore {
                     currentUserID,
                 updatedByUserID:
                     currentUserID,
+                createdByMembershipID:
+                    currentEnvironmentMembership?.id,
+                updatedByMembershipID:
+                    currentEnvironmentMembership?.id,
                 createdTimeZoneID:
                     currentTimeZoneID,
                 updatedTimeZoneID:
@@ -5348,8 +5374,9 @@ extension DReportStore {
                     ? "Logged event"
                     : "Created \(kind.displayName.lowercased())",
                 actorUserID:
-                    currentUserID
-,
+                    currentUserID,
+                actorMembershipID:
+                    currentEnvironmentMembership?.id,
                 timeZoneID:
                     currentTimeZoneID            )
         )
@@ -5445,6 +5472,8 @@ extension DReportStore {
                     newValue,
                 actorUserID:
                     currentUserID,
+                actorMembershipID:
+                    currentEnvironmentMembership?.id,
                 timeZoneID:
                     DReportTime
                         .deviceTimeZoneID,
@@ -9267,5 +9296,36 @@ extension DReportStore {
                     .atomic
             )
         }
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Person / Environment Membership bridge
+// ============================================================
+
+extension DReportStore {
+
+    func environmentMembership(
+        linkedToPerson personEntityID:
+            UUID
+    ) -> EnvironmentMembership? {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return nil
+        }
+
+        return
+            data
+                .environmentMemberships
+                .first {
+                    $0.environmentID
+                        == environmentID
+                    && $0.personEntityID
+                        == personEntityID
+                }
     }
 }

@@ -1,5 +1,21 @@
 import Foundation
 
+// ============================================================
+// LEGACY COMPATIBILITY MODEL
+//
+// UserRole and DReportUser remain only so older Environment
+// databases can be decoded and migrated.
+//
+// They are NOT the current account system.
+//
+// Runtime identity, permissions and authentication belong to:
+//
+//   EnvironmentMembership
+//   EnvironmentCredential
+//
+// Do not build new runtime functionality on DReportUser.
+// ============================================================
+
 enum UserRole: String, Codable, CaseIterable, Identifiable {
     case administrator
     case member
