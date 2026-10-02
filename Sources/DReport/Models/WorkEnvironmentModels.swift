@@ -376,3 +376,83 @@ enum EnvironmentOpenOutcome {
     case identityRequired
     case failed(String)
 }
+
+
+
+// ============================================================
+// MARK: - Environment-local authentication credentials
+//
+// Credentials belong to the Work Environment, never to the
+// application installation and never to LocalUserProfile.
+//
+// For a Local Folder Environment these are stored beside the
+// Environment database in EnvironmentCredentials.json.
+//
+// Future directory providers may authenticate externally and
+// therefore may not use a local EnvironmentCredential.
+// ============================================================
+
+struct EnvironmentCredential:
+    Identifiable,
+    Codable,
+    Hashable
+{
+    var membershipID:
+        UUID
+
+    var passwordSaltBase64:
+        String
+
+    var passwordHashBase64:
+        String
+
+    var passwordIterations:
+        Int
+
+    var createdAt:
+        Date
+
+    var updatedAt:
+        Date
+
+
+    var id:
+        UUID
+    {
+        membershipID
+    }
+}
+
+
+struct EnvironmentCredentialStore:
+    Codable,
+    Hashable
+{
+    var schemaVersion:
+        Int
+
+    var environmentID:
+        UUID
+
+    var credentials:
+        [EnvironmentCredential]
+
+
+    init(
+        schemaVersion:
+            Int = 1,
+        environmentID:
+            UUID,
+        credentials:
+            [EnvironmentCredential] = []
+    ) {
+        self.schemaVersion =
+            schemaVersion
+
+        self.environmentID =
+            environmentID
+
+        self.credentials =
+            credentials
+    }
+}

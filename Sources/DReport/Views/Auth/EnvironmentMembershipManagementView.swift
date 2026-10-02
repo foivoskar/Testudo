@@ -400,6 +400,14 @@ private struct EnvironmentMembershipEditorView:
     private var messageIsError =
         false
 
+    @State
+    private var showingPasswordEditor =
+        false
+
+    @State
+    private var passwordRevision =
+        0
+
 
     var body: some View {
         Group {
@@ -424,6 +432,10 @@ private struct EnvironmentMembershipEditorView:
                         Divider()
 
                         identitySection(
+                            membership
+                        )
+
+                        authenticationSection(
                             membership
                         )
 
@@ -496,6 +508,36 @@ private struct EnvironmentMembershipEditorView:
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingPasswordEditor
+        ) {
+            EnvironmentPasswordEditorView(
+                membershipID:
+                    membershipID,
+                memberName:
+                    store
+                        .environmentMembership(
+                            id:
+                                membershipID
+                        )?
+                        .displayName
+                    ?? "Environment Member"
+            ) {
+                passwordRevision +=
+                    1
+            }
+            .environmentObject(
+                store
+            )
+        }
+    }
+
+
+    private var passwordSheetBinding:
+        Binding<Bool>
+    {
+        $showingPasswordEditor
     }
 
 
@@ -646,6 +688,99 @@ private struct EnvironmentMembershipEditorView:
                     .uuidString
             )
         }
+    }
+
+
+    private func authenticationSection(
+        _ membership:
+            EnvironmentMembership
+    ) -> some View {
+        let hasPassword =
+            store
+                .environmentMembershipHasPassword(
+                    id:
+                        membership.id
+                )
+
+        let _ =
+            passwordRevision
+
+        return
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
+                Text(
+                    "Authentication"
+                )
+                .font(
+                    .headline
+                )
+
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing:
+                        18
+                ) {
+                    Text(
+                        "Local password"
+                    )
+                    .font(
+                        .callout
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .frame(
+                        width:
+                            150,
+                        alignment:
+                            .leading
+                    )
+
+                    Label(
+                        hasPassword
+                        ? "Set"
+                        : "Not set",
+                        systemImage:
+                            hasPassword
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.circle"
+                    )
+                    .font(
+                        .callout
+                    )
+                    .foregroundStyle(
+                        hasPassword
+                        ? Color.secondary
+                        : Color.orange
+                    )
+
+                    Spacer()
+
+                    Button(
+                        hasPassword
+                        ? "Change Password…"
+                        : "Set Password…"
+                    ) {
+                        showingPasswordEditor =
+                            true
+                    }
+                }
+
+                Text(
+                    "This credential belongs to this Work Environment and is separate from the local application profile."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
     }
 
 
@@ -945,6 +1080,200 @@ private struct EnvironmentMembershipEditorView:
 }
 
 
+private struct EnvironmentPasswordEditorView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        DReportStore
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let membershipID:
+        UUID
+
+    let memberName:
+        String
+
+    let onSaved:
+        () -> Void
+
+    @State
+    private var password =
+        ""
+
+    @State
+    private var confirmation =
+        ""
+
+    @State
+    private var errorMessage:
+        String?
+
+
+    var body: some View {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                20
+        ) {
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    4
+            ) {
+                Text(
+                    "Environment Password"
+                )
+                .font(
+                    .title2
+                )
+                .fontWeight(
+                    .semibold
+                )
+
+                Text(
+                    memberName
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            Divider()
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
+                SecureField(
+                    "New password",
+                    text:
+                        $password
+                )
+
+                SecureField(
+                    "Confirm password",
+                    text:
+                        $confirmation
+                )
+
+                Text(
+                    "Minimum 8 characters."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            if let errorMessage {
+                Label(
+                    errorMessage,
+                    systemImage:
+                        "exclamationmark.triangle"
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .red
+                )
+            }
+
+
+            HStack {
+                Spacer()
+
+                Button(
+                    "Cancel"
+                ) {
+                    dismiss()
+                }
+
+                Button(
+                    "Save Password"
+                ) {
+                    save()
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .keyboardShortcut(
+                    .defaultAction
+                )
+            }
+        }
+        .padding(
+            24
+        )
+        .frame(
+            width:
+                430
+        )
+    }
+
+
+    private func save() {
+        errorMessage =
+            nil
+
+        guard
+            password.count
+                >= 8
+        else {
+            errorMessage =
+                "Password must contain at least 8 characters."
+
+            return
+        }
+
+        guard
+            password
+                == confirmation
+        else {
+            errorMessage =
+                "The passwords do not match."
+
+            return
+        }
+
+        if
+            let error =
+                store
+                    .setEnvironmentMembershipPassword(
+                        membershipID:
+                            membershipID,
+                        newPassword:
+                            password
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        onSaved()
+
+        dismiss()
+    }
+}
+
+
 private struct AddEnvironmentMembershipView:
     View
 {
@@ -982,6 +1311,14 @@ private struct AddEnvironmentMembershipView:
     @State
     private var isActive =
         true
+
+    @State
+    private var password =
+        ""
+
+    @State
+    private var passwordConfirmation =
+        ""
 
     @State
     private var errorMessage:
@@ -1155,8 +1492,45 @@ private struct AddEnvironmentMembershipView:
             }
 
 
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
+                Text(
+                    "Authentication"
+                )
+                .font(
+                    .headline
+                )
+
+                SecureField(
+                    "Environment password (optional)",
+                    text:
+                        $password
+                )
+
+                SecureField(
+                    "Confirm password",
+                    text:
+                        $passwordConfirmation
+                )
+
+                Text(
+                    "If provided, this password is scoped only to this Work Environment."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
             Text(
-                "This creates an Environment membership only. It does not create a legacy DReport user account or password."
+                "This creates an Environment membership. It does not create a legacy DReport user account."
             )
             .font(
                 .caption
@@ -1223,6 +1597,28 @@ private struct AddEnvironmentMembershipView:
         errorMessage =
             nil
 
+        if !password.isEmpty {
+            guard
+                password.count
+                    >= 8
+            else {
+                errorMessage =
+                    "Password must contain at least 8 characters."
+
+                return
+            }
+
+            guard
+                password
+                    == passwordConfirmation
+            else {
+                errorMessage =
+                    "The passwords do not match."
+
+                return
+            }
+        }
+
         let result =
             store
                 .addEnvironmentMembership(
@@ -1256,6 +1652,26 @@ private struct AddEnvironmentMembershipView:
 
             return
         }
+
+
+        if !password.isEmpty {
+            if
+                let passwordError =
+                    store
+                        .setEnvironmentMembershipPassword(
+                            membershipID:
+                                membershipID,
+                            newPassword:
+                                password
+                        )
+            {
+                errorMessage =
+                    "The membership was created, but its password could not be saved: \(passwordError)"
+
+                return
+            }
+        }
+
 
         onCreated(
             membershipID

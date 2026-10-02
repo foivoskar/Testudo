@@ -2019,6 +2019,16 @@ final class DReportStore: ObservableObject {
             return false
         }
 
+        if
+            environmentMembershipHasPassword(
+                id:
+                    membershipID
+            )
+        {
+            return true
+        }
+
+        // Backward-compatible fallback only.
         return
             legacyUser(
                 for:
@@ -2071,6 +2081,23 @@ final class DReportStore: ObservableObject {
                     ),
             membership.isActive
         else {
+            currentUserID =
+                nil
+
+            environmentSessionIsOpen =
+                false
+
+            return
+                .identityRequired
+        }
+
+
+        if
+            environmentMembershipNeedsPassword(
+                id:
+                    membership.id
+            )
+        {
             currentUserID =
                 nil
 
@@ -2192,12 +2219,39 @@ final class DReportStore: ObservableObject {
             )
 
 
-        if let legacyUser {
+        if
+            let credential =
+                environmentCredential(
+                    for:
+                        membership.id
+                )
+        {
+            guard
+                PasswordHasher.verify(
+                    password:
+                        password,
+                    saltBase64:
+                        credential
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        credential
+                            .passwordHashBase64,
+                    iterations:
+                        credential
+                            .passwordIterations
+                )
+            else {
+                return
+                    "Incorrect password."
+            }
+
+        } else if let legacyUser {
+            // Transitional fallback for an older Environment that
+            // has not yet produced EnvironmentCredentials.json.
             guard legacyUser.isActive else {
                 return
                     "This Environment account is disabled."
             }
-
 
             guard
                 PasswordHasher.verify(
@@ -8494,5 +8548,397 @@ extension DReportStore {
             membership.id,
             nil
         )
+    }
+}
+
+
+// ============================================================
+// MARK: - Environment-scoped local credentials
+// ============================================================
+
+extension DReportStore {
+
+    private var environmentCredentialStoreURL:
+        URL?
+    {
+        guard
+            fileURL.lastPathComponent
+                == "EnvironmentData.json"
+        else {
+            return nil
+        }
+
+        return
+            fileURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    "EnvironmentCredentials.json"
+                )
+    }
+
+
+    private func loadEnvironmentCredentialStore()
+        -> EnvironmentCredentialStore
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return
+                EnvironmentCredentialStore(
+                    environmentID:
+                        UUID()
+                )
+        }
+
+        guard
+            let url =
+                environmentCredentialStoreURL,
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        url.path
+                )
+        else {
+            return
+                EnvironmentCredentialStore(
+                    environmentID:
+                        environmentID
+                )
+        }
+
+
+        do {
+            let raw =
+                try Data(
+                    contentsOf:
+                        url
+                )
+
+            let decoded =
+                try JSONDecoder()
+                    .decode(
+                        EnvironmentCredentialStore.self,
+                        from:
+                            raw
+                    )
+
+            guard
+                decoded.environmentID
+                    == environmentID
+            else {
+                return
+                    EnvironmentCredentialStore(
+                        environmentID:
+                            environmentID
+                    )
+            }
+
+            return decoded
+
+        } catch {
+            return
+                EnvironmentCredentialStore(
+                    environmentID:
+                        environmentID
+                )
+        }
+    }
+
+
+    @discardableResult
+    private func saveEnvironmentCredentialStore(
+        _ credentialStore:
+            EnvironmentCredentialStore
+    ) -> String? {
+        guard
+            let url =
+                environmentCredentialStoreURL
+        else {
+            return
+                "The Environment credential store is unavailable."
+        }
+
+        do {
+            let encoder =
+                JSONEncoder()
+
+            encoder.outputFormatting =
+                [
+                    .prettyPrinted,
+                    .sortedKeys
+                ]
+
+            let raw =
+                try encoder.encode(
+                    credentialStore
+                )
+
+            try FileManager.default
+                .createDirectory(
+                    at:
+                        url.deletingLastPathComponent(),
+                    withIntermediateDirectories:
+                        true
+                )
+
+            try raw.write(
+                to:
+                    url,
+                options:
+                    .atomic
+            )
+
+            return nil
+
+        } catch {
+            return
+                "The Environment credential store could not be saved."
+        }
+    }
+
+
+    private func migrateLegacyEnvironmentCredentialsIfNeeded() {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return
+        }
+
+        var credentialStore =
+            loadEnvironmentCredentialStore()
+
+        var changed =
+            false
+
+
+        for membership in
+            data.environmentMemberships
+                .filter({
+                    $0.environmentID
+                        == environmentID
+                })
+        {
+            let alreadyMigrated =
+                credentialStore
+                    .credentials
+                    .contains {
+                        $0.membershipID
+                            == membership.id
+                    }
+
+            if alreadyMigrated {
+                continue
+            }
+
+            guard
+                let legacyUser =
+                    legacyUser(
+                        for:
+                            membership
+                    )
+            else {
+                continue
+            }
+
+
+            credentialStore
+                .credentials
+                .append(
+                    EnvironmentCredential(
+                        membershipID:
+                            membership.id,
+                        passwordSaltBase64:
+                            legacyUser
+                                .passwordSaltBase64,
+                        passwordHashBase64:
+                            legacyUser
+                                .passwordHashBase64,
+                        passwordIterations:
+                            legacyUser
+                                .passwordIterations,
+                        createdAt:
+                            legacyUser.createdAt,
+                        updatedAt:
+                            Date()
+                    )
+                )
+
+            changed =
+                true
+        }
+
+
+        if changed {
+            _ =
+                saveEnvironmentCredentialStore(
+                    credentialStore
+                )
+        }
+    }
+
+
+    func environmentMembershipHasPassword(
+        id membershipID:
+            UUID
+    ) -> Bool {
+        migrateLegacyEnvironmentCredentialsIfNeeded()
+
+        return
+            loadEnvironmentCredentialStore()
+                .credentials
+                .contains {
+                    $0.membershipID
+                        == membershipID
+                }
+    }
+
+
+    private func environmentCredential(
+        for membershipID:
+            UUID
+    ) -> EnvironmentCredential? {
+        migrateLegacyEnvironmentCredentialsIfNeeded()
+
+        return
+            loadEnvironmentCredentialStore()
+                .credentials
+                .first {
+                    $0.membershipID
+                        == membershipID
+                }
+    }
+
+
+    @discardableResult
+    func setEnvironmentMembershipPassword(
+        membershipID:
+            UUID,
+        newPassword:
+            String
+    ) -> String? {
+        guard
+            currentEnvironmentUserIsAdministrator
+        else {
+            return
+                "Environment Administrator rights are required."
+        }
+
+        guard
+            let environmentID =
+                activeEnvironmentID,
+            data.environmentMemberships
+                .contains(
+                    where: {
+                        $0.id
+                            == membershipID
+                        && $0.environmentID
+                            == environmentID
+                    }
+                )
+        else {
+            return
+                "Environment membership not found."
+        }
+
+
+        guard
+            newPassword.count
+                >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+
+        let hash:
+            (
+                saltBase64:
+                    String,
+                hashBase64:
+                    String,
+                iterations:
+                    Int
+            )
+
+        do {
+            hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            newPassword
+                    )
+
+        } catch {
+            return
+                "The password could not be secured."
+        }
+
+
+        var credentialStore =
+            loadEnvironmentCredentialStore()
+
+        let now =
+            Date()
+
+
+        if
+            let index =
+                credentialStore
+                    .credentials
+                    .firstIndex(
+                        where: {
+                            $0.membershipID
+                                == membershipID
+                        }
+                    )
+        {
+            credentialStore
+                .credentials[index]
+                .passwordSaltBase64 =
+                    hash.saltBase64
+
+            credentialStore
+                .credentials[index]
+                .passwordHashBase64 =
+                    hash.hashBase64
+
+            credentialStore
+                .credentials[index]
+                .passwordIterations =
+                    hash.iterations
+
+            credentialStore
+                .credentials[index]
+                .updatedAt =
+                    now
+
+        } else {
+            credentialStore
+                .credentials
+                .append(
+                    EnvironmentCredential(
+                        membershipID:
+                            membershipID,
+                        passwordSaltBase64:
+                            hash.saltBase64,
+                        passwordHashBase64:
+                            hash.hashBase64,
+                        passwordIterations:
+                            hash.iterations,
+                        createdAt:
+                            now,
+                        updatedAt:
+                            now
+                    )
+                )
+        }
+
+
+        return
+            saveEnvironmentCredentialStore(
+                credentialStore
+            )
     }
 }
