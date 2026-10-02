@@ -359,12 +359,12 @@ struct EnvironmentAccess:
 // ============================================================
 // MARK: - Portable Environment Manifest
 //
-// Stored inside the Environment directory as:
+// Stored inside the .testudoenv package as:
 //
 //     EnvironmentManifest.json
 //
-// This file makes an external Environment directory
-// self-identifying before its database is opened.
+// This file makes a portable Environment package self-identifying
+// before its database is opened.
 // ============================================================
 
 struct EnvironmentManifest:
@@ -391,7 +391,12 @@ struct EnvironmentManifest:
 // ============================================================
 // MARK: - Environment Storage
 //
-// Physical Environment location known to this app installation.
+// Physical Environment package location known to this app
+// installation.
+//
+// The canonical representation is a user-selected .testudoenv
+// package. Legacy localFolder values remain readable only so old
+// installations can be relocated explicitly.
 //
 // This is deliberately separate from the Environment's identity
 // and authentication provider.
@@ -403,6 +408,10 @@ enum EnvironmentStorageKind:
     CaseIterable,
     Identifiable
 {
+    case testudoPackage
+
+    // Legacy storage kind retained so existing ApplicationData
+    // registries can still be decoded and explicitly relocated.
     case localFolder
 
 
@@ -417,8 +426,11 @@ enum EnvironmentStorageKind:
         String
     {
         switch self {
+        case .testudoPackage:
+            return "Testudo Work Environment Package"
+
         case .localFolder:
-            return "Local Folder"
+            return "Legacy Local Folder"
         }
     }
 }
@@ -434,15 +446,16 @@ struct EnvironmentStorageConfiguration:
 
     var kind:
         EnvironmentStorageKind =
-            .localFolder
+            .testudoPackage
 
     var displayName:
         String = ""
 
-    // Human-readable filesystem path.
+    // Human-readable last-known filesystem path to the
+    // .testudoenv package.
     //
-    // bookmarkData can later preserve macOS sandbox permission
-    // for a user-selected external storage folder.
+    // bookmarkData preserves persistent macOS access to a
+    // user-selected package, including cloud-backed locations.
     var path:
         String?
 

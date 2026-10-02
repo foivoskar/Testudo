@@ -70,6 +70,49 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 
     <key>NSHighResolutionCapable</key>
     <true/>
+
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.testudo.environment</string>
+
+            <key>UTTypeDescription</key>
+            <string>Testudo Work Environment</string>
+
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>com.apple.package</string>
+            </array>
+
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>testudoenv</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Testudo Work Environment</string>
+
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.testudo.environment</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST

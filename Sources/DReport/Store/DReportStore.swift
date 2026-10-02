@@ -533,8 +533,12 @@ final class DReportStore: ObservableObject {
 
     @discardableResult
     func createWorkEnvironment(
-        name: String
+        name:
+            String,
+        packageURL:
+            URL
     ) -> String? {
+
         guard
             let localProfile =
                 applicationData
@@ -555,6 +559,39 @@ final class DReportStore: ObservableObject {
         guard !cleanedName.isEmpty else {
             return
                 "Environment name is required."
+        }
+
+
+        let destinationURL =
+            TestudoEnvironmentPackage
+                .normalizedURL(
+                    packageURL
+                )
+
+
+        guard
+            destinationURL
+                .pathExtension
+                .caseInsensitiveCompare(
+                    TestudoEnvironmentPackage
+                        .filenameExtension
+                )
+                == .orderedSame
+        else {
+            return
+                "A Work Environment must be stored as a .testudoenv package."
+        }
+
+
+        guard
+            !FileManager.default
+                .fileExists(
+                    atPath:
+                        destinationURL.path
+                )
+        else {
+            return
+                "A file or Work Environment already exists at that location."
         }
 
 
@@ -582,22 +619,23 @@ final class DReportStore: ObservableObject {
         let now =
             Date()
 
-        let directoryURL =
-            managedEnvironmentDirectoryURL(
-                for:
-                    environmentID
-            )
 
         let dataURL =
-            directoryURL
+            destinationURL
                 .appendingPathComponent(
                     "EnvironmentData.json"
                 )
 
         let manifestURL =
-            directoryURL
+            destinationURL
                 .appendingPathComponent(
                     "EnvironmentManifest.json"
+                )
+
+        let credentialsURL =
+            destinationURL
+                .appendingPathComponent(
+                    "EnvironmentCredentials.json"
                 )
 
 
@@ -632,7 +670,7 @@ final class DReportStore: ObservableObject {
         newData.schemaVersion =
             max(
                 newData.schemaVersion,
-                7
+                8
             )
 
         newData
@@ -642,48 +680,12 @@ final class DReportStore: ObservableObject {
             ]
 
 
-        let directory =
-            EnvironmentStorageConfiguration(
-                kind:
-                    .localFolder,
-                displayName:
-                    cleanedName,
-                path:
-                    directoryURL.path,
-                bookmarkData:
-                    nil,
-                createdAt:
-                    now,
-                updatedAt:
-                    now,
-                lastConnectedAt:
-                    now
-            )
-
-
         let identityProvider =
             EnvironmentIdentityProviderConfiguration(
                 kind:
                     .localAccounts,
                 displayName:
                     "Local Environment Accounts",
-                createdAt:
-                    now,
-                updatedAt:
-                    now
-            )
-
-
-        let environment =
-            WorkEnvironment(
-                id:
-                    environmentID,
-                name:
-                    cleanedName,
-                storage:
-                    directory,
-                identityProvider:
-                    identityProvider,
                 createdAt:
                     now,
                 updatedAt:
@@ -708,29 +710,37 @@ final class DReportStore: ObservableObject {
             )
 
 
-        do {
-            try FileManager.default
-                .createDirectory(
-                    at:
-                        directoryURL,
-                    withIntermediateDirectories:
-                        true
-                )
+        let credentialStore =
+            EnvironmentCredentialStore(
+                environmentID:
+                    environmentID
+            )
 
 
-            let dataEncoder =
-                JSONEncoder()
+        let encoder =
+            JSONEncoder()
 
-            dataEncoder.outputFormatting = [
+        encoder.outputFormatting =
+            [
                 .prettyPrinted,
                 .sortedKeys
             ]
 
-            dataEncoder.dateEncodingStrategy =
-                .iso8601
+        encoder.dateEncodingStrategy =
+            .iso8601
 
 
-            try dataEncoder
+        do {
+            try FileManager.default
+                .createDirectory(
+                    at:
+                        destinationURL,
+                    withIntermediateDirectories:
+                        false
+                )
+
+
+            try encoder
                 .encode(
                     newData
                 )
@@ -742,7 +752,7 @@ final class DReportStore: ObservableObject {
                 )
 
 
-            try dataEncoder
+            try encoder
                 .encode(
                     manifest
                 )
@@ -753,10 +763,75 @@ final class DReportStore: ObservableObject {
                         .atomic
                 )
 
+
+            try encoder
+                .encode(
+                    credentialStore
+                )
+                .write(
+                    to:
+                        credentialsURL,
+                    options:
+                        .atomic
+                )
+
         } catch {
+
+            try? FileManager.default
+                .removeItem(
+                    at:
+                        destinationURL
+                )
+
             return
                 "The Work Environment could not be created: \(error.localizedDescription)"
         }
+
+
+        _ =
+            destinationURL
+                .startAccessingSecurityScopedResource()
+
+
+        let storage =
+            EnvironmentStorageConfiguration(
+                kind:
+                    .testudoPackage,
+                displayName:
+                    destinationURL
+                        .lastPathComponent,
+                path:
+                    destinationURL.path,
+                bookmarkData:
+                    Self
+                        .securityScopedBookmarkData(
+                            for:
+                                destinationURL
+                        ),
+                createdAt:
+                    now,
+                updatedAt:
+                    now,
+                lastConnectedAt:
+                    now
+            )
+
+
+        let environment =
+            WorkEnvironment(
+                id:
+                    environmentID,
+                name:
+                    cleanedName,
+                storage:
+                    storage,
+                identityProvider:
+                    identityProvider,
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
 
 
         applicationData
@@ -785,13 +860,6 @@ final class DReportStore: ObservableObject {
             environmentID
 
 
-        applicationData.schemaVersion =
-            max(
-                applicationData.schemaVersion,
-                2
-            )
-
-
         fileURL =
             dataURL
 
@@ -804,6 +872,7 @@ final class DReportStore: ObservableObject {
 
         saveApplicationData()
 
+
         return nil
     }
 
@@ -813,20 +882,49 @@ final class DReportStore: ObservableObject {
     // ========================================================
 
     func registerWorkEnvironment(
-        from directoryURL:
+        from packageURL:
             URL
     ) -> (
-        environmentID: UUID?,
-        error: String?
+        environmentID:
+            UUID?,
+        error:
+            String?
     ) {
+
+        let packageURL =
+            packageURL
+                .standardizedFileURL
+
+
+        guard
+            packageURL
+                .pathExtension
+                .caseInsensitiveCompare(
+                    TestudoEnvironmentPackage
+                        .filenameExtension
+                )
+                == .orderedSame
+        else {
+            return (
+                nil,
+                "Select a Testudo Work Environment (.testudoenv)."
+            )
+        }
+
+
+        _ =
+            packageURL
+                .startAccessingSecurityScopedResource()
+
+
         let manifestURL =
-            directoryURL
+            packageURL
                 .appendingPathComponent(
                     "EnvironmentManifest.json"
                 )
 
         let dataURL =
-            directoryURL
+            packageURL
                 .appendingPathComponent(
                     "EnvironmentData.json"
                 )
@@ -841,7 +939,7 @@ final class DReportStore: ObservableObject {
         else {
             return (
                 nil,
-                "This folder does not contain EnvironmentManifest.json."
+                "This package does not contain EnvironmentManifest.json."
             )
         }
 
@@ -855,7 +953,21 @@ final class DReportStore: ObservableObject {
         else {
             return (
                 nil,
-                "This folder does not contain EnvironmentData.json."
+                "This package does not contain EnvironmentData.json."
+            )
+        }
+
+
+        do {
+            try Self
+                .migrateEnvironmentIdentityToSchema8IfNeeded(
+                    at:
+                        dataURL
+                )
+        } catch {
+            return (
+                nil,
+                "The Environment database could not be migrated: \(error.localizedDescription)"
             )
         }
 
@@ -870,6 +982,7 @@ final class DReportStore: ObservableObject {
         let manifest:
             EnvironmentManifest
 
+
         do {
             manifest =
                 try manifestDecoder.decode(
@@ -880,6 +993,7 @@ final class DReportStore: ObservableObject {
                                 manifestURL
                         )
                 )
+
         } catch {
             return (
                 nil,
@@ -926,6 +1040,7 @@ final class DReportStore: ObservableObject {
         let now =
             Date()
 
+
         let identityProvider =
             manifest.identityProvider
             ?? EnvironmentIdentityProviderConfiguration(
@@ -939,16 +1054,22 @@ final class DReportStore: ObservableObject {
                     now
             )
 
-        let directory =
+
+        let storage =
             EnvironmentStorageConfiguration(
                 kind:
-                    .localFolder,
+                    .testudoPackage,
                 displayName:
-                    manifest.name,
+                    packageURL
+                        .lastPathComponent,
                 path:
-                    directoryURL.path,
+                    packageURL.path,
                 bookmarkData:
-                    nil,
+                    Self
+                        .securityScopedBookmarkData(
+                            for:
+                                packageURL
+                        ),
                 createdAt:
                     manifest.createdAt,
                 updatedAt:
@@ -977,7 +1098,7 @@ final class DReportStore: ObservableObject {
             applicationData
                 .workEnvironments[index]
                 .storage =
-                directory
+                storage
 
             applicationData
                 .workEnvironments[index]
@@ -988,7 +1109,9 @@ final class DReportStore: ObservableObject {
                 .workEnvironments[index]
                 .updatedAt =
                 now
+
         } else {
+
             applicationData
                 .workEnvironments
                 .append(
@@ -998,7 +1121,7 @@ final class DReportStore: ObservableObject {
                         name:
                             manifest.name,
                         storage:
-                            directory,
+                            storage,
                         identityProvider:
                             identityProvider,
                         createdAt:
@@ -1013,6 +1136,7 @@ final class DReportStore: ObservableObject {
         applicationData
             .activeEnvironmentID =
             manifest.environmentID
+
 
         saveApplicationData()
 
@@ -1703,43 +1827,24 @@ final class DReportStore: ObservableObject {
     private func environmentDataURL(
         for environment:
             WorkEnvironment
-    ) -> URL {
+    ) -> URL? {
 
-        // A configured Environment storage location always wins.
-        //
-        // User-selected storage folders can later use their
-        // bookmarkData here to restore security-scoped access.
-        if
-            let configuredPath =
-                environment
-                    .storage?
-                    .path?
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    ),
-            !configuredPath.isEmpty
-        {
-            return
-                URL(
-                    fileURLWithPath:
-                        configuredPath,
-                    isDirectory:
-                        true
+        guard
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
                 )
+        else {
+            return nil
+        }
+
+
+        return
+            packageURL
                 .appendingPathComponent(
                     "EnvironmentData.json"
                 )
-        }
-
-        return
-            managedEnvironmentDirectoryURL(
-                for:
-                    environment.id
-            )
-            .appendingPathComponent(
-                "EnvironmentData.json"
-            )
     }
 
 
@@ -1907,11 +2012,16 @@ final class DReportStore: ObservableObject {
         }
 
 
-        let targetURL =
-            environmentDataURL(
-                for:
-                    environment
-            )
+        guard
+            let targetURL =
+                environmentDataURL(
+                    for:
+                        environment
+                )
+        else {
+            return
+                "This Work Environment has no registered storage location. Open its .testudoenv package again."
+        }
 
 
         guard
@@ -8357,5 +8467,294 @@ extension DReportStore {
             options:
                 .atomic
         )
+    }
+}
+
+
+// ============================================================
+// MARK: - Portable Testudo Environment package storage
+// ============================================================
+
+extension DReportStore {
+
+    private static func securityScopedBookmarkData(
+        for url:
+            URL
+    ) -> Data? {
+
+        try? url.bookmarkData(
+            options:
+                [
+                    .withSecurityScope
+                ],
+            includingResourceValuesForKeys:
+                nil,
+            relativeTo:
+                nil
+        )
+    }
+
+
+    private func resolvedStorageURL(
+        for environment:
+            WorkEnvironment
+    ) -> URL? {
+
+        guard
+            let storage =
+                environment.storage
+        else {
+            return nil
+        }
+
+
+        // ----------------------------------------------------
+        // Persistent bookmark is canonical when available.
+        // ----------------------------------------------------
+
+        if
+            let bookmarkData =
+                storage.bookmarkData
+        {
+            var isStale =
+                false
+
+            if
+                let resolved =
+                    try? URL(
+                        resolvingBookmarkData:
+                            bookmarkData,
+                        options:
+                            [
+                                .withSecurityScope
+                            ],
+                        relativeTo:
+                            nil,
+                        bookmarkDataIsStale:
+                            &isStale
+                    )
+            {
+                _ =
+                    resolved
+                        .startAccessingSecurityScopedResource()
+
+                return
+                    resolved
+                        .standardizedFileURL
+            }
+        }
+
+
+        // ----------------------------------------------------
+        // Path remains a human-readable / unsandboxed fallback
+        // for this installation's explicitly registered storage.
+        //
+        // It is never synthesized from Application Support.
+        // ----------------------------------------------------
+
+        guard
+            let configuredPath =
+                storage.path?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !configuredPath.isEmpty
+        else {
+            return nil
+        }
+
+
+        return
+            URL(
+                fileURLWithPath:
+                    configuredPath,
+                isDirectory:
+                    true
+            )
+            .standardizedFileURL
+    }
+
+
+    @discardableResult
+    func saveWorkEnvironmentAsPackage(
+        id environmentID:
+            UUID,
+        destinationURL:
+            URL
+    ) -> String? {
+
+        guard
+            let environmentIndex =
+                applicationData
+                    .workEnvironments
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "Work Environment not found."
+        }
+
+
+        let environment =
+            applicationData
+                .workEnvironments[
+                    environmentIndex
+                ]
+
+
+        guard
+            let sourceDataURL =
+                environmentDataURL(
+                    for:
+                        environment
+                )
+        else {
+            return
+                "The current Environment storage location is unavailable."
+        }
+
+
+        let sourceRoot =
+            sourceDataURL
+                .deletingLastPathComponent()
+                .standardizedFileURL
+
+
+        let destination =
+            TestudoEnvironmentPackage
+                .normalizedURL(
+                    destinationURL
+                )
+                .standardizedFileURL
+
+
+        if
+            destination
+                .pathExtension
+                .caseInsensitiveCompare(
+                    TestudoEnvironmentPackage
+                        .filenameExtension
+                )
+                != .orderedSame
+        {
+            return
+                "The destination must be a .testudoenv package."
+        }
+
+
+        if
+            sourceRoot.path
+                != destination.path
+        {
+            guard
+                !FileManager.default
+                    .fileExists(
+                        atPath:
+                            destination.path
+                    )
+            else {
+                return
+                    "A file or Work Environment already exists at that location."
+            }
+
+
+            if
+                activeEnvironmentID
+                    == environmentID
+            {
+                save()
+            }
+
+
+            do {
+                try FileManager.default
+                    .copyItem(
+                        at:
+                            sourceRoot,
+                        to:
+                            destination
+                    )
+
+            } catch {
+                return
+                    "The Work Environment could not be copied: \(error.localizedDescription)"
+            }
+        }
+
+
+        _ =
+            destination
+                .startAccessingSecurityScopedResource()
+
+
+        let now =
+            Date()
+
+
+        var storage =
+            environment.storage
+            ?? EnvironmentStorageConfiguration()
+
+
+        storage.kind =
+            .testudoPackage
+
+        storage.displayName =
+            destination
+                .lastPathComponent
+
+        storage.path =
+            destination.path
+
+        storage.bookmarkData =
+            Self
+                .securityScopedBookmarkData(
+                    for:
+                        destination
+                )
+
+        storage.updatedAt =
+            now
+
+        storage.lastConnectedAt =
+            now
+
+
+        applicationData
+            .workEnvironments[
+                environmentIndex
+            ]
+            .storage =
+            storage
+
+        applicationData
+            .workEnvironments[
+                environmentIndex
+            ]
+            .updatedAt =
+            now
+
+
+        if
+            activeEnvironmentID
+                == environmentID
+        {
+            fileURL =
+                destination
+                    .appendingPathComponent(
+                        "EnvironmentData.json"
+                    )
+        }
+
+
+        saveApplicationData()
+
+
+        return nil
     }
 }

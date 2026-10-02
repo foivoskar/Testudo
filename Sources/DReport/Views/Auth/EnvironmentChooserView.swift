@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 
 struct EnvironmentChooserView: View {
@@ -294,7 +295,7 @@ struct EnvironmentChooserView: View {
                 loadEnvironment()
             } label: {
                 Label(
-                    "Load Existing Environment…",
+                    "Open Existing Environment…",
                     systemImage:
                         "folder"
                 )
@@ -341,20 +342,24 @@ struct EnvironmentChooserView: View {
 
 
     private func loadEnvironment() {
+
         let panel =
             NSOpenPanel()
 
         panel.title =
-            "Load Work Environment"
+            "Open Testudo Work Environment"
 
         panel.prompt =
-            "Load Environment"
+            "Open Environment"
 
         panel.canChooseFiles =
-            false
+            true
 
         panel.canChooseDirectories =
-            true
+            false
+
+        panel.treatsFilePackagesAsDirectories =
+            false
 
         panel.allowsMultipleSelection =
             false
@@ -362,11 +367,17 @@ struct EnvironmentChooserView: View {
         panel.canCreateDirectories =
             false
 
+        panel.allowedContentTypes =
+            [
+                TestudoEnvironmentPackage
+                    .contentType
+            ]
+
 
         guard
             panel.runModal()
                 == .OK,
-            let directoryURL =
+            let packageURL =
                 panel.url
         else {
             return
@@ -376,7 +387,7 @@ struct EnvironmentChooserView: View {
         let result =
             store.registerWorkEnvironment(
                 from:
-                    directoryURL
+                    packageURL
             )
 
 
@@ -396,7 +407,7 @@ struct EnvironmentChooserView: View {
                 result.environmentID
         else {
             errorMessage =
-                "The Work Environment could not be loaded."
+                "The Work Environment could not be opened."
 
             return
         }
@@ -406,6 +417,8 @@ struct EnvironmentChooserView: View {
             environmentID
         )
     }
+
+
 }
 
 
@@ -455,6 +468,17 @@ private struct CreateWorkEnvironmentView:
                     .secondary
                 )
             }
+
+            Text(
+                "The Environment will be saved as a portable .testudoenv package. Choose any local, cloud-synced or external location in the Save dialog."
+            )
+            .font(
+                .callout
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
 
             TextField(
                 "Environment name",
@@ -509,17 +533,90 @@ private struct CreateWorkEnvironmentView:
 
 
     private func create() {
+
+        errorMessage =
+            nil
+
+
+        let cleanedName =
+            name.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+
+        guard
+            !cleanedName.isEmpty
+        else {
+            errorMessage =
+                "Environment name is required."
+
+            return
+        }
+
+
+        let panel =
+            NSSavePanel()
+
+        panel.title =
+            "Create Testudo Work Environment"
+
+        panel.prompt =
+            "Create Environment"
+
+        panel.canCreateDirectories =
+            true
+
+        panel.isExtensionHidden =
+            false
+
+        panel.allowedContentTypes =
+            [
+                TestudoEnvironmentPackage
+                    .contentType
+            ]
+
+        panel.nameFieldStringValue =
+            TestudoEnvironmentPackage
+                .suggestedFileName(
+                    for:
+                        cleanedName
+                )
+
+
+        guard
+            panel.runModal()
+                == .OK,
+            let selectedURL =
+                panel.url
+        else {
+            return
+        }
+
+
+        let packageURL =
+            TestudoEnvironmentPackage
+                .normalizedURL(
+                    selectedURL
+                )
+
+
         errorMessage =
             store
                 .createWorkEnvironment(
                     name:
-                        name
+                        cleanedName,
+                    packageURL:
+                        packageURL
                 )
+
 
         if errorMessage == nil {
             dismiss()
         }
     }
+
+
 }
 
 
