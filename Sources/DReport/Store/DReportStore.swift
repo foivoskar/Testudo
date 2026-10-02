@@ -2052,8 +2052,13 @@ final class DReportStore: ObservableObject {
         }
 
 
-        // Persist the currently open Environment first.
-        save()
+        // Persist only a genuinely open Environment.
+        //
+        // A Work Environment may have been removed from this
+        // installation while its package remains safely on disk.
+        if environmentSessionIsOpen {
+            save()
+        }
 
 
         fileURL =
@@ -8749,6 +8754,97 @@ extension DReportStore {
                     .appendingPathComponent(
                         "EnvironmentData.json"
                     )
+        }
+
+
+        saveApplicationData()
+
+
+        return nil
+    }
+}
+
+
+// ============================================================
+// MARK: - Work Environment local registration
+// ============================================================
+
+extension DReportStore {
+
+    /// Removes a Work Environment only from this installation's
+    /// local registry.
+    ///
+    /// The Environment package/folder itself is deliberately
+    /// left completely untouched so it can be opened again later.
+    @discardableResult
+    func unregisterWorkEnvironment(
+        id environmentID:
+            UUID
+    ) -> String? {
+
+        guard
+            applicationData
+                .workEnvironments
+                .contains(
+                    where: {
+                        $0.id
+                            == environmentID
+                    }
+                )
+        else {
+            return
+                "Work Environment not found."
+        }
+
+
+        let removingActiveEnvironment =
+            applicationData
+                .activeEnvironmentID
+                == environmentID
+
+
+        // If an Environment is genuinely open, persist its current
+        // state before forgetting the local registration.
+        //
+        // This writes to the existing Environment package but does
+        // not move, rename or delete it.
+        if
+            removingActiveEnvironment,
+            environmentSessionIsOpen
+        {
+            save()
+        }
+
+
+        applicationData
+            .workEnvironments
+            .removeAll {
+                $0.id
+                    == environmentID
+            }
+
+
+        applicationData
+            .environmentAccesses
+            .removeAll {
+                $0.environmentID
+                    == environmentID
+            }
+
+
+        if removingActiveEnvironment {
+
+            applicationData
+                .activeEnvironmentID =
+                nil
+
+            environmentSessionIsOpen =
+                false
+
+            // Do not retain Environment-owned data as the active
+            // in-memory model after the local registration is gone.
+            data =
+                DReportData()
         }
 
 

@@ -23,6 +23,10 @@ struct EnvironmentChooserView: View {
     private var errorMessage:
         String?
 
+    @State
+    private var environmentPendingRemoval:
+        WorkEnvironment?
+
 
     var body: some View {
         ZStack {
@@ -107,6 +111,35 @@ struct EnvironmentChooserView: View {
                 }
             }
         }
+        .alert(
+            item:
+                $environmentPendingRemoval
+        ) {
+            environment in
+
+            Alert(
+                title:
+                    Text(
+                        "Remove Work Environment?"
+                    ),
+                message:
+                    Text(
+                        "“\(environment.name)” will be removed only from this installation of Testudo. Its .testudoenv package and all Environment data will remain untouched at the current storage location, and you can open it again later."
+                    ),
+                primaryButton:
+                    .destructive(
+                        Text(
+                            "Remove"
+                        )
+                    ) {
+                        remove(
+                            environment
+                        )
+                    },
+                secondaryButton:
+                    .cancel()
+            )
+        }
     }
 
 
@@ -141,7 +174,7 @@ struct EnvironmentChooserView: View {
             }
 
             Text(
-                "Choose an existing Work Environment, create a new one, or load one from a directory."
+                "Choose a registered Work Environment, create a new one, or open an existing .testudoenv package."
             )
             .foregroundStyle(
                 .secondary
@@ -161,7 +194,7 @@ struct EnvironmentChooserView: View {
                     "square.stack.3d.up",
                 description:
                     Text(
-                        "Create a new Environment or load an existing one from a directory."
+                        "Create a new Environment or open an existing .testudoenv package."
                     )
             )
             .frame(
@@ -247,6 +280,26 @@ struct EnvironmentChooserView: View {
             Spacer()
 
             Button(
+                role:
+                    .destructive
+            ) {
+                environmentPendingRemoval =
+                    environment
+            } label: {
+                Label(
+                    "Remove",
+                    systemImage:
+                        "minus.circle"
+                )
+            }
+            .buttonStyle(
+                .bordered
+            )
+            .help(
+                "Remove this Environment from Testudo without deleting its package"
+            )
+
+            Button(
                 "Open"
             ) {
                 open(
@@ -306,6 +359,36 @@ struct EnvironmentChooserView: View {
 
             Spacer()
         }
+    }
+
+
+    private func remove(
+        _ environment:
+            WorkEnvironment
+    ) {
+
+        errorMessage =
+            store
+                .unregisterWorkEnvironment(
+                    id:
+                        environment.id
+                )
+
+
+        if
+            entryEnvironmentID
+                == environment.id
+        {
+            entryEnvironmentID =
+                nil
+
+            showingEnvironmentEntry =
+                false
+        }
+
+
+        environmentPendingRemoval =
+            nil
     }
 
 
