@@ -9,7 +9,7 @@ struct AdminToolsView: View {
     private var dismiss
 
     @State
-    private var showingUsers =
+    private var showingMembers =
         false
 
 
@@ -49,9 +49,9 @@ struct AdminToolsView: View {
             )
             .sheet(
                 isPresented:
-                    $showingUsers
+                    $showingMembers
             ) {
-                UserManagementView()
+                EnvironmentMembershipManagementView()
             }
 
         } else {
@@ -250,9 +250,9 @@ struct AdminToolsView: View {
             )
 
             Button(
-                "Manage Environment Users…"
+                "Manage Environment Members…"
             ) {
-                showingUsers =
+                showingMembers =
                     true
             }
         }

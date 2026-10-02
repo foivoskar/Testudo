@@ -1578,6 +1578,154 @@ final class DReportStore: ObservableObject {
     }
 
 
+    var environmentMembershipsForActiveEnvironment:
+        [EnvironmentMembership]
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return []
+        }
+
+        return
+            data.environmentMemberships
+                .filter {
+                    $0.environmentID
+                        == environmentID
+                }
+                .sorted {
+                    $0.displayName
+                        .localizedCaseInsensitiveCompare(
+                            $1.displayName
+                        )
+                        == .orderedAscending
+                }
+    }
+
+
+    func environmentMembership(
+        id membershipID:
+            UUID
+    ) -> EnvironmentMembership? {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return nil
+        }
+
+        return
+            data.environmentMemberships
+                .first {
+                    $0.id
+                        == membershipID
+                    && $0.environmentID
+                        == environmentID
+                }
+    }
+
+
+    @discardableResult
+    func updateEnvironmentMembership(
+        membershipID:
+            UUID,
+        role:
+            EnvironmentRole,
+        isActive:
+            Bool
+    ) -> String? {
+        guard
+            currentEnvironmentUserIsAdministrator
+        else {
+            return
+                "Environment Administrator rights are required."
+        }
+
+        guard
+            let environmentID =
+                activeEnvironmentID,
+            let index =
+                data.environmentMemberships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == membershipID
+                            && $0.environmentID
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "Environment membership not found."
+        }
+
+        let currentMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        if
+            membershipID
+                == currentMembershipID,
+            !isActive
+        {
+            return
+                "You cannot deactivate the Environment membership currently in use."
+        }
+
+        let existing =
+            data.environmentMemberships[
+                index
+            ]
+
+        let removesActiveAdministrator =
+            existing.isActive
+            && existing.role
+                == .administrator
+            && (
+                !isActive
+                || role != .administrator
+            )
+
+        if removesActiveAdministrator {
+            let otherActiveAdministrators =
+                data.environmentMemberships
+                    .filter {
+                        $0.environmentID
+                            == environmentID
+                        && $0.id
+                            != membershipID
+                        && $0.isActive
+                        && $0.role
+                            == .administrator
+                    }
+
+            guard
+                !otherActiveAdministrators
+                    .isEmpty
+            else {
+                return
+                    "The last active Environment Administrator cannot be deactivated or changed to User."
+            }
+        }
+
+        data.environmentMemberships[
+            index
+        ].role =
+            role
+
+        data.environmentMemberships[
+            index
+        ].isActive =
+            isActive
+
+        save()
+
+        return nil
+    }
+
+
+
     private func legacyUser(
         for membership:
             EnvironmentMembership
@@ -3928,38 +4076,7 @@ extension DReportStore {
         !data.users.isEmpty
     }
 
-    var currentUserIsAdministrator:
-        Bool
-    {
-        currentUser?.role
-            == .administrator
-    }
 
-    func createInitialAdministrator(
-        username: String,
-        firstName: String,
-        lastName: String,
-        password: String,
-        avatarData: Data?,
-        staySignedIn: Bool
-    ) -> String? {
-        guard data.users.isEmpty else {
-            return
-                "An administrator account already exists."
-        }
-
-        return createUser(
-            username: username,
-            firstName: firstName,
-            lastName: lastName,
-            password: password,
-            avatarData: avatarData,
-            role: .administrator,
-            signInAfterCreation: true,
-            staySignedIn:
-                staySignedIn
-        )
-    }
 
     func addMember(
         username: String,
@@ -3987,84 +4104,7 @@ extension DReportStore {
         )
     }
 
-    func login(
-        username: String,
-        password: String,
-        staySignedIn: Bool
-    ) -> String? {
-        let cleanedUsername =
-            username.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
 
-        guard
-            let index =
-                data.users.firstIndex(
-                    where: {
-                        $0.username
-                            .caseInsensitiveCompare(
-                                cleanedUsername
-                            )
-                            == .orderedSame
-                    }
-                )
-        else {
-            return
-                "Incorrect username or password."
-        }
-
-        let user =
-            data.users[index]
-
-        guard user.isActive else {
-            return
-                "This account is disabled."
-        }
-
-        guard
-            PasswordHasher.verify(
-                password: password,
-                saltBase64:
-                    user.passwordSaltBase64,
-                expectedHashBase64:
-                    user.passwordHashBase64,
-                iterations:
-                    user.passwordIterations
-            )
-        else {
-            return
-                "Incorrect username or password."
-        }
-
-        currentUserID =
-            user.id
-
-        data.users[index].lastLoginAt =
-            Date()
-
-        data.schemaVersion =
-            max(
-                data.schemaVersion,
-                3
-            )
-
-        if staySignedIn {
-            PersistentSession.save(
-                userID: user.id
-            )
-        } else {
-            PersistentSession.clear()
-        }
-
-        save()
-
-        return nil
-    }
-
-    func signOut() {
-        PersistentSession.clear()
-        currentUserID = nil
-    }
 
     private func createUser(
         username: String,
@@ -4214,27 +4254,7 @@ extension DReportStore {
         return nil
     }
 
-    private func restorePersistentSessionIfPossible() {
-        guard
-            let storedID =
-                PersistentSession
-                    .loadUserID(),
-            let user =
-                data.users.first(
-                    where: {
-                        $0.id == storedID
-                    }
-                ),
-            user.isActive
-        else {
-            PersistentSession.clear()
-            currentUserID = nil
-            return
-        }
 
-        currentUserID =
-            storedID
-    }
 }
 
 
@@ -5645,28 +5665,7 @@ extension DReportStore {
 
 
 extension DReportStore {
-    func verifyCurrentUserPassword(
-        _ password: String
-    ) -> Bool {
-        guard
-            let user =
-                currentUser,
-            user.isActive
-        else {
-            return false
-        }
 
-        return PasswordHasher.verify(
-            password:
-                password,
-            saltBase64:
-                user.passwordSaltBase64,
-            expectedHashBase64:
-                user.passwordHashBase64,
-            iterations:
-                user.passwordIterations
-        )
-    }
 }
 
 
