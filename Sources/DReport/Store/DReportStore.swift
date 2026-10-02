@@ -1630,6 +1630,14 @@ final class DReportStore: ObservableObject {
     func updateEnvironmentMembership(
         membershipID:
             UUID,
+        firstName:
+            String,
+        lastName:
+            String,
+        directoryUserIdentifier:
+            String,
+        personEntityID:
+            UUID?,
         role:
             EnvironmentRole,
         isActive:
@@ -1659,6 +1667,137 @@ final class DReportStore: ObservableObject {
             return
                 "Environment membership not found."
         }
+
+        let cleanedFirstName =
+            firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedLastName =
+            lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedDirectoryIdentifier =
+            directoryUserIdentifier
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        if !cleanedDirectoryIdentifier.isEmpty {
+            let duplicateIdentifier =
+                data.environmentMemberships
+                    .contains {
+                        guard
+                            $0.environmentID
+                                == environmentID,
+                            $0.id
+                                != membershipID,
+                            let existingIdentifier =
+                                $0.directoryUserIdentifier
+                        else {
+                            return false
+                        }
+
+                        return
+                            existingIdentifier
+                                .caseInsensitiveCompare(
+                                    cleanedDirectoryIdentifier
+                                )
+                                == .orderedSame
+                    }
+
+            guard
+                !duplicateIdentifier
+            else {
+                return
+                    "That directory identifier is already used by another Environment membership."
+            }
+        }
+
+
+        var linkedPerson:
+            Entity?
+
+        if let personEntityID {
+            guard
+                let person =
+                    data.entities.first(
+                        where: {
+                            $0.id
+                                == personEntityID
+                            && $0.kind
+                                == .person
+                        }
+                    )
+            else {
+                return
+                    "The selected Person no longer exists."
+            }
+
+            let alreadyLinkedElsewhere =
+                data.environmentMemberships
+                    .contains {
+                        $0.environmentID
+                            == environmentID
+                        && $0.id
+                            != membershipID
+                        && $0.personEntityID
+                            == personEntityID
+                    }
+
+            guard
+                !alreadyLinkedElsewhere
+            else {
+                return
+                    "That Person is already linked to another Environment membership."
+            }
+
+            linkedPerson =
+                person
+        }
+
+
+        let currentStoredMembership =
+            data.environmentMemberships[
+                index
+            ]
+
+        let currentLegacyCredentialUser =
+            legacyUser(
+                for:
+                    currentStoredMembership
+            )
+
+        var proposedIdentity =
+            currentStoredMembership
+
+        proposedIdentity.personEntityID =
+            personEntityID
+
+        proposedIdentity.directoryUserIdentifier =
+            cleanedDirectoryIdentifier.isEmpty
+            ? nil
+            : cleanedDirectoryIdentifier
+
+        if
+            let currentLegacyCredentialUser,
+            legacyUser(
+                for:
+                    proposedIdentity
+            )?.id
+                != currentLegacyCredentialUser.id
+        {
+            return
+                "This change would disconnect the migrated credentials used by this membership. Keep either its linked Person or its current directory identifier until legacy authentication has been fully migrated."
+        }
+
 
         let currentMembershipID =
             currentEnvironmentMembership?
@@ -1708,6 +1847,102 @@ final class DReportStore: ObservableObject {
                     "The last active Environment Administrator cannot be deactivated or changed to User."
             }
         }
+
+        data.environmentMemberships[
+            index
+        ].personEntityID =
+            personEntityID
+
+        data.environmentMemberships[
+            index
+        ].directoryUserIdentifier =
+            cleanedDirectoryIdentifier.isEmpty
+            ? nil
+            : cleanedDirectoryIdentifier
+
+
+        if let linkedPerson {
+            if
+                let profile =
+                    data.personProfiles.first(
+                        where: {
+                            $0.entityID
+                                == linkedPerson.id
+                        }
+                    )
+            {
+                let first =
+                    profile.firstName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                let last =
+                    profile.lastName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                if
+                    !first.isEmpty
+                    || !last.isEmpty
+                {
+                    data.environmentMemberships[
+                        index
+                    ].firstName =
+                        first
+
+                    data.environmentMemberships[
+                        index
+                    ].lastName =
+                        last
+
+                } else {
+                    data.environmentMemberships[
+                        index
+                    ].firstName =
+                        linkedPerson.name
+
+                    data.environmentMemberships[
+                        index
+                    ].lastName =
+                        ""
+                }
+
+            } else {
+                data.environmentMemberships[
+                    index
+                ].firstName =
+                    linkedPerson.name
+
+                data.environmentMemberships[
+                    index
+                ].lastName =
+                    ""
+            }
+
+        } else {
+            guard
+                !cleanedFirstName.isEmpty
+                || !cleanedLastName.isEmpty
+            else {
+                return
+                    "A member name is required when no Person is linked."
+            }
+
+            data.environmentMemberships[
+                index
+            ].firstName =
+                cleanedFirstName
+
+            data.environmentMemberships[
+                index
+            ].lastName =
+                cleanedLastName
+        }
+
 
         data.environmentMemberships[
             index
@@ -7996,5 +8231,268 @@ extension DReportStore {
         save()
 
         return nil
+    }
+}
+
+
+
+extension DReportStore {
+
+    var peopleAvailableForEnvironmentMembershipLink:
+        [Entity]
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return []
+        }
+
+        let linkedPersonIDs =
+            Set(
+                data.environmentMemberships
+                    .filter {
+                        $0.environmentID
+                            == environmentID
+                    }
+                    .compactMap {
+                        $0.personEntityID
+                    }
+            )
+
+        return
+            data.entities
+                .filter {
+                    $0.kind
+                        == .person
+                    && !linkedPersonIDs
+                        .contains(
+                            $0.id
+                        )
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+    }
+
+
+    @discardableResult
+    func addEnvironmentMembership(
+        firstName:
+            String,
+        lastName:
+            String,
+        directoryUserIdentifier:
+            String,
+        personEntityID:
+            UUID?,
+        role:
+            EnvironmentRole,
+        isActive:
+            Bool
+    ) -> (
+        membershipID:
+            UUID?,
+        error:
+            String?
+    ) {
+        guard
+            currentEnvironmentUserIsAdministrator
+        else {
+            return (
+                nil,
+                "Environment Administrator rights are required."
+            )
+        }
+
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return (
+                nil,
+                "No Work Environment is active."
+            )
+        }
+
+
+        let cleanedIdentifier =
+            directoryUserIdentifier
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !cleanedIdentifier.isEmpty {
+            let duplicateIdentifier =
+                data.environmentMemberships
+                    .contains {
+                        guard
+                            $0.environmentID
+                                == environmentID,
+                            let existing =
+                                $0.directoryUserIdentifier
+                        else {
+                            return false
+                        }
+
+                        return
+                            existing
+                                .caseInsensitiveCompare(
+                                    cleanedIdentifier
+                                )
+                                == .orderedSame
+                    }
+
+            guard
+                !duplicateIdentifier
+            else {
+                return (
+                    nil,
+                    "That directory identifier is already used by another Environment membership."
+                )
+            }
+        }
+
+
+        var resolvedFirstName =
+            firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        var resolvedLastName =
+            lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        if let personEntityID {
+            guard
+                let person =
+                    data.entities.first(
+                        where: {
+                            $0.id
+                                == personEntityID
+                            && $0.kind
+                                == .person
+                        }
+                    )
+            else {
+                return (
+                    nil,
+                    "The selected Person no longer exists."
+                )
+            }
+
+            let alreadyLinked =
+                data.environmentMemberships
+                    .contains {
+                        $0.environmentID
+                            == environmentID
+                        && $0.personEntityID
+                            == personEntityID
+                    }
+
+            guard
+                !alreadyLinked
+            else {
+                return (
+                    nil,
+                    "That Person is already linked to an Environment membership."
+                )
+            }
+
+
+            if
+                let profile =
+                    data.personProfiles.first(
+                        where: {
+                            $0.entityID
+                                == personEntityID
+                        }
+                    )
+            {
+                resolvedFirstName =
+                    profile.firstName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                resolvedLastName =
+                    profile.lastName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+            }
+
+
+            if
+                resolvedFirstName.isEmpty
+                && resolvedLastName.isEmpty
+            {
+                resolvedFirstName =
+                    person.name
+            }
+        }
+
+
+        guard
+            !resolvedFirstName.isEmpty
+            || !resolvedLastName.isEmpty
+        else {
+            return (
+                nil,
+                "A member name is required."
+            )
+        }
+
+
+        let membership =
+            EnvironmentMembership(
+                environmentID:
+                    environmentID,
+                localUserProfileID:
+                    nil,
+                personEntityID:
+                    personEntityID,
+                directoryUserIdentifier:
+                    cleanedIdentifier.isEmpty
+                    ? nil
+                    : cleanedIdentifier,
+                firstName:
+                    resolvedFirstName,
+                lastName:
+                    resolvedLastName,
+                role:
+                    role,
+                isActive:
+                    isActive,
+                createdAt:
+                    Date(),
+                lastAccessAt:
+                    nil
+            )
+
+        data.environmentMemberships
+            .append(
+                membership
+            )
+
+        save()
+
+        return (
+            membership.id,
+            nil
+        )
     }
 }

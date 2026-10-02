@@ -15,6 +15,10 @@ struct EnvironmentMembershipManagementView:
     private var selectedMembershipID:
         UUID?
 
+    @State
+    private var showingAddMember =
+        false
+
 
     var body: some View {
         NavigationSplitView {
@@ -57,6 +61,22 @@ struct EnvironmentMembershipManagementView:
                     }
 
                     Spacer()
+
+                    Button {
+                        showingAddMember =
+                            true
+                    } label: {
+                        Image(
+                            systemName:
+                                "plus"
+                        )
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                    .help(
+                        "Add Environment Member"
+                    )
                 }
                 .padding(
                     .horizontal,
@@ -136,6 +156,18 @@ struct EnvironmentMembershipManagementView:
             idealHeight:
                 620
         )
+        .onAppear {
+            if selectedMembershipID == nil {
+                selectedMembershipID =
+                    store
+                        .currentEnvironmentMembership?
+                        .id
+                    ?? store
+                        .environmentMembershipsForActiveEnvironment
+                        .first?
+                        .id
+            }
+        }
         .toolbar {
             ToolbarItem {
                 Button(
@@ -144,6 +176,23 @@ struct EnvironmentMembershipManagementView:
                     dismiss()
                 }
             }
+        }
+        .sheet(
+            isPresented:
+                $showingAddMember
+        ) {
+            AddEnvironmentMembershipView {
+                membershipID in
+
+                selectedMembershipID =
+                    membershipID
+
+                showingAddMember =
+                    false
+            }
+            .environmentObject(
+                store
+            )
         }
     }
 }
@@ -317,6 +366,22 @@ private struct EnvironmentMembershipEditorView:
 
     let membershipID:
         UUID
+
+    @State
+    private var selectedPersonID:
+        UUID?
+
+    @State
+    private var firstName =
+        ""
+
+    @State
+    private var lastName =
+        ""
+
+    @State
+    private var directoryIdentifier =
+        ""
 
     @State
     private var role:
@@ -493,25 +558,86 @@ private struct EnvironmentMembershipEditorView:
                 .headline
             )
 
-            infoRow(
-                "Name",
-                membership
-                    .displayName
-            )
 
-            infoRow(
-                "Directory identifier",
-                membership
-                    .directoryUserIdentifier
-                ?? "None"
-            )
+            EntitySelectionSummaryRow(
+                label:
+                    "Linked Person",
+                selectedIDs:
+                    selectedPersonID
+                        .map {
+                            [$0]
+                        }
+                    ?? [],
+                tabs:
+                    [.people],
+                candidateIDs:
+                    linkedPersonCandidateIDs,
+                maximumSelectionCount:
+                    1,
+                selectorTitle:
+                    "Link to Person",
+                selectorMessage:
+                    "Choose the Person represented by this Environment membership.",
+                emptyText:
+                    "None",
+                buttonSystemImage:
+                    "pencil"
+            ) {
+                selection in
 
-            infoRow(
-                "Linked Person",
-                linkedPersonName(
-                    membership
+                selectedPersonID =
+                    selection.first
+
+                return nil
+            }
+
+
+            if selectedPersonID == nil {
+                editableTextRow(
+                    label:
+                        "First name",
+                    prompt:
+                        "First name",
+                    text:
+                        $firstName
                 )
+
+                editableTextRow(
+                    label:
+                        "Last name",
+                    prompt:
+                        "Last name",
+                    text:
+                        $lastName
+                )
+
+            } else {
+                infoRow(
+                    "Name",
+                    selectedPersonDisplayName
+                )
+
+                Text(
+                    "The membership name follows the linked Person."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            editableTextRow(
+                label:
+                    "Directory identifier",
+                prompt:
+                    "Optional",
+                text:
+                    $directoryIdentifier
             )
+
 
             infoRow(
                 "Membership ID",
@@ -592,6 +718,52 @@ private struct EnvironmentMembershipEditorView:
     }
 
 
+    private func editableTextRow(
+        label:
+            String,
+        prompt:
+            String,
+        text:
+            Binding<String>
+    ) -> some View {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                18
+        ) {
+            Text(
+                label
+            )
+            .font(
+                .callout
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    150,
+                alignment:
+                    .leading
+            )
+
+            TextField(
+                prompt,
+                text:
+                    text
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+            .frame(
+                maxWidth:
+                    360
+            )
+        }
+    }
+
+
     private func infoRow(
         _ label:
             String,
@@ -633,18 +805,15 @@ private struct EnvironmentMembershipEditorView:
     }
 
 
-    private func linkedPersonName(
-        _ membership:
-            EnvironmentMembership
-    ) -> String {
+    private var selectedPersonDisplayName:
+        String
+    {
         guard
-            let personID =
-                membership
-                    .personEntityID,
+            let selectedPersonID,
             let person =
                 store.entity(
                     id:
-                        personID
+                        selectedPersonID
                 )
         else {
             return "None"
@@ -655,10 +824,46 @@ private struct EnvironmentMembershipEditorView:
     }
 
 
+    private var linkedPersonCandidateIDs:
+        Set<UUID>
+    {
+        var ids =
+            Set(
+                store
+                    .peopleAvailableForEnvironmentMembershipLink
+                    .map(
+                        \.id
+                    )
+            )
+
+        if let selectedPersonID {
+            ids.insert(
+                selectedPersonID
+            )
+        }
+
+        return ids
+    }
+
+
     private func load(
         _ membership:
             EnvironmentMembership
     ) {
+        selectedPersonID =
+            membership.personEntityID
+
+        firstName =
+            membership.firstName
+
+        lastName =
+            membership.lastName
+
+        directoryIdentifier =
+            membership
+                .directoryUserIdentifier
+            ?? ""
+
         role =
             membership.role
 
@@ -679,6 +884,14 @@ private struct EnvironmentMembershipEditorView:
                 .updateEnvironmentMembership(
                     membershipID:
                         membershipID,
+                    firstName:
+                        firstName,
+                    lastName:
+                        lastName,
+                    directoryUserIdentifier:
+                        directoryIdentifier,
+                    personEntityID:
+                        selectedPersonID,
                     role:
                         role,
                     isActive:
@@ -700,6 +913,20 @@ private struct EnvironmentMembershipEditorView:
                                 membershipID
                         )
             {
+                selectedPersonID =
+                    membership.personEntityID
+
+                firstName =
+                    membership.firstName
+
+                lastName =
+                    membership.lastName
+
+                directoryIdentifier =
+                    membership
+                        .directoryUserIdentifier
+                    ?? ""
+
                 role =
                     membership.role
 
@@ -714,5 +941,326 @@ private struct EnvironmentMembershipEditorView:
             messageIsError =
                 false
         }
+    }
+}
+
+
+private struct AddEnvironmentMembershipView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        DReportStore
+
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let onCreated:
+        (UUID) -> Void
+
+    @State
+    private var selectedPersonID:
+        UUID?
+
+    @State
+    private var firstName =
+        ""
+
+    @State
+    private var lastName =
+        ""
+
+    @State
+    private var directoryIdentifier =
+        ""
+
+    @State
+    private var role:
+        EnvironmentRole =
+            .user
+
+    @State
+    private var isActive =
+        true
+
+    @State
+    private var errorMessage:
+        String?
+
+
+    var body: some View {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                22
+        ) {
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    4
+            ) {
+                Text(
+                    "Add Environment Member"
+                )
+                .font(
+                    .title2
+                )
+                .fontWeight(
+                    .semibold
+                )
+
+                Text(
+                    "Create a membership for this Work Environment."
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            Divider()
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
+                Text(
+                    "Identity"
+                )
+                .font(
+                    .headline
+                )
+
+
+                EntitySelectionButton(
+                    title:
+                        "Link to Person",
+                    selectedIDs:
+                        selectedPersonID
+                            .map {
+                                [$0]
+                            }
+                        ?? [],
+                    tabs:
+                        [.people],
+                    candidateIDs:
+                        Set(
+                            store
+                                .peopleAvailableForEnvironmentMembershipLink
+                                .map(
+                                    \.id
+                                )
+                        ),
+                    maximumSelectionCount:
+                        1,
+                    placeholder:
+                        "No linked Person",
+                    selectorMessage:
+                        "Choose a Person to link to this Environment membership."
+                ) {
+                    selection in
+
+                    selectedPersonID =
+                        selection.first
+
+                    return nil
+                }
+
+
+                if selectedPersonID == nil {
+                    HStack(
+                        spacing:
+                            12
+                    ) {
+                        TextField(
+                            "First name",
+                            text:
+                                $firstName
+                        )
+
+                        TextField(
+                            "Last name",
+                            text:
+                                $lastName
+                        )
+                    }
+
+                } else {
+                    Text(
+                        "The member name will be copied from the linked Person."
+                    )
+                    .font(
+                        .caption
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+
+                TextField(
+                    "Directory identifier (optional)",
+                    text:
+                        $directoryIdentifier
+                )
+            }
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
+                Text(
+                    "Environment Access"
+                )
+                .font(
+                    .headline
+                )
+
+                Picker(
+                    "Role",
+                    selection:
+                        $role
+                ) {
+                    ForEach(
+                        EnvironmentRole
+                            .allCases
+                    ) {
+                        role in
+
+                        Text(
+                            role.displayName
+                        )
+                        .tag(
+                            role
+                        )
+                    }
+                }
+
+                Toggle(
+                    "Active membership",
+                    isOn:
+                        $isActive
+                )
+            }
+
+
+            Text(
+                "This creates an Environment membership only. It does not create a legacy DReport user account or password."
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .fixedSize(
+                horizontal:
+                    false,
+                vertical:
+                    true
+            )
+
+
+            if let errorMessage {
+                Label(
+                    errorMessage,
+                    systemImage:
+                        "exclamationmark.triangle"
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .red
+                )
+            }
+
+
+            HStack {
+                Spacer()
+
+                Button(
+                    "Cancel"
+                ) {
+                    dismiss()
+                }
+
+                Button(
+                    "Add Member"
+                ) {
+                    create()
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .keyboardShortcut(
+                    .defaultAction
+                )
+            }
+        }
+        .padding(
+            24
+        )
+        .frame(
+            width:
+                520
+        )
+    }
+
+
+    private func create() {
+        errorMessage =
+            nil
+
+        let result =
+            store
+                .addEnvironmentMembership(
+                    firstName:
+                        firstName,
+                    lastName:
+                        lastName,
+                    directoryUserIdentifier:
+                        directoryIdentifier,
+                    personEntityID:
+                        selectedPersonID,
+                    role:
+                        role,
+                    isActive:
+                        isActive
+                )
+
+        if let error = result.error {
+            errorMessage =
+                error
+
+            return
+        }
+
+        guard
+            let membershipID =
+                result.membershipID
+        else {
+            errorMessage =
+                "The Environment membership could not be created."
+
+            return
+        }
+
+        onCreated(
+            membershipID
+        )
+
+        dismiss()
     }
 }
