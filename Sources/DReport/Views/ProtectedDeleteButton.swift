@@ -2,9 +2,6 @@ import SwiftUI
 
 
 struct ProtectedDeleteButton: View {
-    @EnvironmentObject
-    private var store: DReportStore
-
     let objectType: String
     let objectName: String
     let warning: String
@@ -27,6 +24,7 @@ struct ProtectedDeleteButton: View {
             Button {
                 showingConfirmation =
                     true
+
             } label: {
                 Text("Delete")
                     .font(
@@ -124,9 +122,6 @@ struct ProtectedDeleteButton: View {
                 onDeleted:
                     onDeleted
             )
-            .environmentObject(
-                store
-            )
         }
     }
 }
@@ -135,9 +130,6 @@ struct ProtectedDeleteButton: View {
 private struct ProtectedDeleteConfirmationView:
     View
 {
-    @EnvironmentObject
-    private var store: DReportStore
-
     @Environment(\.dismiss)
     private var dismiss
 
@@ -152,12 +144,25 @@ private struct ProtectedDeleteConfirmationView:
         () -> Void
 
     @State
-    private var password =
+    private var confirmation =
         ""
 
     @State
     private var errorMessage:
         String?
+
+
+    private var isConfirmed:
+        Bool
+    {
+        confirmation
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .uppercased()
+            == "DELETE"
+    }
 
 
     var body: some View {
@@ -179,6 +184,7 @@ private struct ProtectedDeleteConfirmationView:
             .foregroundStyle(
                 .red
             )
+
 
             VStack(
                 alignment:
@@ -204,7 +210,9 @@ private struct ProtectedDeleteConfirmationView:
                     )
             }
 
+
             Divider()
+
 
             VStack(
                 alignment:
@@ -212,33 +220,37 @@ private struct ProtectedDeleteConfirmationView:
                 spacing:
                     8
             ) {
-                if
-                    let user =
-                        store.currentUser
-                {
-                    Text(
-                        "Enter the password for @\(user.username) to confirm."
-                    )
-                    .font(.callout)
-                } else {
-                    Text(
-                        "Enter your password to confirm."
-                    )
-                    .font(.callout)
-                }
+                Text(
+                    "This action cannot be undone."
+                )
+                .font(.callout)
+                .fontWeight(
+                    .medium
+                )
 
-                SecureField(
-                    "Password",
+                Text(
+                    "Type DELETE to confirm:"
+                )
+                .font(.callout)
+                .foregroundStyle(
+                    .secondary
+                )
+
+                TextField(
+                    "DELETE",
                     text:
-                        $password
+                        $confirmation
                 )
                 .textFieldStyle(
                     .roundedBorder
                 )
                 .onSubmit {
-                    performDeletion()
+                    if isConfirmed {
+                        performDeletion()
+                    }
                 }
             }
+
 
             if let errorMessage {
                 Label(
@@ -251,6 +263,7 @@ private struct ProtectedDeleteConfirmationView:
                     .red
                 )
             }
+
 
             HStack {
                 Spacer()
@@ -272,7 +285,7 @@ private struct ProtectedDeleteConfirmationView:
                     .defaultAction
                 )
                 .disabled(
-                    password.isEmpty
+                    !isConfirmed
                 )
             }
         }
@@ -288,18 +301,7 @@ private struct ProtectedDeleteConfirmationView:
         errorMessage =
             nil
 
-        guard
-            store
-                .verifyCurrentUserPassword(
-                    password
-                )
-        else {
-            errorMessage =
-                "Incorrect password."
-
-            password =
-                ""
-
+        guard isConfirmed else {
             return
         }
 
@@ -309,9 +311,6 @@ private struct ProtectedDeleteConfirmationView:
         {
             errorMessage =
                 deletionError
-
-            password =
-                ""
 
             return
         }

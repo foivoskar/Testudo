@@ -3319,126 +3319,136 @@ struct SettingsView: View {
 
 
     var body: some View {
-        Form {
-            Section(
-                "My Profile"
+        ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 28
             ) {
-                if
-                    let profile =
-                        store.localUserProfile
-                {
-                    LabeledContent(
-                        "Name"
+                header
+
+                settingsSection(
+                    "My Profile"
+                ) {
+                    profileContent
+                }
+
+                settingsSection(
+                    "Application"
+                ) {
+                    settingsRow(
+                        label:
+                            "Storage",
+                        value:
+                            "Local"
+                    )
+
+                    settingsRow(
+                        label:
+                            "Known Work Environments",
+                        value:
+                            "\(store.workEnvironments.count)"
+                    )
+                }
+
+                settingsSection(
+                    "Application Data"
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 6
                     ) {
                         Text(
-                            profile.displayName
+                            "Application database"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                        Text(
+                            store
+                                .applicationFileURL
+                                .path
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                design:
+                                    .monospaced
+                            )
+                        )
+                        .textSelection(
+                            .enabled
+                        )
+                        .fixedSize(
+                            horizontal:
+                                false,
+                            vertical:
+                                true
                         )
                     }
+                }
 
-                    if
-                        !profile
-                            .professionalEmail
-                            .isEmpty
-                    {
-                        LabeledContent(
-                            "Email"
-                        ) {
-                            Text(
-                                profile
-                                    .professionalEmail
-                            )
-                        }
-                    }
-
-                    Button(
-                        "Edit My Profile…"
+                settingsSection(
+                    "Reset This Installation"
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 12
                     ) {
-                        showingProfileEditor =
-                            true
+                        Text(
+                            "Resetting removes this installation's local profile, Work Environment registry and local identity mappings."
+                        )
+                        .font(.callout)
+
+                        Text(
+                            "Work Environment databases and their contents are not deleted."
+                        )
+                        .font(.callout)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                        Button(
+                            "Reset Application…",
+                            role:
+                                .destructive
+                        ) {
+                            showingResetConfirmation =
+                                true
+                        }
+                        .padding(
+                            .top,
+                            2
+                        )
                     }
-
-                } else {
-                    Text(
-                        "No local application profile exists."
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
                 }
             }
-
-
-            Section(
-                "Application"
-            ) {
-                LabeledContent(
-                    "Storage"
-                ) {
-                    Text(
-                        "Local"
-                    )
-                }
-
-                LabeledContent(
-                    "Known Work Environments"
-                ) {
-                    Text(
-                        "\(store.workEnvironments.count)"
-                    )
-                }
-            }
-
-
-            Section(
-                "Application Data"
-            ) {
-                LabeledContent(
-                    "Application database"
-                ) {
-                    Text(
-                        store
-                            .applicationFileURL
-                            .path
-                    )
-                    .font(
-                        .caption
-                    )
-                    .textSelection(
-                        .enabled
-                    )
-                    .multilineTextAlignment(
-                        .trailing
-                    )
-                }
-            }
-
-
-            Section(
-                "Reset This Installation"
-            ) {
-                Text(
-                    "Resetting removes this installation's profile, Environment registry and local mappings. Work Environment databases are not deleted."
-                )
-                .font(
-                    .callout
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-
-                Button(
-                    "Reset Application…",
-                    role:
-                        .destructive
-                ) {
-                    showingResetConfirmation =
-                        true
-                }
-            }
+            .padding(
+                28
+            )
+            .frame(
+                maxWidth:
+                    720,
+                alignment:
+                    .leading
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+                alignment:
+                    .center
+            )
         }
-        .padding()
         .frame(
-            width: 600
+            minWidth:
+                640,
+            idealWidth:
+                700,
+            minHeight:
+                560,
+            idealHeight:
+                620
         )
         .sheet(
             isPresented:
@@ -3464,6 +3474,199 @@ struct SettingsView: View {
 
                 showingResetConfirmation =
                     false
+            }
+        }
+    }
+
+
+    private var header:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 4
+        ) {
+            Text(
+                "Settings"
+            )
+            .font(.title2)
+            .fontWeight(
+                .semibold
+            )
+
+            Text(
+                "Settings for this application installation."
+            )
+            .font(.callout)
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+
+    @ViewBuilder
+    private var profileContent:
+        some View
+    {
+        if
+            let profile =
+                store.localUserProfile
+        {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                settingsRow(
+                    label:
+                        "Name",
+                    value:
+                        profile.displayName
+                )
+
+                if
+                    !profile
+                        .professionalEmail
+                        .isEmpty
+                {
+                    settingsRow(
+                        label:
+                            "Email",
+                        value:
+                            profile
+                                .professionalEmail
+                    )
+                }
+
+                Button(
+                    "Edit My Profile…"
+                ) {
+                    showingProfileEditor =
+                        true
+                }
+                .padding(
+                    .top,
+                    2
+                )
+            }
+
+        } else {
+            Text(
+                "No local application profile exists."
+            )
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+
+    private func settingsRow(
+        label:
+            String,
+        value:
+            String
+    ) -> some View {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                18
+        ) {
+            Text(
+                label
+            )
+            .font(.callout)
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    180,
+                alignment:
+                    .leading
+            )
+
+            Text(
+                value
+            )
+            .font(.callout)
+            .textSelection(
+                .enabled
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+                alignment:
+                    .leading
+            )
+        }
+    }
+
+
+    private func settingsSection<
+        Content:
+            View
+    >(
+        _ title:
+            String,
+        @ViewBuilder
+        content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(
+                title
+            )
+            .font(.headline)
+
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                content()
+            }
+            .padding(
+                14
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+                alignment:
+                    .leading
+            )
+            .background {
+                RoundedRectangle(
+                    cornerRadius:
+                        10,
+                    style:
+                        .continuous
+                )
+                .fill(
+                    Color.primary
+                        .opacity(
+                            0.035
+                        )
+                )
+            }
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        10,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.primary
+                        .opacity(
+                            0.08
+                        ),
+                    lineWidth:
+                        1
+                )
             }
         }
     }

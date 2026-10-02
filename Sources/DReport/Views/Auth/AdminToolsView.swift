@@ -227,7 +227,7 @@ struct AdminToolsView: View {
         ) {
             HStack {
                 Text(
-                    "Members"
+                    "Active Members"
                 )
                 .font(.headline)
 
