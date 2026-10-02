@@ -1,9 +1,12 @@
 import SwiftUI
 
 
-struct AdminToolsView: View {
+struct AdminToolsView:
+    View
+{
     @EnvironmentObject
-    private var store: DReportStore
+    private var store:
+        DReportStore
 
     @Environment(\.dismiss)
     private var dismiss
@@ -20,32 +23,42 @@ struct AdminToolsView: View {
             let environment =
                 store.activeWorkEnvironment
         {
-            VStack(
-                alignment: .leading,
-                spacing: 24
-            ) {
-                header(
-                    environment
+            ScrollView {
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        24
+                ) {
+                    header(
+                        environment
+                    )
+
+                    Divider()
+
+                    environmentSection(
+                        environment
+                    )
+
+                    storageSection(
+                        environment
+                    )
+
+                    identitySection(
+                        environment
+                    )
+
+                    membersSection
+                }
+                .padding(
+                    24
                 )
-
-                Divider()
-
-                environmentSection(
-                    environment
-                )
-
-                directorySection(
-                    environment
-                )
-
-                membersSection
-
-                Spacer()
             }
-            .padding(24)
             .frame(
-                width: 560,
-                height: 520
+                width:
+                    620,
+                height:
+                    650
             )
             .sheet(
                 isPresented:
@@ -65,8 +78,10 @@ struct AdminToolsView: View {
                     )
             )
             .frame(
-                width: 520,
-                height: 300
+                width:
+                    520,
+                height:
+                    300
             )
         }
     }
@@ -78,13 +93,17 @@ struct AdminToolsView: View {
     ) -> some View {
         HStack {
             VStack(
-                alignment: .leading,
-                spacing: 4
+                alignment:
+                    .leading,
+                spacing:
+                    4
             ) {
                 Text(
                     "Admin Tools"
                 )
-                .font(.title2)
+                .font(
+                    .title2
+                )
                 .fontWeight(
                     .semibold
                 )
@@ -92,7 +111,9 @@ struct AdminToolsView: View {
                 Text(
                     "Administration for \(environment.name)"
                 )
-                .font(.callout)
+                .font(
+                    .callout
+                )
                 .foregroundStyle(
                     .secondary
                 )
@@ -114,13 +135,17 @@ struct AdminToolsView: View {
             WorkEnvironment
     ) -> some View {
         VStack(
-            alignment: .leading,
-            spacing: 10
+            alignment:
+                .leading,
+            spacing:
+                10
         ) {
             Text(
                 "Work Environment"
             )
-            .font(.headline)
+            .font(
+                .headline
+            )
 
             LabeledContent(
                 "Name"
@@ -149,7 +174,9 @@ struct AdminToolsView: View {
                         .id
                         .uuidString
                 )
-                .font(.caption)
+                .font(
+                    .caption
+                )
                 .textSelection(
                     .enabled
                 )
@@ -158,28 +185,32 @@ struct AdminToolsView: View {
     }
 
 
-    private func directorySection(
+    private func storageSection(
         _ environment:
             WorkEnvironment
     ) -> some View {
         VStack(
-            alignment: .leading,
-            spacing: 10
+            alignment:
+                .leading,
+            spacing:
+                10
         ) {
             Text(
-                "Directory"
+                "Environment Storage"
             )
-            .font(.headline)
+            .font(
+                .headline
+            )
 
             if
-                let directory =
-                    environment.directory
+                let storage =
+                    environment.storage
             {
                 LabeledContent(
                     "Type"
                 ) {
                     Text(
-                        directory
+                        storage
                             .kind
                             .displayName
                     )
@@ -187,29 +218,117 @@ struct AdminToolsView: View {
 
                 if
                     let path =
-                        directory.path
+                        storage.path
                 {
                     LabeledContent(
                         "Location"
                     ) {
-                        Text(path)
-                            .font(
-                                .caption
-                            )
-                            .textSelection(
-                                .enabled
-                            )
-                            .multilineTextAlignment(
-                                .trailing
-                            )
+                        Text(
+                            path
+                        )
+                        .font(
+                            .caption
+                        )
+                        .textSelection(
+                            .enabled
+                        )
+                        .multilineTextAlignment(
+                            .trailing
+                        )
                     }
                 }
 
+                Text(
+                    "Storage describes where this installation reads and writes the Environment database. It is separate from user identity and authentication."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
             } else {
                 Text(
-                    "No directory is currently configured for this Environment."
+                    "No explicit storage location is registered for this Environment."
                 )
-                .font(.callout)
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+        }
+    }
+
+
+    private func identitySection(
+        _ environment:
+            WorkEnvironment
+    ) -> some View {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                10
+        ) {
+            Text(
+                "Identity & Authentication"
+            )
+            .font(
+                .headline
+            )
+
+            LabeledContent(
+                "Provider"
+            ) {
+                Text(
+                    environment
+                        .identityProvider
+                        .displayName
+                )
+            }
+
+            switch
+                environment
+                    .identityProvider
+                    .kind
+            {
+            case .localAccounts:
+                LabeledContent(
+                    "Authentication"
+                ) {
+                    Text(
+                        "Environment-scoped passwords"
+                    )
+                }
+
+                Text(
+                    "Members and credentials are managed by this Work Environment. No external identity directory is connected."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+            case .externalDirectory:
+                LabeledContent(
+                    "Authentication"
+                ) {
+                    Text(
+                        "External directory"
+                    )
+                }
+
+                Text(
+                    "Identity and authentication are supplied by the Environment's configured external directory."
+                )
+                .font(
+                    .caption
+                )
                 .foregroundStyle(
                     .secondary
                 )
@@ -222,14 +341,18 @@ struct AdminToolsView: View {
         some View
     {
         VStack(
-            alignment: .leading,
-            spacing: 10
+            alignment:
+                .leading,
+            spacing:
+                10
         ) {
             HStack {
                 Text(
                     "Active Members"
                 )
-                .font(.headline)
+                .font(
+                    .headline
+                )
 
                 Spacer()
 
@@ -242,9 +365,11 @@ struct AdminToolsView: View {
             }
 
             Text(
-                "Manage the users and identities that can enter this Work Environment."
+                "Manage the identities, roles and authentication access for this Work Environment."
             )
-            .font(.callout)
+            .font(
+                .callout
+            )
             .foregroundStyle(
                 .secondary
             )

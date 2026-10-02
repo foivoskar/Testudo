@@ -226,7 +226,7 @@ struct EnvironmentChooserView: View {
                 if
                     let path =
                         environment
-                            .directory?
+                            .storage?
                             .path
                 {
                     Text(path)
@@ -294,7 +294,7 @@ struct EnvironmentChooserView: View {
                 loadEnvironment()
             } label: {
                 Label(
-                    "Load Environment from Directory",
+                    "Load Existing Environment…",
                     systemImage:
                         "folder"
                 )

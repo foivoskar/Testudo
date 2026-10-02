@@ -673,7 +673,7 @@ private struct EnvironmentMembershipEditorView:
 
             editableTextRow(
                 label:
-                    "Directory identifier",
+                    "Identity identifier",
                 prompt:
                     "Optional",
                 text:
@@ -1444,7 +1444,7 @@ private struct AddEnvironmentMembershipView:
 
 
                 TextField(
-                    "Directory identifier (optional)",
+                    "Identity identifier (optional)",
                     text:
                         $directoryIdentifier
                 )

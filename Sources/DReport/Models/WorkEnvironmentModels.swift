@@ -114,40 +114,219 @@ struct WorkEnvironment:
     Codable,
     Hashable
 {
-    var id: UUID = UUID()
+    var id:
+        UUID = UUID()
 
-    var name: String
+    var name:
+        String
 
-    // Every Work Environment owns its own directory source.
+    // --------------------------------------------------------
+    // Application-local physical storage.
     //
-    // nil means that the Environment has not yet been connected
-    // to an external directory. We deliberately do not invent
-    // a path during legacy migration.
-    var directory:
-        EnvironmentDirectoryConfiguration?
+    // This describes where this installation can find the
+    // Environment files. It is NOT an identity directory.
+    // --------------------------------------------------------
 
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
+    var storage:
+        EnvironmentStorageConfiguration?
+
+    // --------------------------------------------------------
+    // Environment identity / authentication provider.
+    //
+    // This is conceptually independent from physical storage.
+    // --------------------------------------------------------
+
+    var identityProvider:
+        EnvironmentIdentityProviderConfiguration
+
+    var createdAt:
+        Date = Date()
+
+    var updatedAt:
+        Date = Date()
 
 
     init(
-        id: UUID = UUID(),
-        name: String,
-        directory:
-            EnvironmentDirectoryConfiguration? = nil,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        id:
+            UUID = UUID(),
+        name:
+            String,
+        storage:
+            EnvironmentStorageConfiguration? = nil,
+        identityProvider:
+            EnvironmentIdentityProviderConfiguration =
+                EnvironmentIdentityProviderConfiguration(),
+        createdAt:
+            Date = Date(),
+        updatedAt:
+            Date = Date()
     ) {
-        self.id = id
-        self.name = name
-        self.directory = directory
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
+        self.id =
+            id
+
+        self.name =
+            name
+
+        self.storage =
+            storage
+
+        self.identityProvider =
+            identityProvider
+
+        self.createdAt =
+            createdAt
+
+        self.updatedAt =
+            updatedAt
+    }
+
+
+    // --------------------------------------------------------
+    // Backward-compatible decoding
+    //
+    // ApplicationData schema <= 2 stored physical storage under
+    // the misleading key "directory".
+    //
+    // Decode that old key into "storage", but never encode it
+    // again.
+    // --------------------------------------------------------
+
+    enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case id
+        case name
+        case storage
+        case identityProvider
+        case createdAt
+        case updatedAt
+
+        // Legacy ApplicationData key.
+        case directory
+    }
+
+
+    init(
+        from decoder:
+            Decoder
+    ) throws {
+        let container =
+            try decoder.container(
+                keyedBy:
+                    CodingKeys.self
+            )
+
+        id =
+            try container.decodeIfPresent(
+                UUID.self,
+                forKey:
+                    .id
+            )
+            ?? UUID()
+
+        name =
+            try container.decode(
+                String.self,
+                forKey:
+                    .name
+            )
+
+        let currentStorage =
+            try container.decodeIfPresent(
+                EnvironmentStorageConfiguration.self,
+                forKey:
+                    .storage
+            )
+
+        let legacyStorage =
+            try container.decodeIfPresent(
+                EnvironmentStorageConfiguration.self,
+                forKey:
+                    .directory
+            )
+
+        storage =
+            currentStorage
+            ?? legacyStorage
+
+        identityProvider =
+            try container.decodeIfPresent(
+                EnvironmentIdentityProviderConfiguration.self,
+                forKey:
+                    .identityProvider
+            )
+            ?? EnvironmentIdentityProviderConfiguration()
+
+        createdAt =
+            try container.decodeIfPresent(
+                Date.self,
+                forKey:
+                    .createdAt
+            )
+            ?? Date()
+
+        updatedAt =
+            try container.decodeIfPresent(
+                Date.self,
+                forKey:
+                    .updatedAt
+            )
+            ?? createdAt
+    }
+
+
+    func encode(
+        to encoder:
+            Encoder
+    ) throws {
+        var container =
+            encoder.container(
+                keyedBy:
+                    CodingKeys.self
+            )
+
+        try container.encode(
+            id,
+            forKey:
+                .id
+        )
+
+        try container.encode(
+            name,
+            forKey:
+                .name
+        )
+
+        try container.encodeIfPresent(
+            storage,
+            forKey:
+                .storage
+        )
+
+        try container.encode(
+            identityProvider,
+            forKey:
+                .identityProvider
+        )
+
+        try container.encode(
+            createdAt,
+            forKey:
+                .createdAt
+        )
+
+        try container.encode(
+            updatedAt,
+            forKey:
+                .updatedAt
+        )
     }
 }
 
 
 // ============================================================
+
 // MARK: - Local Environment Access
 //
 // This belongs to ApplicationData, NOT EnvironmentData.
@@ -197,22 +376,28 @@ struct EnvironmentManifest:
     var environmentID: UUID
     var name: String
 
+    // Identity/authentication belongs to the Environment itself
+    // and therefore travels with its portable manifest.
+    //
+    // nil is accepted only for manifests written before schema 2.
+    var identityProvider:
+        EnvironmentIdentityProviderConfiguration? = nil
+
     var createdAt: Date
     var updatedAt: Date
 }
 
 
 // ============================================================
-// MARK: - Environment Directory
+// MARK: - Environment Storage
 //
-// This describes the database/source directory belonging to
-// exactly one Work Environment.
+// Physical Environment location known to this app installation.
 //
-// The security-scoped bookmark will later allow the macOS app
-// to retain permission to a user-selected external directory.
+// This is deliberately separate from the Environment's identity
+// and authentication provider.
 // ============================================================
 
-enum EnvironmentDirectoryKind:
+enum EnvironmentStorageKind:
     String,
     Codable,
     CaseIterable,
@@ -220,11 +405,17 @@ enum EnvironmentDirectoryKind:
 {
     case localFolder
 
-    var id: String {
+
+    var id:
+        String
+    {
         rawValue
     }
 
-    var displayName: String {
+
+    var displayName:
+        String
+    {
         switch self {
         case .localFolder:
             return "Local Folder"
@@ -233,33 +424,131 @@ enum EnvironmentDirectoryKind:
 }
 
 
-struct EnvironmentDirectoryConfiguration:
+struct EnvironmentStorageConfiguration:
     Identifiable,
     Codable,
     Hashable
 {
-    var id: UUID = UUID()
+    var id:
+        UUID = UUID()
 
     var kind:
-        EnvironmentDirectoryKind =
+        EnvironmentStorageKind =
             .localFolder
 
-    var displayName: String = ""
+    var displayName:
+        String = ""
 
-    // Human-readable path. This is not sufficient by itself
-    // for sandbox permission; bookmarkData is the persistent
-    // macOS permission token.
-    var path: String?
+    // Human-readable filesystem path.
+    //
+    // bookmarkData can later preserve macOS sandbox permission
+    // for a user-selected external storage folder.
+    var path:
+        String?
 
-    var bookmarkData: Data?
+    var bookmarkData:
+        Data?
 
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
-    var lastConnectedAt: Date?
+    var createdAt:
+        Date = Date()
+
+    var updatedAt:
+        Date = Date()
+
+    var lastConnectedAt:
+        Date?
 }
 
 
 // ============================================================
+// MARK: - Environment Identity Provider
+//
+// Defines how identities are authenticated for one Environment.
+//
+// It has no relationship to where EnvironmentData.json is stored.
+// ============================================================
+
+enum EnvironmentIdentityProviderKind:
+    String,
+    Codable,
+    CaseIterable,
+    Identifiable
+{
+    case localAccounts
+
+    // Reserved architecture for the future.
+    case externalDirectory
+
+
+    var id:
+        String
+    {
+        rawValue
+    }
+
+
+    var displayName:
+        String
+    {
+        switch self {
+        case .localAccounts:
+            return
+                "Local Environment Accounts"
+
+        case .externalDirectory:
+            return
+                "External Directory"
+        }
+    }
+}
+
+
+struct EnvironmentIdentityProviderConfiguration:
+    Codable,
+    Hashable
+{
+    var kind:
+        EnvironmentIdentityProviderKind
+
+    var displayName:
+        String
+
+    var createdAt:
+        Date
+
+    var updatedAt:
+        Date
+
+
+    init(
+        kind:
+            EnvironmentIdentityProviderKind =
+                .localAccounts,
+        displayName:
+            String? = nil,
+        createdAt:
+            Date = Date(),
+        updatedAt:
+            Date = Date()
+    ) {
+        self.kind =
+            kind
+
+        self.displayName =
+            displayName
+            ?? kind.displayName
+
+        self.createdAt =
+            createdAt
+
+        self.updatedAt =
+            updatedAt
+    }
+}
+
+
+// ============================================================
+
 // MARK: - Environment Membership
 //
 // Roles belong to a Work Environment, never to the app.
@@ -321,7 +610,7 @@ struct EnvironmentMembership:
     // Optional link to the Environment's People database.
     var personEntityID: UUID?
 
-    // Identity supplied by the Environment directory.
+    // Identifier supplied by the Environment identity provider.
     var directoryUserIdentifier: String?
 
     // Snapshot / display information for Environment management.

@@ -29,7 +29,7 @@ struct ApplicationData:
     Codable
 {
     var schemaVersion:
-        Int = 2
+        Int = 3
 
     var localUserProfile:
         LocalUserProfile?

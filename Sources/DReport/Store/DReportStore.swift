@@ -239,7 +239,7 @@ final class DReportStore: ObservableObject {
         // combined database into ApplicationData.json.
         migrateApplicationMetadataIfNeeded()
 
-        configureActiveEnvironmentDirectoryIfNeeded()
+        configureActiveEnvironmentStorageIfNeeded()
 
         // Phase 2C:
         // move the machine-local identity link out of the
@@ -254,6 +254,8 @@ final class DReportStore: ObservableObject {
         //
         // Legacy credentials remain temporarily inside old
         // Environment databases only for Environment entry.
+        migrateKnownEnvironmentManifestsIfNeeded()
+
         PersistentSession.clear()
         currentUserID = nil
         environmentSessionIsOpen = false
@@ -1200,7 +1202,7 @@ final class DReportStore: ObservableObject {
 
 
         let directory =
-            EnvironmentDirectoryConfiguration(
+            EnvironmentStorageConfiguration(
                 kind:
                     .localFolder,
                 displayName:
@@ -1218,14 +1220,29 @@ final class DReportStore: ObservableObject {
             )
 
 
+        let identityProvider =
+            EnvironmentIdentityProviderConfiguration(
+                kind:
+                    .localAccounts,
+                displayName:
+                    "Local Environment Accounts",
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
         let environment =
             WorkEnvironment(
                 id:
                     environmentID,
                 name:
                     cleanedName,
-                directory:
+                storage:
                     directory,
+                identityProvider:
+                    identityProvider,
                 createdAt:
                     now,
                 updatedAt:
@@ -1236,11 +1253,13 @@ final class DReportStore: ObservableObject {
         let manifest =
             EnvironmentManifest(
                 schemaVersion:
-                    1,
+                    2,
                 environmentID:
                     environmentID,
                 name:
                     cleanedName,
+                identityProvider:
+                    identityProvider,
                 createdAt:
                     now,
                 updatedAt:
@@ -1352,7 +1371,7 @@ final class DReportStore: ObservableObject {
 
 
     // ========================================================
-    // MARK: Register Environment from a directory
+    // MARK: Register Environment from a storage folder
     // ========================================================
 
     func registerWorkEnvironment(
@@ -1469,8 +1488,21 @@ final class DReportStore: ObservableObject {
         let now =
             Date()
 
+        let identityProvider =
+            manifest.identityProvider
+            ?? EnvironmentIdentityProviderConfiguration(
+                kind:
+                    .localAccounts,
+                displayName:
+                    "Local Environment Accounts",
+                createdAt:
+                    manifest.createdAt,
+                updatedAt:
+                    now
+            )
+
         let directory =
-            EnvironmentDirectoryConfiguration(
+            EnvironmentStorageConfiguration(
                 kind:
                     .localFolder,
                 displayName:
@@ -1506,8 +1538,13 @@ final class DReportStore: ObservableObject {
 
             applicationData
                 .workEnvironments[index]
-                .directory =
+                .storage =
                 directory
+
+            applicationData
+                .workEnvironments[index]
+                .identityProvider =
+                identityProvider
 
             applicationData
                 .workEnvironments[index]
@@ -1522,8 +1559,10 @@ final class DReportStore: ObservableObject {
                             manifest.environmentID,
                         name:
                             manifest.name,
-                        directory:
+                        storage:
                             directory,
+                        identityProvider:
+                            identityProvider,
                         createdAt:
                             manifest.createdAt,
                         updatedAt:
@@ -1538,6 +1577,8 @@ final class DReportStore: ObservableObject {
             manifest.environmentID
 
         saveApplicationData()
+
+        migrateKnownEnvironmentManifestsIfNeeded()
 
 
         return (
@@ -1717,7 +1758,7 @@ final class DReportStore: ObservableObject {
                 !duplicateIdentifier
             else {
                 return
-                    "That directory identifier is already used by another Environment membership."
+                    "That identity identifier is already used by another Environment membership."
             }
         }
 
@@ -2374,14 +2415,14 @@ final class DReportStore: ObservableObject {
             WorkEnvironment
     ) -> URL {
 
-        // A configured Environment directory always wins.
+        // A configured Environment storage location always wins.
         //
-        // Later, external directories will also use their
+        // User-selected storage folders can later use their
         // bookmarkData here to restore security-scoped access.
         if
             let configuredPath =
                 environment
-                    .directory?
+                    .storage?
                     .path?
                     .trimmingCharacters(
                         in:
@@ -2412,7 +2453,7 @@ final class DReportStore: ObservableObject {
     }
 
 
-    private func configureActiveEnvironmentDirectoryIfNeeded() {
+    private func configureActiveEnvironmentStorageIfNeeded() {
         guard
             fileURL.lastPathComponent
                 == "EnvironmentData.json",
@@ -2433,6 +2474,21 @@ final class DReportStore: ObservableObject {
         }
 
 
+        // ApplicationData schema 2 -> 3.
+        //
+        // WorkEnvironment's custom decoder has already translated
+        // the legacy JSON key "directory" into "storage".
+        // Saving now permanently writes the new representation.
+        if applicationData.schemaVersion < 3 {
+            applicationData.schemaVersion =
+                3
+
+            saveApplicationData()
+        }
+
+        migrateActiveEnvironmentManifestIdentityIfNeeded()
+
+
         let environmentDirectory =
             fileURL
                 .deletingLastPathComponent()
@@ -2441,7 +2497,7 @@ final class DReportStore: ObservableObject {
         let existingPath =
             applicationData
                 .workEnvironments[index]
-                .directory?
+                .storage?
                 .path?
                 .trimmingCharacters(
                     in:
@@ -2466,8 +2522,8 @@ final class DReportStore: ObservableObject {
 
         applicationData
             .workEnvironments[index]
-            .directory =
-            EnvironmentDirectoryConfiguration(
+            .storage =
+            EnvironmentStorageConfiguration(
                 kind:
                     .localFolder,
                 displayName:
@@ -8407,7 +8463,7 @@ extension DReportStore {
             else {
                 return (
                     nil,
-                    "That directory identifier is already used by another Environment membership."
+                    "That identity identifier is already used by another Environment membership."
                 )
             }
         }
@@ -8940,5 +8996,276 @@ extension DReportStore {
             saveEnvironmentCredentialStore(
                 credentialStore
             )
+    }
+}
+
+
+// ============================================================
+// MARK: - Environment manifest architecture migration
+// ============================================================
+
+extension DReportStore {
+
+    private func migrateActiveEnvironmentManifestIdentityIfNeeded() {
+        guard
+            fileURL.lastPathComponent
+                == "EnvironmentData.json",
+            let environmentID =
+                applicationData.activeEnvironmentID,
+            let environment =
+                applicationData
+                    .workEnvironments
+                    .first(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+        }
+
+
+        let manifestURL =
+            fileURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+
+        guard
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        manifestURL.path
+                )
+        else {
+            return
+        }
+
+
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
+
+
+        guard
+            let raw =
+                try? Data(
+                    contentsOf:
+                        manifestURL
+                ),
+            var manifest =
+                try? decoder.decode(
+                    EnvironmentManifest.self,
+                    from:
+                        raw
+                ),
+            manifest.environmentID
+                == environmentID
+        else {
+            return
+        }
+
+
+        var changed =
+            false
+
+
+        if manifest.schemaVersion < 2 {
+            manifest.schemaVersion =
+                2
+
+            changed =
+                true
+        }
+
+
+        if manifest.identityProvider == nil {
+            manifest.identityProvider =
+                environment.identityProvider
+
+            manifest.updatedAt =
+                Date()
+
+            changed =
+                true
+        }
+
+
+        guard changed else {
+            return
+        }
+
+
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting =
+            [
+                .prettyPrinted,
+                .sortedKeys
+            ]
+
+        encoder.dateEncodingStrategy =
+            .iso8601
+
+
+        if
+            let encoded =
+                try? encoder.encode(
+                    manifest
+                )
+        {
+            try? encoded.write(
+                to:
+                    manifestURL,
+                options:
+                    .atomic
+            )
+        }
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Known Environment manifest migration
+//
+// ApplicationData knows the storage location of every registered
+// Environment. Portable manifest migrations therefore do not
+// depend on that Environment already being open.
+// ============================================================
+
+extension DReportStore {
+
+    private func migrateKnownEnvironmentManifestsIfNeeded() {
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
+
+
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting =
+            [
+                .prettyPrinted,
+                .sortedKeys
+            ]
+
+        encoder.dateEncodingStrategy =
+            .iso8601
+
+
+        for environment in
+            applicationData
+                .workEnvironments
+        {
+            guard
+                let rawPath =
+                    environment
+                        .storage?
+                        .path?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        ),
+                !rawPath.isEmpty
+            else {
+                continue
+            }
+
+
+            let manifestURL =
+                URL(
+                    fileURLWithPath:
+                        rawPath,
+                    isDirectory:
+                        true
+                )
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+
+            guard
+                FileManager.default
+                    .fileExists(
+                        atPath:
+                            manifestURL.path
+                    ),
+                let raw =
+                    try? Data(
+                        contentsOf:
+                            manifestURL
+                    ),
+                var manifest =
+                    try? decoder.decode(
+                        EnvironmentManifest.self,
+                        from:
+                            raw
+                    ),
+                manifest.environmentID
+                    == environment.id
+            else {
+                continue
+            }
+
+
+            var changed =
+                false
+
+
+            if manifest.schemaVersion < 2 {
+                manifest.schemaVersion =
+                    2
+
+                changed =
+                    true
+            }
+
+
+            if manifest.identityProvider == nil {
+                manifest.identityProvider =
+                    environment
+                        .identityProvider
+
+                changed =
+                    true
+            }
+
+
+            guard changed else {
+                continue
+            }
+
+
+            manifest.updatedAt =
+                Date()
+
+
+            guard
+                let encoded =
+                    try? encoder.encode(
+                        manifest
+                    )
+            else {
+                continue
+            }
+
+
+            try? encoded.write(
+                to:
+                    manifestURL,
+                options:
+                    .atomic
+            )
+        }
     }
 }
