@@ -6571,14 +6571,13 @@ struct WorkDetailRouterView: View {
         if
             entity.kind
                 == .person,
-            let user =
-                store.user(
-                    linkedToPerson:
-                        entity.id
-                )
+            store.environmentMembership(
+                linkedToPerson:
+                    entity.id
+            ) != nil
         {
             return
-                "This Person is linked to the DReport account @\(user.username). The account must be unlinked or removed before this Person can be deleted."
+                "This Person is linked to an Environment membership. The membership must be unlinked before this Person can be deleted."
         }
 
         switch entity.kind {

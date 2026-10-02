@@ -12,10 +12,6 @@ final class DReportStore: ObservableObject {
     var applicationData:
         ApplicationData
 
-    @Published
-    private(set)
-    var currentUserID: UUID?
-
     // This is intentionally NOT persisted.
     //
     // Opening the application is not the same thing as
@@ -221,6 +217,18 @@ final class DReportStore: ObservableObject {
         }
 
 
+        do {
+            try Self
+                .migrateEnvironmentIdentityToSchema8IfNeeded(
+                    at:
+                        fileURL
+                )
+        } catch {
+            fatalError(
+                "Environment schema migration failed: \(error.localizedDescription)"
+            )
+        }
+
         if
             let storedData = try? Data(contentsOf: fileURL),
             let decoded = Self.decode(storedData)
@@ -230,21 +238,17 @@ final class DReportStore: ObservableObject {
             data = DReportData()
         }
 
-        migrateUsersToPeopleIfNeeded()
         ensureAllPeopleHaveProfiles()
-        migrateLegacyDataToWorkEnvironmentsIfNeeded()
 
         // Phase 2A:
         // extract application-owned state from the legacy
         // combined database into ApplicationData.json.
-        migrateApplicationMetadataIfNeeded()
 
         configureActiveEnvironmentStorageIfNeeded()
 
         // Phase 2C:
         // move the machine-local identity link out of the
         // portable Environment database.
-        migrateEnvironmentAccessLinksIfNeeded()
 
         ensureEnvironmentManifestIfNeeded()
 
@@ -256,8 +260,6 @@ final class DReportStore: ObservableObject {
         // Environment databases only for Environment entry.
         migrateKnownEnvironmentManifestsIfNeeded()
 
-        PersistentSession.clear()
-        currentUserID = nil
         environmentSessionIsOpen = false
     }
 
@@ -265,397 +267,9 @@ final class DReportStore: ObservableObject {
     // MARK: Legacy schema 6 -> Work Environment schema 7
     // ========================================================
 
-    private func migrateLegacyDataToWorkEnvironmentsIfNeeded() {
-        guard
-            data.schemaVersion < 7
-        else {
-            return
-        }
-
-
-        // ----------------------------------------------------
-        // The entire legacy database becomes one Environment.
-        //
-        // We intentionally do NOT assign an external directory
-        // path here. That requires an explicit user choice.
-        // ----------------------------------------------------
-
-        let environment =
-            WorkEnvironment(
-                name:
-                    "Test Environment"
-            )
-
-        data.workEnvironments =
-            [
-                environment
-            ]
-
-        data.activeEnvironmentID =
-            environment.id
-
-
-        // ----------------------------------------------------
-        // Determine which legacy account corresponds to the
-        // owner of this local app installation.
-        //
-        // Priority:
-        //   1. persisted/current legacy account
-        //   2. first active Administrator
-        //   3. first legacy user
-        // ----------------------------------------------------
-
-        let persistedUserID =
-            PersistentSession
-                .loadUserID()
-
-        let ownerUser =
-            data.users.first(
-                where: {
-                    $0.id
-                        == persistedUserID
-                }
-            )
-            ?? data.users.first(
-                where: {
-                    $0.role
-                        == .administrator
-                    && $0.isActive
-                }
-            )
-            ?? data.users.first
-
-
-        // ----------------------------------------------------
-        // Create the application-level LocalUserProfile.
-        //
-        // Prefer the linked PersonProfile, because it contains
-        // the richer People-compatible profile information.
-        // ----------------------------------------------------
-
-        var localProfile:
-            LocalUserProfile?
-
-        if let ownerUser {
-            var profile =
-                LocalUserProfile()
-
-            if
-                let personEntityID =
-                    ownerUser.personEntityID,
-                let personProfile =
-                    data.personProfiles.first(
-                        where: {
-                            $0.entityID
-                                == personEntityID
-                        }
-                    )
-            {
-                profile.firstName =
-                    personProfile.firstName
-
-                profile.middleName =
-                    personProfile.middleName
-
-                profile.lastName =
-                    personProfile.lastName
-
-                profile.preferredName =
-                    personProfile.preferredName
-
-                profile.jobTitle =
-                    personProfile.jobTitle
-
-                profile.professionalEmail =
-                    personProfile
-                        .professionalEmail
-
-                profile.secondaryProfessionalEmail =
-                    personProfile
-                        .secondaryProfessionalEmail
-
-                profile.professionalPhone =
-                    personProfile
-                        .professionalPhone
-
-                profile.secondaryPhone =
-                    personProfile
-                        .secondaryPhone
-
-                profile.office =
-                    personProfile.office
-
-                profile.employeeID =
-                    personProfile.employeeID
-
-                profile.website =
-                    personProfile.website
-
-                profile.orcid =
-                    personProfile.orcid
-
-                profile.linkedIn =
-                    personProfile.linkedIn
-
-                profile.github =
-                    personProfile.github
-
-                profile.professionalFields =
-                    personProfile
-                        .professionalFields
-
-                profile.responsibilities =
-                    personProfile
-                        .responsibilities
-
-                profile.notes =
-                    personProfile.notes
-
-                profile.avatarData =
-                    personProfile.avatarData
-
-                profile.academicTitle =
-                    personProfile
-                        .academicTitle
-
-                profile.professionalAddress =
-                    personProfile
-                        .professionalAddress
-
-                profile.city =
-                    personProfile.city
-
-                profile.postalCode =
-                    personProfile.postalCode
-
-                profile.country =
-                    personProfile.country
-
-                profile.researcherID =
-                    personProfile.researcherID
-
-                profile.scopusAuthorID =
-                    personProfile
-                        .scopusAuthorID
-
-                profile.googleScholarURL =
-                    personProfile
-                        .googleScholarURL
-
-                profile.preferredLanguage =
-                    personProfile
-                        .preferredLanguage
-
-                profile.timeZone =
-                    personProfile.timeZone
-
-                profile.assistantContact =
-                    personProfile
-                        .assistantContact
-
-                profile.tags =
-                    personProfile.tags
-
-                profile.createdAt =
-                    personProfile.createdAt
-
-                profile.updatedAt =
-                    personProfile.updatedAt
-            } else {
-                profile.firstName =
-                    ownerUser.firstName
-
-                profile.lastName =
-                    ownerUser.lastName
-
-                profile.avatarData =
-                    ownerUser.avatarData
-
-                profile.createdAt =
-                    ownerUser.createdAt
-
-                profile.updatedAt =
-                    Date()
-            }
-
-            data.localUserProfile =
-                profile
-
-            localProfile =
-                profile
-        }
-
-
-        // ----------------------------------------------------
-        // Every legacy account becomes a membership of the
-        // migrated Test Environment.
-        //
-        // Legacy .member maps to the new Environment .user.
-        //
-        // Password hashes remain only in the legacy user model
-        // for now. Authentication will move to Environment
-        // entry / directory access in a later phase.
-        // ----------------------------------------------------
-
-        data.environmentMemberships =
-            data.users.map {
-                legacyUser in
-
-                let role:
-                    EnvironmentRole =
-                        legacyUser.role
-                            == .administrator
-                        ? .administrator
-                        : .user
-
-                return
-                    EnvironmentMembership(
-                        environmentID:
-                            environment.id,
-                        localUserProfileID:
-                            legacyUser.id
-                                == ownerUser?.id
-                            ? localProfile?.id
-                            : nil,
-                        personEntityID:
-                            legacyUser
-                                .personEntityID,
-                        directoryUserIdentifier:
-                            legacyUser.username,
-                        firstName:
-                            legacyUser.firstName,
-                        lastName:
-                            legacyUser.lastName,
-                        role:
-                            role,
-                        isActive:
-                            legacyUser.isActive,
-                        createdAt:
-                            legacyUser.createdAt,
-                        lastAccessAt:
-                            legacyUser
-                                .lastLoginAt
-                    )
-            }
-
-
-        data.schemaVersion = 7
-
-        save()
-    }
-
-
     // ========================================================
     // MARK: Combined database -> application registry
     // ========================================================
-
-    private func migrateApplicationMetadataIfNeeded() {
-        var changed =
-            false
-
-
-        // Local profile belongs to the application installation,
-        // not to an Environment.
-        if
-            applicationData
-                .localUserProfile == nil,
-            let profile =
-                data.localUserProfile
-        {
-            applicationData
-                .localUserProfile =
-                profile
-
-            changed =
-                true
-        }
-
-
-        // The Work Environment list is an application-level
-        // registry telling this installation which Environments
-        // it knows how to open.
-        if
-            applicationData
-                .workEnvironments
-                .isEmpty,
-            !data.workEnvironments
-                .isEmpty
-        {
-            applicationData
-                .workEnvironments =
-                data.workEnvironments
-
-            changed =
-                true
-        }
-
-
-        // Active Environment is local UI/application state.
-        if
-            applicationData
-                .activeEnvironmentID == nil,
-            let activeID =
-                data.activeEnvironmentID
-        {
-            applicationData
-                .activeEnvironmentID =
-                activeID
-
-            changed =
-                true
-        }
-
-
-        // Defensive repair:
-        // if the stored active Environment disappeared,
-        // fall back to the first known Environment.
-        if
-            let activeID =
-                applicationData
-                    .activeEnvironmentID,
-            !applicationData
-                .workEnvironments
-                .contains(
-                    where: {
-                        $0.id
-                            == activeID
-                    }
-                )
-        {
-            applicationData
-                .activeEnvironmentID =
-                applicationData
-                    .workEnvironments
-                    .first?
-                    .id
-
-            changed =
-                true
-        }
-
-
-        if
-            applicationData
-                .activeEnvironmentID == nil,
-            let first =
-                applicationData
-                    .workEnvironments
-                    .first
-        {
-            applicationData
-                .activeEnvironmentID =
-                first.id
-
-            changed =
-                true
-        }
-
-
-        if changed {
-            saveApplicationData()
-        }
-    }
-
 
     // ========================================================
     // MARK: Application / Environment context
@@ -754,179 +368,6 @@ final class DReportStore: ObservableObject {
     // ========================================================
     // MARK: Local identity ↔ Environment identity
     // ========================================================
-
-    private func migrateEnvironmentAccessLinksIfNeeded() {
-        guard
-            let environmentID =
-                applicationData
-                    .activeEnvironmentID
-        else {
-            return
-        }
-
-
-        var applicationChanged =
-            false
-
-        var environmentChanged =
-            false
-
-
-        // ----------------------------------------------------
-        // Legacy schema-7 installations stored the app-local
-        // LocalUserProfile UUID directly inside a portable
-        // EnvironmentMembership.
-        //
-        // Move that relationship into ApplicationData.
-        // ----------------------------------------------------
-
-        if
-            !applicationData
-                .environmentAccesses
-                .contains(
-                    where: {
-                        $0.environmentID
-                            == environmentID
-                    }
-                )
-        {
-            var resolvedMembershipID:
-                UUID?
-
-
-            if
-                let localProfileID =
-                    applicationData
-                        .localUserProfile?
-                        .id
-            {
-                resolvedMembershipID =
-                    data.environmentMemberships
-                        .first(
-                            where: {
-                                $0.environmentID
-                                    == environmentID
-                                && $0.localUserProfileID
-                                    == localProfileID
-                            }
-                        )?
-                        .id
-            }
-
-
-            // Defensive migration fallback for databases in
-            // which the explicit local link was unavailable.
-            if resolvedMembershipID == nil {
-                let persistedLegacyUserID =
-                    PersistentSession
-                        .loadUserID()
-
-                if
-                    let legacyUser =
-                        data.users.first(
-                            where: {
-                                $0.id
-                                    == persistedLegacyUserID
-                            }
-                        )
-                        ?? data.users.first(
-                            where: {
-                                $0.role
-                                    == .administrator
-                                && $0.isActive
-                            }
-                        )
-                {
-                    resolvedMembershipID =
-                        data.environmentMemberships
-                            .first(
-                                where: {
-                                    guard
-                                        $0.environmentID
-                                            == environmentID
-                                    else {
-                                        return false
-                                    }
-
-                                    if
-                                        let personID =
-                                            legacyUser
-                                                .personEntityID,
-                                        $0.personEntityID
-                                            == personID
-                                    {
-                                        return true
-                                    }
-
-                                    return
-                                        $0.directoryUserIdentifier?
-                                            .caseInsensitiveCompare(
-                                                legacyUser.username
-                                            )
-                                            == .orderedSame
-                                }
-                            )?
-                            .id
-                }
-            }
-
-
-            applicationData
-                .environmentAccesses
-                .append(
-                    EnvironmentAccess(
-                        environmentID:
-                            environmentID,
-                        membershipID:
-                            resolvedMembershipID,
-                        lastOpenedAt:
-                            Date()
-                    )
-                )
-
-            applicationChanged =
-                true
-        }
-
-
-        // ----------------------------------------------------
-        // EnvironmentData must not retain a machine-local
-        // LocalUserProfile UUID.
-        // ----------------------------------------------------
-
-        for index in
-            data.environmentMemberships.indices
-        {
-            if
-                data.environmentMemberships[index]
-                    .localUserProfileID != nil
-            {
-                data.environmentMemberships[index]
-                    .localUserProfileID =
-                    nil
-
-                environmentChanged =
-                    true
-            }
-        }
-
-
-        if applicationChanged {
-            applicationData.schemaVersion =
-                max(
-                    applicationData.schemaVersion,
-                    2
-                )
-
-            saveApplicationData()
-        }
-
-
-        if environmentChanged {
-            save()
-        }
-    }
-
 
     private func ensureEnvironmentManifestIfNeeded() {
         guard
@@ -1356,9 +797,6 @@ final class DReportStore: ObservableObject {
 
         data =
             newData
-
-        currentUserID =
-            nil
 
         environmentSessionIsOpen =
             true
@@ -1805,41 +1243,6 @@ final class DReportStore: ObservableObject {
         }
 
 
-        let currentStoredMembership =
-            data.environmentMemberships[
-                index
-            ]
-
-        let currentLegacyCredentialUser =
-            legacyUser(
-                for:
-                    currentStoredMembership
-            )
-
-        var proposedIdentity =
-            currentStoredMembership
-
-        proposedIdentity.personEntityID =
-            personEntityID
-
-        proposedIdentity.directoryUserIdentifier =
-            cleanedDirectoryIdentifier.isEmpty
-            ? nil
-            : cleanedDirectoryIdentifier
-
-        if
-            let currentLegacyCredentialUser,
-            legacyUser(
-                for:
-                    proposedIdentity
-            )?.id
-                != currentLegacyCredentialUser.id
-        {
-            return
-                "This change would disconnect the migrated credentials used by this membership. Keep either its linked Person or its current directory identifier until legacy authentication has been fully migrated."
-        }
-
-
         let currentMembershipID =
             currentEnvironmentMembership?
                 .id
@@ -2002,76 +1405,14 @@ final class DReportStore: ObservableObject {
 
 
 
-    private func legacyUser(
-        for membership:
-            EnvironmentMembership
-    ) -> DReportUser? {
-
-        // Legacy credentials are migration material only.
-        //
-        // Do not infer a legacy credential merely because a new
-        // membership links to the same Person.
-        //
-        // Migrated memberships received the old username as their
-        // identity identifier. That identifier is the compatibility
-        // bridge to DReportUser.
-
-        guard
-            let identifier =
-                membership
-                    .directoryUserIdentifier?
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    ),
-            !identifier.isEmpty
-        else {
-            return nil
-        }
-
-        return
-            data.users.first {
-                $0.username
-                    .caseInsensitiveCompare(
-                        identifier
-                    )
-                    == .orderedSame
-            }
-    }
-
-
     func environmentMembershipNeedsPassword(
         id membershipID:
             UUID
     ) -> Bool {
-        guard
-            let membership =
-                data.environmentMemberships
-                    .first(
-                        where: {
-                            $0.id
-                                == membershipID
-                        }
-                    )
-        else {
-            return false
-        }
-
-        if
-            environmentMembershipHasPassword(
-                id:
-                    membershipID
-            )
-        {
-            return true
-        }
-
-        // Backward-compatible fallback only.
-        return
-            legacyUser(
-                for:
-                    membership
-            ) != nil
+        environmentMembershipHasPassword(
+            id:
+                membershipID
+        )
     }
 
 
@@ -2119,9 +1460,6 @@ final class DReportStore: ObservableObject {
                     ),
             membership.isActive
         else {
-            currentUserID =
-                nil
-
             environmentSessionIsOpen =
                 false
 
@@ -2136,9 +1474,6 @@ final class DReportStore: ObservableObject {
                     membership.id
             )
         {
-            currentUserID =
-                nil
-
             environmentSessionIsOpen =
                 false
 
@@ -2146,13 +1481,6 @@ final class DReportStore: ObservableObject {
                 .identityRequired
         }
 
-
-        currentUserID =
-            legacyUser(
-                for:
-                    membership
-            )?
-            .id
 
 
         if
@@ -2193,7 +1521,6 @@ final class DReportStore: ObservableObject {
         }
 
 
-        PersistentSession.clear()
 
         saveApplicationData()
 
@@ -2250,13 +1577,6 @@ final class DReportStore: ObservableObject {
         }
 
 
-        let legacyUser =
-            legacyUser(
-                for:
-                    membership
-            )
-
-
         if
             let credential =
                 environmentCredential(
@@ -2283,32 +1603,14 @@ final class DReportStore: ObservableObject {
                     "Incorrect password."
             }
 
-        } else if let legacyUser {
-            // Transitional fallback for an older Environment that
-            // has not yet produced EnvironmentCredentials.json.
-            guard legacyUser.isActive else {
-                return
-                    "This Environment account is disabled."
-            }
-
-            guard
-                PasswordHasher.verify(
-                    password:
-                        password,
-                    saltBase64:
-                        legacyUser
-                            .passwordSaltBase64,
-                    expectedHashBase64:
-                        legacyUser
-                            .passwordHashBase64,
-                    iterations:
-                        legacyUser
-                            .passwordIterations
-                )
-            else {
-                return
-                    "Incorrect password."
-            }
+        } else if
+            environmentMembershipHasPassword(
+                id:
+                    membership.id
+            )
+        {
+            return
+                "The Environment credential is unavailable."
         }
 
 
@@ -2355,15 +1657,10 @@ final class DReportStore: ObservableObject {
             Date()
 
 
-        currentUserID =
-            legacyUser?
-                .id
-
         environmentSessionIsOpen =
             true
 
 
-        PersistentSession.clear()
 
         saveApplicationData()
         save()
@@ -2376,10 +1673,6 @@ final class DReportStore: ObservableObject {
         environmentSessionIsOpen =
             false
 
-        currentUserID =
-            nil
-
-        PersistentSession.clear()
     }
 
 
@@ -2686,34 +1979,11 @@ final class DReportStore: ObservableObject {
         saveApplicationData()
 
 
-        migrateUsersToPeopleIfNeeded()
         ensureAllPeopleHaveProfiles()
 
-        migrateEnvironmentAccessLinksIfNeeded()
         ensureEnvironmentManifestIfNeeded()
 
         removeApplicationMetadataFromEnvironmentDatabaseIfNeeded()
-
-
-        // Legacy authentication is temporary.
-        //
-        // Until Environment entry/authentication replaces the
-        // old global login UI, never keep a legacy currentUserID
-        // that does not exist in the newly loaded Environment.
-        if
-            let currentUserID,
-            !data.users.contains(
-                where: {
-                    $0.id
-                        == currentUserID
-                }
-            )
-        {
-            self.currentUserID =
-                nil
-
-            PersistentSession.clear()
-        }
 
 
         return nil
@@ -3000,10 +2270,6 @@ final class DReportStore: ObservableObject {
                     kind == .activity
                     ? now
                     : nil,
-                createdByUserID:
-                    currentUserID,
-                updatedByUserID:
-                    currentUserID,
                 createdByMembershipID:
                     currentEnvironmentMembership?.id,
                 updatedByMembershipID:
@@ -3038,8 +2304,6 @@ final class DReportStore: ObservableObject {
                 timestamp: now,
                 text:
                     "Created \(kind.displayName.lowercased())",
-                actorUserID:
-                    currentUserID,
                 actorMembershipID:
                     currentEnvironmentMembership?.id,
                 timeZoneID:
@@ -3182,8 +2446,6 @@ final class DReportStore: ObservableObject {
         data.workItems[index].updatedAt =
             now
 
-        data.workItems[index].updatedByUserID =
-            currentUserID
         data.workItems[index].updatedByMembershipID =
             currentEnvironmentMembership?.id
 
@@ -3271,8 +2533,6 @@ final class DReportStore: ObservableObject {
                     previous?.rawValue,
                 newValue:
                     status.rawValue,
-                actorUserID:
-                    currentUserID,
                 actorMembershipID:
                     currentEnvironmentMembership?.id,
                 timeZoneID:
@@ -3658,52 +2918,6 @@ extension DReportStore {
         }
     }
 
-    func personEntity(
-        for user: DReportUser
-    ) -> Entity? {
-        guard
-            let personID =
-                user.personEntityID
-        else {
-            return nil
-        }
-
-        return data.entities.first {
-            $0.id == personID
-            && $0.kind == .person
-        }
-    }
-
-    func user(
-        linkedToPerson entityID: UUID
-    ) -> DReportUser? {
-        data.users.first {
-            $0.personEntityID == entityID
-        }
-    }
-
-    var peopleWithoutUserAccounts:
-        [Entity]
-    {
-        data.entities
-            .filter {
-                $0.kind == .person
-            }
-            .filter { person in
-                !data.users.contains {
-                    $0.personEntityID
-                        == person.id
-                }
-            }
-            .sorted {
-                $0.name
-                    .localizedCaseInsensitiveCompare(
-                        $1.name
-                    )
-                    == .orderedAscending
-            }
-    }
-
     @discardableResult
     private func createPersonForUser(
         firstName: String,
@@ -3867,753 +3081,14 @@ extension DReportStore {
         }
     }
 
-    func addMemberLinkedToExistingPerson(
-        username: String,
-        password: String,
-        personEntityID: UUID
-    ) -> String? {
-        guard currentEnvironmentUserIsAdministrator else {
-            return "Administrator rights are required."
-        }
-
-        let cleanedUsername =
-            username.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard !cleanedUsername.isEmpty else {
-            return "Username is required."
-        }
-
-        guard
-            cleanedUsername.rangeOfCharacter(
-                from: .whitespacesAndNewlines
-            ) == nil
-        else {
-            return "Username cannot contain spaces."
-        }
-
-        guard password.count >= 8 else {
-            return "Password must contain at least 8 characters."
-        }
-
-        guard
-            let person =
-                data.entities.first(
-                    where: {
-                        $0.id == personEntityID
-                        && $0.kind == .person
-                    }
-                )
-        else {
-            return "The selected Person no longer exists."
-        }
-
-        guard
-            !data.users.contains(
-                where: {
-                    $0.personEntityID
-                        == personEntityID
-                }
-            )
-        else {
-            return "This Person already has a user account."
-        }
-
-        guard
-            !data.users.contains(
-                where: {
-                    $0.username
-                        .caseInsensitiveCompare(
-                            cleanedUsername
-                        )
-                        == .orderedSame
-                }
-            )
-        else {
-            return "That username already exists."
-        }
-
-        let hash:
-            (
-                saltBase64: String,
-                hashBase64: String,
-                iterations: Int
-            )
-
-        do {
-            hash =
-                try PasswordHasher
-                    .createHash(
-                        password: password
-                    )
-        } catch {
-            return "The password could not be secured."
-        }
-
-        let profile =
-            personProfile(
-                for: personEntityID
-            )
-
-        let user =
-            DReportUser(
-                personEntityID:
-                    personEntityID,
-                username:
-                    cleanedUsername,
-                firstName:
-                    profile?.firstName
-                    ?? person.name,
-                lastName:
-                    profile?.lastName
-                    ?? "",
-                role:
-                    .member,
-                passwordSaltBase64:
-                    hash.saltBase64,
-                passwordHashBase64:
-                    hash.hashBase64,
-                passwordIterations:
-                    hash.iterations,
-                avatarData:
-                    profile?.avatarData
-            )
-
-        data.users.append(user)
-
-        data.schemaVersion =
-            max(
-                data.schemaVersion,
-                4
-            )
-
-        save()
-
-        return nil
-    }
-
-    private func migrateUsersToPeopleIfNeeded() {
-        var changed = false
-
-        for index in data.users.indices {
-            if
-                let personID =
-                    data.users[index]
-                        .personEntityID,
-                data.entities.contains(
-                    where: {
-                        $0.id == personID
-                        && $0.kind == .person
-                    }
-                )
-            {
-                if !data.personProfiles.contains(
-                    where: {
-                        $0.entityID
-                            == personID
-                    }
-                ) {
-                    data.personProfiles.append(
-                        PersonProfile(
-                            entityID:
-                                personID,
-                            firstName:
-                                data.users[index]
-                                    .firstName,
-                            lastName:
-                                data.users[index]
-                                    .lastName,
-                            avatarData:
-                                data.users[index]
-                                    .avatarData
-                        )
-                    )
-
-                    changed = true
-                }
-
-                continue
-            }
-
-            let personID =
-                createPersonForUser(
-                    firstName:
-                        data.users[index]
-                            .firstName,
-                    lastName:
-                        data.users[index]
-                            .lastName,
-                    avatarData:
-                        data.users[index]
-                            .avatarData
-                )
-
-            data.users[index]
-                .personEntityID =
-                personID
-
-            changed = true
-        }
-
-        if changed {
-            data.schemaVersion =
-                max(
-                    data.schemaVersion,
-                    3
-                )
-
-            save()
-        }
-    }
 }
 
 
 extension DReportStore {
-    func user(
-        id: UUID
-    ) -> DReportUser? {
-        data.users.first {
-            $0.id == id
-        }
-    }
-
-    func availablePeopleForUserLink(
-        userID: UUID
-    ) -> [Entity] {
-        guard
-            let user =
-                user(id: userID)
-        else {
-            return []
-        }
-
-        return data.entities
-            .filter {
-                $0.kind == .person
-            }
-            .filter { person in
-                if
-                    person.id
-                        == user.personEntityID
-                {
-                    return true
-                }
-
-                return !data.users.contains {
-                    $0.id != userID
-                    && $0.personEntityID
-                        == person.id
-                }
-            }
-            .sorted {
-                $0.name
-                    .localizedCaseInsensitiveCompare(
-                        $1.name
-                    )
-                    == .orderedAscending
-            }
-    }
-
-    func updateUsername(
-        userID: UUID,
-        username: String
-    ) -> String? {
-        guard
-            currentEnvironmentUserIsAdministrator
-        else {
-            return
-                "Administrator rights are required."
-        }
-
-        let cleaned =
-            username.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard !cleaned.isEmpty else {
-            return "Username is required."
-        }
-
-        guard
-            cleaned.rangeOfCharacter(
-                from: .whitespacesAndNewlines
-            ) == nil
-        else {
-            return
-                "Username cannot contain spaces."
-        }
-
-        guard
-            let index =
-                data.users.firstIndex(
-                    where: {
-                        $0.id == userID
-                    }
-                )
-        else {
-            return "User not found."
-        }
-
-        let duplicate =
-            data.users.contains {
-                $0.id != userID
-                && $0.username
-                    .caseInsensitiveCompare(
-                        cleaned
-                    )
-                    == .orderedSame
-            }
-
-        guard !duplicate else {
-            return
-                "That username already exists."
-        }
-
-        data.users[index].username =
-            cleaned
-
-        save()
-
-        return nil
-    }
-
-    func changeUserPassword(
-        userID: UUID,
-        newPassword: String
-    ) -> String? {
-        guard
-            currentEnvironmentUserIsAdministrator
-        else {
-            return
-                "Administrator rights are required."
-        }
-
-        guard
-            data.users.contains(
-                where: {
-                    $0.id == userID
-                }
-            )
-        else {
-            return "User not found."
-        }
-
-        guard
-            newPassword.count >= 8
-        else {
-            return
-                "Password must contain at least 8 characters."
-        }
-
-        let hash:
-            (
-                saltBase64: String,
-                hashBase64: String,
-                iterations: Int
-            )
-
-        do {
-            hash =
-                try PasswordHasher
-                    .createHash(
-                        password:
-                            newPassword
-                    )
-        } catch {
-            return
-                "The password could not be secured."
-        }
-
-        guard
-            let index =
-                data.users.firstIndex(
-                    where: {
-                        $0.id == userID
-                    }
-                )
-        else {
-            return "User not found."
-        }
-
-        data.users[index]
-            .passwordSaltBase64 =
-            hash.saltBase64
-
-        data.users[index]
-            .passwordHashBase64 =
-            hash.hashBase64
-
-        data.users[index]
-            .passwordIterations =
-            hash.iterations
-
-        save()
-
-        return nil
-    }
-
-    func relinkUser(
-        userID: UUID,
-        toPerson personEntityID: UUID
-    ) -> String? {
-        guard
-            currentEnvironmentUserIsAdministrator
-        else {
-            return
-                "Administrator rights are required."
-        }
-
-        guard
-            let userIndex =
-                data.users.firstIndex(
-                    where: {
-                        $0.id == userID
-                    }
-                )
-        else {
-            return "User not found."
-        }
-
-        guard
-            let person =
-                data.entities.first(
-                    where: {
-                        $0.id
-                            == personEntityID
-                        && $0.kind
-                            == .person
-                    }
-                )
-        else {
-            return "Person not found."
-        }
-
-        let alreadyLinked =
-            data.users.contains {
-                $0.id != userID
-                && $0.personEntityID
-                    == personEntityID
-            }
-
-        guard !alreadyLinked else {
-            return
-                "This Person already has a DReport user account."
-        }
-
-        data.users[userIndex]
-            .personEntityID =
-            personEntityID
-
-        if
-            let profile =
-                personProfile(
-                    for: personEntityID
-                )
-        {
-            data.users[userIndex]
-                .firstName =
-                profile.firstName
-
-            data.users[userIndex]
-                .lastName =
-                profile.lastName
-
-            data.users[userIndex]
-                .avatarData =
-                profile.avatarData
-        } else {
-            data.users[userIndex]
-                .firstName =
-                person.name
-
-            data.users[userIndex]
-                .lastName =
-                ""
-        }
-
-        save()
-
-        return nil
-    }
-
-    func setUserActive(
-        userID: UUID,
-        isActive: Bool
-    ) -> String? {
-        guard
-            currentEnvironmentUserIsAdministrator
-        else {
-            return
-                "Administrator rights are required."
-        }
-
-        guard
-            let index =
-                data.users.firstIndex(
-                    where: {
-                        $0.id == userID
-                    }
-                )
-        else {
-            return "User not found."
-        }
-
-        if
-            !isActive,
-            currentUserID == userID
-        {
-            return
-                "You cannot disable the account you are currently using."
-        }
-
-        if
-            !isActive,
-            data.users[index].role
-                == .administrator
-        {
-            let otherActiveAdmins =
-                data.users.filter {
-                    $0.id != userID
-                    && $0.role
-                        == .administrator
-                    && $0.isActive
-                }
-
-            guard
-                !otherActiveAdmins.isEmpty
-            else {
-                return
-                    "The last active Administrator cannot be disabled."
-            }
-        }
-
-        data.users[index].isActive =
-            isActive
-
-        if !isActive {
-            if
-                PersistentSession
-                    .loadUserID()
-                    == userID
-            {
-                PersistentSession.clear()
-            }
-        }
-
-        save()
-
-        return nil
-    }
 }
 
 
 extension DReportStore {
-    var users: [DReportUser] {
-        data.users.sorted {
-            $0.displayName
-                .localizedCaseInsensitiveCompare(
-                    $1.displayName
-                )
-                == .orderedAscending
-        }
-    }
-
-    var currentUser: DReportUser? {
-        guard
-            let currentUserID
-        else {
-            return nil
-        }
-
-        return data.users.first {
-            $0.id == currentUserID
-        }
-    }
-
-    var hasUsers: Bool {
-        !data.users.isEmpty
-    }
-
-
-
-    func addMember(
-        username: String,
-        firstName: String,
-        lastName: String,
-        password: String,
-        avatarData: Data?
-    ) -> String? {
-        guard
-            currentEnvironmentUserIsAdministrator
-        else {
-            return
-                "Administrator rights are required."
-        }
-
-        return createUser(
-            username: username,
-            firstName: firstName,
-            lastName: lastName,
-            password: password,
-            avatarData: avatarData,
-            role: .member,
-            signInAfterCreation: false,
-            staySignedIn: false
-        )
-    }
-
-
-
-    private func createUser(
-        username: String,
-        firstName: String,
-        lastName: String,
-        password: String,
-        avatarData: Data?,
-        role: UserRole,
-        signInAfterCreation: Bool,
-        staySignedIn: Bool
-    ) -> String? {
-        let cleanedUsername =
-            username.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        let cleanedFirstName =
-            firstName.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        let cleanedLastName =
-            lastName.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        guard !cleanedUsername.isEmpty else {
-            return "Username is required."
-        }
-
-        guard
-            cleanedUsername.rangeOfCharacter(
-                from: .whitespacesAndNewlines
-            ) == nil
-        else {
-            return
-                "Username cannot contain spaces."
-        }
-
-        guard !cleanedFirstName.isEmpty else {
-            return
-                "First name is required."
-        }
-
-        guard password.count >= 8 else {
-            return
-                "Password must contain at least 8 characters."
-        }
-
-        let usernameExists =
-            data.users.contains {
-                $0.username
-                    .caseInsensitiveCompare(
-                        cleanedUsername
-                    )
-                    == .orderedSame
-            }
-
-        guard !usernameExists else {
-            return
-                "That username already exists."
-        }
-
-        let hash:
-            (
-                saltBase64: String,
-                hashBase64: String,
-                iterations: Int
-            )
-
-        do {
-            hash =
-                try PasswordHasher
-                    .createHash(
-                        password:
-                            password
-                    )
-        } catch {
-            return
-                "The password could not be secured."
-        }
-
-        let now = Date()
-
-        let personEntityID =
-            createPersonForUser(
-                firstName:
-                    cleanedFirstName,
-                lastName:
-                    cleanedLastName,
-                avatarData:
-                    avatarData
-            )
-
-        let user =
-            DReportUser(
-                personEntityID:
-                    personEntityID,
-                username:
-                    cleanedUsername,
-                firstName:
-                    cleanedFirstName,
-                lastName:
-                    cleanedLastName,
-                role:
-                    role,
-                passwordSaltBase64:
-                    hash.saltBase64,
-                passwordHashBase64:
-                    hash.hashBase64,
-                passwordIterations:
-                    hash.iterations,
-                avatarData:
-                    avatarData,
-                createdAt:
-                    now,
-                lastLoginAt:
-                    signInAfterCreation
-                    ? now
-                    : nil
-            )
-
-        data.users.append(user)
-
-        data.schemaVersion =
-            max(
-                data.schemaVersion,
-                3
-            )
-
-        if signInAfterCreation {
-            currentUserID =
-                user.id
-
-            if staySignedIn {
-                PersistentSession.save(
-                    userID:
-                        user.id
-                )
-            } else {
-                PersistentSession.clear()
-            }
-        }
-
-        save()
-
-        return nil
-    }
-
-
 }
 
 
@@ -4630,10 +3105,6 @@ extension DReportStore {
     // ========================================================
 
     func resetApplication() {
-        PersistentSession.clear()
-
-        currentUserID =
-            nil
 
         environmentSessionIsOpen =
             false
@@ -5026,9 +3497,6 @@ extension DReportStore {
             currentTimeZoneID
 
         data.workItems[index]
-            .updatedByUserID =
-            currentUserID
-        data.workItems[index]
             .updatedByMembershipID =
             currentEnvironmentMembership?.id
 
@@ -5120,9 +3588,6 @@ extension DReportStore {
             timeZoneID
 
         data.workItems[workIndex]
-            .updatedByUserID =
-            currentUserID
-        data.workItems[workIndex]
             .updatedByMembershipID =
             currentEnvironmentMembership?.id
 
@@ -5137,8 +3602,6 @@ extension DReportStore {
                         now,
                     text:
                         "\(role.displayName): \(entity.name)",
-                    actorUserID:
-                        currentUserID,
                     actorMembershipID:
                         currentEnvironmentMembership?.id,
                     timeZoneID:
@@ -5311,10 +3774,6 @@ extension DReportStore {
                         ?? now
                     )
                     : nil,
-                createdByUserID:
-                    currentUserID,
-                updatedByUserID:
-                    currentUserID,
                 createdByMembershipID:
                     currentEnvironmentMembership?.id,
                 updatedByMembershipID:
@@ -5373,8 +3832,6 @@ extension DReportStore {
                     kind == .activity
                     ? "Logged event"
                     : "Created \(kind.displayName.lowercased())",
-                actorUserID:
-                    currentUserID,
                 actorMembershipID:
                     currentEnvironmentMembership?.id,
                 timeZoneID:
@@ -5470,8 +3927,6 @@ extension DReportStore {
                     previousValue,
                 newValue:
                     newValue,
-                actorUserID:
-                    currentUserID,
                 actorMembershipID:
                     currentEnvironmentMembership?.id,
                 timeZoneID:
@@ -6062,15 +4517,15 @@ extension DReportStore {
 
         if
             entity.kind == .person,
-            let linkedUser =
-                user(
-                    linkedToPerson:
-                        id
-                )
+            environmentMembership(
+                linkedToPerson:
+                    id
+            ) != nil
         {
             return
-                "This Person is linked to the DReport account @\(linkedUser.username). Remove or unlink that account before deleting the Person."
+                "This Person is linked to an Environment membership. Unlink that membership before deleting the Person."
         }
+
 
         let now =
             Date()
@@ -8783,92 +7238,10 @@ extension DReportStore {
     }
 
 
-    private func migrateLegacyEnvironmentCredentialsIfNeeded() {
-        guard
-            let environmentID =
-                activeEnvironmentID
-        else {
-            return
-        }
-
-        var credentialStore =
-            loadEnvironmentCredentialStore()
-
-        var changed =
-            false
-
-
-        for membership in
-            data.environmentMemberships
-                .filter({
-                    $0.environmentID
-                        == environmentID
-                })
-        {
-            let alreadyMigrated =
-                credentialStore
-                    .credentials
-                    .contains {
-                        $0.membershipID
-                            == membership.id
-                    }
-
-            if alreadyMigrated {
-                continue
-            }
-
-            guard
-                let legacyUser =
-                    legacyUser(
-                        for:
-                            membership
-                    )
-            else {
-                continue
-            }
-
-
-            credentialStore
-                .credentials
-                .append(
-                    EnvironmentCredential(
-                        membershipID:
-                            membership.id,
-                        passwordSaltBase64:
-                            legacyUser
-                                .passwordSaltBase64,
-                        passwordHashBase64:
-                            legacyUser
-                                .passwordHashBase64,
-                        passwordIterations:
-                            legacyUser
-                                .passwordIterations,
-                        createdAt:
-                            legacyUser.createdAt,
-                        updatedAt:
-                            Date()
-                    )
-                )
-
-            changed =
-                true
-        }
-
-
-        if changed {
-            _ =
-                saveEnvironmentCredentialStore(
-                    credentialStore
-                )
-        }
-    }
-
-
     func environmentMembershipHasPassword(
         id membershipID:
             UUID
     ) -> Bool {
-        migrateLegacyEnvironmentCredentialsIfNeeded()
 
         return
             loadEnvironmentCredentialStore()
@@ -8884,7 +7257,6 @@ extension DReportStore {
         for membershipID:
             UUID
     ) -> EnvironmentCredential? {
-        migrateLegacyEnvironmentCredentialsIfNeeded()
 
         return
             loadEnvironmentCredentialStore()
@@ -9327,5 +7699,663 @@ extension DReportStore {
                     && $0.personEntityID
                         == personEntityID
                 }
+    }
+}
+
+
+// ============================================================
+// MARK: - Environment schema 7 -> 8 identity migration
+//
+// Schema 8 permanently removes the legacy users array and the
+// legacy account audit UUIDs.
+//
+// The migration operates on raw JSON before DReportData is decoded,
+// so the legacy Swift account model no longer needs to exist.
+// ============================================================
+
+extension DReportStore {
+
+    private static func migrateEnvironmentIdentityToSchema8IfNeeded(
+        at fileURL:
+            URL
+    ) throws {
+
+        guard
+            fileURL.lastPathComponent
+                == "EnvironmentData.json",
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        fileURL.path
+                )
+        else {
+            return
+        }
+
+
+        let raw =
+            try Data(
+                contentsOf:
+                    fileURL
+            )
+
+
+        guard
+            var root =
+                try JSONSerialization
+                    .jsonObject(
+                        with:
+                            raw
+                    )
+                    as? [String: Any]
+        else {
+            return
+        }
+
+
+        let schemaVersion =
+            (
+                root[
+                    "schemaVersion"
+                ]
+                as? NSNumber
+            )?
+            .intValue
+            ?? 1
+
+
+        guard schemaVersion < 8 else {
+            return
+        }
+
+
+        guard schemaVersion >= 7 else {
+            throw NSError(
+                domain:
+                    "DReport.SchemaMigration",
+                code:
+                    8,
+                userInfo:
+                    [
+                        NSLocalizedDescriptionKey:
+                            "This Environment predates schema 7 and must first be migrated by an earlier DReport build."
+                    ]
+            )
+        }
+
+
+        let memberships =
+            root[
+                "environmentMemberships"
+            ]
+            as? [[String: Any]]
+            ?? []
+
+
+        let legacyUsers =
+            root[
+                "users"
+            ]
+            as? [[String: Any]]
+            ?? []
+
+
+        var membershipByIdentifier:
+            [String: String] = [:]
+
+        var membershipByPerson:
+            [String: String] = [:]
+
+
+        for membership in memberships {
+
+            guard
+                let membershipID =
+                    membership["id"]
+                    as? String
+            else {
+                continue
+            }
+
+
+            if
+                let identifier =
+                    membership[
+                        "directoryUserIdentifier"
+                    ]
+                    as? String
+            {
+                let key =
+                    identifier
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .lowercased()
+
+                if !key.isEmpty {
+                    membershipByIdentifier[
+                        key
+                    ] =
+                        membershipID
+                }
+            }
+
+
+            if
+                let personID =
+                    membership[
+                        "personEntityID"
+                    ]
+                    as? String
+            {
+                membershipByPerson[
+                    personID
+                ] =
+                    membershipID
+            }
+        }
+
+
+        var legacyUserToMembership:
+            [String: String] = [:]
+
+
+        for legacyUser in legacyUsers {
+
+            guard
+                let legacyUserID =
+                    legacyUser["id"]
+                    as? String
+            else {
+                continue
+            }
+
+
+            let username =
+                (
+                    legacyUser[
+                        "username"
+                    ]
+                    as? String
+                    ?? ""
+                )
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .lowercased()
+
+
+            let personID =
+                legacyUser[
+                    "personEntityID"
+                ]
+                as? String
+
+
+            let membershipID =
+                membershipByIdentifier[
+                    username
+                ]
+                ?? (
+                    personID.flatMap {
+                        membershipByPerson[
+                            $0
+                        ]
+                    }
+                )
+
+
+            guard let membershipID else {
+                throw NSError(
+                    domain:
+                        "DReport.SchemaMigration",
+                    code:
+                        81,
+                    userInfo:
+                        [
+                            NSLocalizedDescriptionKey:
+                                "A legacy Environment user cannot be mapped to an Environment membership."
+                        ]
+                )
+            }
+
+
+            legacyUserToMembership[
+                legacyUserID
+            ] =
+                membershipID
+        }
+
+
+        func membershipID(
+            forLegacyUserID legacyUserID:
+                String?
+        ) throws -> String? {
+
+            guard
+                let legacyUserID
+            else {
+                return nil
+            }
+
+
+            guard
+                let membershipID =
+                    legacyUserToMembership[
+                        legacyUserID
+                    ]
+            else {
+                throw NSError(
+                    domain:
+                        "DReport.SchemaMigration",
+                    code:
+                        82,
+                    userInfo:
+                        [
+                            NSLocalizedDescriptionKey:
+                                "A historical user identity cannot be mapped to an Environment membership."
+                        ]
+                )
+            }
+
+
+            return membershipID
+        }
+
+
+        // ----------------------------------------------------
+        // WorkItem audit migration
+        // ----------------------------------------------------
+
+        var workItems =
+            root[
+                "workItems"
+            ]
+            as? [[String: Any]]
+            ?? []
+
+
+        for index in workItems.indices {
+
+            let createdLegacyID =
+                workItems[index][
+                    "createdByUserID"
+                ]
+                as? String
+
+            let updatedLegacyID =
+                workItems[index][
+                    "updatedByUserID"
+                ]
+                as? String
+
+
+            if
+                workItems[index][
+                    "createdByMembershipID"
+                ]
+                == nil,
+                let migrated =
+                    try membershipID(
+                        forLegacyUserID:
+                            createdLegacyID
+                    )
+            {
+                workItems[index][
+                    "createdByMembershipID"
+                ] =
+                    migrated
+            }
+
+
+            if
+                workItems[index][
+                    "updatedByMembershipID"
+                ]
+                == nil,
+                let migrated =
+                    try membershipID(
+                        forLegacyUserID:
+                            updatedLegacyID
+                    )
+            {
+                workItems[index][
+                    "updatedByMembershipID"
+                ] =
+                    migrated
+            }
+
+
+            workItems[index]
+                .removeValue(
+                    forKey:
+                        "createdByUserID"
+                )
+
+            workItems[index]
+                .removeValue(
+                    forKey:
+                        "updatedByUserID"
+                )
+        }
+
+
+        root[
+            "workItems"
+        ] =
+            workItems
+
+
+        // ----------------------------------------------------
+        // History audit migration
+        // ----------------------------------------------------
+
+        var historyEvents =
+            root[
+                "historyEvents"
+            ]
+            as? [[String: Any]]
+            ?? []
+
+
+        for index in historyEvents.indices {
+
+            let legacyID =
+                historyEvents[index][
+                    "actorUserID"
+                ]
+                as? String
+
+
+            if
+                historyEvents[index][
+                    "actorMembershipID"
+                ]
+                == nil,
+                let migrated =
+                    try membershipID(
+                        forLegacyUserID:
+                            legacyID
+                    )
+            {
+                historyEvents[index][
+                    "actorMembershipID"
+                ] =
+                    migrated
+            }
+
+
+            historyEvents[index]
+                .removeValue(
+                    forKey:
+                        "actorUserID"
+                )
+        }
+
+
+        root[
+            "historyEvents"
+        ] =
+            historyEvents
+
+
+        // ----------------------------------------------------
+        // Credential migration
+        //
+        // Existing Environment credentials always win.
+        // Missing credentials can still be copied from schema-7
+        // user hashes before the legacy users array disappears.
+        // ----------------------------------------------------
+
+        if !legacyUsers.isEmpty {
+
+            let credentialURL =
+                fileURL
+                    .deletingLastPathComponent()
+                    .appendingPathComponent(
+                        "EnvironmentCredentials.json"
+                    )
+
+
+            let environmentID =
+                memberships
+                    .compactMap {
+                        $0[
+                            "environmentID"
+                        ]
+                        as? String
+                    }
+                    .first
+
+
+            if let environmentID {
+
+                var credentialRoot:
+                    [String: Any]
+
+
+                if
+                    FileManager.default
+                        .fileExists(
+                            atPath:
+                                credentialURL.path
+                        ),
+                    let credentialRaw =
+                        try? Data(
+                            contentsOf:
+                                credentialURL
+                        ),
+                    let decoded =
+                        try? JSONSerialization
+                            .jsonObject(
+                                with:
+                                    credentialRaw
+                            )
+                            as? [String: Any]
+                {
+                    credentialRoot =
+                        decoded
+
+                } else {
+                    credentialRoot =
+                        [
+                            "schemaVersion":
+                                1,
+                            "environmentID":
+                                environmentID,
+                            "credentials":
+                                []
+                        ]
+                }
+
+
+                var credentials =
+                    credentialRoot[
+                        "credentials"
+                    ]
+                    as? [[String: Any]]
+                    ?? []
+
+
+                var existingMembershipIDs =
+                    Set(
+                        credentials
+                            .compactMap {
+                                $0[
+                                    "membershipID"
+                                ]
+                                as? String
+                            }
+                    )
+
+
+                for legacyUser in legacyUsers {
+
+                    guard
+                        let legacyUserID =
+                            legacyUser["id"]
+                            as? String,
+                        let membershipID =
+                            legacyUserToMembership[
+                                legacyUserID
+                            ],
+                        !existingMembershipIDs
+                            .contains(
+                                membershipID
+                            )
+                    else {
+                        continue
+                    }
+
+
+                    guard
+                        let salt =
+                            legacyUser[
+                                "passwordSaltBase64"
+                            ]
+                            as? String,
+                        let hash =
+                            legacyUser[
+                                "passwordHashBase64"
+                            ]
+                            as? String,
+                        let iterations =
+                            legacyUser[
+                                "passwordIterations"
+                            ]
+                            as? NSNumber
+                    else {
+                        throw NSError(
+                            domain:
+                                "DReport.SchemaMigration",
+                            code:
+                                83,
+                            userInfo:
+                                [
+                                    NSLocalizedDescriptionKey:
+                                        "A legacy credential is incomplete and cannot be migrated safely."
+                                ]
+                        )
+                    }
+
+
+                    let now =
+                        Date()
+                            .timeIntervalSinceReferenceDate
+
+
+                    credentials.append(
+                        [
+                            "membershipID":
+                                membershipID,
+                            "passwordSaltBase64":
+                                salt,
+                            "passwordHashBase64":
+                                hash,
+                            "passwordIterations":
+                                iterations,
+                            "createdAt":
+                                (
+                                    legacyUser[
+                                        "createdAt"
+                                    ]
+                                    as? NSNumber
+                                )
+                                ?? NSNumber(
+                                    value:
+                                        now
+                                ),
+                            "updatedAt":
+                                NSNumber(
+                                    value:
+                                        now
+                                )
+                        ]
+                    )
+
+
+                    existingMembershipIDs
+                        .insert(
+                            membershipID
+                        )
+                }
+
+
+                credentialRoot[
+                    "schemaVersion"
+                ] =
+                    1
+
+                credentialRoot[
+                    "environmentID"
+                ] =
+                    environmentID
+
+                credentialRoot[
+                    "credentials"
+                ] =
+                    credentials
+
+
+                let encodedCredentials =
+                    try JSONSerialization
+                        .data(
+                            withJSONObject:
+                                credentialRoot,
+                            options:
+                                [
+                                    .prettyPrinted,
+                                    .sortedKeys
+                                ]
+                        )
+
+
+                try encodedCredentials
+                    .write(
+                        to:
+                            credentialURL,
+                        options:
+                            .atomic
+                    )
+            }
+        }
+
+
+        // ----------------------------------------------------
+        // Schema 8 no longer persists legacy users.
+        // ----------------------------------------------------
+
+        root.removeValue(
+            forKey:
+                "users"
+        )
+
+        root[
+            "schemaVersion"
+        ] =
+            8
+
+
+        let migrated =
+            try JSONSerialization
+                .data(
+                    withJSONObject:
+                        root,
+                    options:
+                        [
+                            .prettyPrinted,
+                            .sortedKeys
+                        ]
+                )
+
+
+        try migrated.write(
+            to:
+                fileURL,
+            options:
+                .atomic
+        )
     }
 }

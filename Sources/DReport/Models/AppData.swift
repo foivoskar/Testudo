@@ -1,7 +1,7 @@
 import Foundation
 
 struct DReportData: Codable {
-    var schemaVersion: Int = 7
+    var schemaVersion: Int = 8
 
     // --------------------------------------------------------
     // Application-level identity
@@ -44,9 +44,6 @@ struct DReportData: Codable {
     var historyEvents:
         [HistoryEvent] = []
 
-    var users:
-        [DReportUser] = []
-
     var calendarAccounts:
         [CalendarAccount] = []
 
@@ -81,7 +78,6 @@ struct DReportData: Codable {
         case workEntityRelationships
         case themeEntityRelationships
         case historyEvents
-        case users
         case calendarAccounts
         case calendars
         case calendarEvents
@@ -180,12 +176,6 @@ struct DReportData: Codable {
             try container.decodeIfPresent(
                 [HistoryEvent].self,
                 forKey: .historyEvents
-            ) ?? []
-
-        users =
-            try container.decodeIfPresent(
-                [DReportUser].self,
-                forKey: .users
             ) ?? []
 
         calendarAccounts =

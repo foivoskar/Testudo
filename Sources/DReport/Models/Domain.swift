@@ -167,15 +167,7 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var completedAt: Date?
     var loggedAt: Date?
 
-    // Legacy audit identity.
-    //
-    // Existing databases may contain DReportUser UUIDs here.
-    // Keep these fields decode-compatible until the historical
-    // migration is permanently retired.
-    var createdByUserID: UUID?
-    var updatedByUserID: UUID?
-
-    // Canonical Environment-scoped audit identity.
+    // Environment-scoped audit identity.
     var createdByMembershipID: UUID? = nil
     var updatedByMembershipID: UUID? = nil
 
@@ -343,10 +335,7 @@ struct HistoryEvent: Identifiable, Codable, Hashable {
     var previousValue: String?
     var newValue: String?
 
-    // Legacy DReportUser audit reference.
-    var actorUserID: UUID?
-
-    // Canonical Environment membership audit reference.
+    // Environment membership responsible for this history event.
     var actorMembershipID: UUID? = nil
 
     // Zone where the history action happened.
