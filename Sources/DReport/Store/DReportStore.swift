@@ -5,11 +5,36 @@ import Combine
 final class DReportStore: ObservableObject {
     @Published private(set) var data: DReportData
 
+    // Application-level state is deliberately independent
+    // from the currently loaded Work Environment database.
+    @Published
+    private(set)
+    var applicationData:
+        ApplicationData
+
     @Published
     private(set)
     var currentUserID: UUID?
 
-    let fileURL: URL
+    // This is intentionally NOT persisted.
+    //
+    // Opening the application is not the same thing as
+    // entering a Work Environment.
+    @Published
+    private(set)
+    var environmentSessionIsOpen:
+        Bool = false
+
+    // Temporary legacy Environment database location.
+    //
+    // In Phase 2B this becomes the backing database of
+    // Test Environment and then moves to its own directory.
+    private(set)
+    var fileURL: URL
+
+    // Local application registry / profile / settings.
+    let applicationFileURL:
+        URL
 
     init() {
         let fileManager = FileManager.default
@@ -45,6 +70,157 @@ final class DReportStore: ObservableObject {
             directory
                 .appendingPathComponent("DReportData.json")
 
+        applicationFileURL =
+            directory
+                .appendingPathComponent(
+                    "ApplicationData.json"
+                )
+
+        if
+            let storedApplicationData =
+                try? Data(
+                    contentsOf:
+                        applicationFileURL
+                ),
+            let decodedApplicationData =
+                Self.decodeApplicationData(
+                    storedApplicationData
+                )
+        {
+            applicationData =
+                decodedApplicationData
+        } else {
+            applicationData =
+                ApplicationData()
+        }
+
+
+        // Swift requires every stored property to be
+        // initialized before `self` can be used.
+        //
+        // This temporary value is replaced immediately below
+        // when the active Environment database is decoded.
+        data =
+            DReportData()
+
+
+        // ----------------------------------------------------
+        // Resolve the database belonging to the active
+        // Work Environment.
+        //
+        // Existing installations still have the historical
+        // DReportData.json at the application root. The first
+        // Environment migration copies it into:
+        //
+        //   DReport/
+        //     Environments/
+        //       <environment UUID>/
+        //         EnvironmentData.json
+        //
+        // The historical file is intentionally retained as
+        // a migration backup.
+        // ----------------------------------------------------
+
+        let legacyDataFileURL =
+            fileURL
+
+        if
+            let activeEnvironmentID =
+                applicationData
+                    .activeEnvironmentID,
+            applicationData
+                .workEnvironments
+                .contains(
+                    where: {
+                        $0.id
+                            == activeEnvironmentID
+                    }
+                )
+        {
+            let environmentsDirectory =
+                directory
+                    .appendingPathComponent(
+                        "Environments",
+                        isDirectory:
+                            true
+                    )
+
+            let activeEnvironmentDirectory =
+                environmentsDirectory
+                    .appendingPathComponent(
+                        activeEnvironmentID
+                            .uuidString,
+                        isDirectory:
+                            true
+                    )
+
+            let environmentDataFileURL =
+                activeEnvironmentDirectory
+                    .appendingPathComponent(
+                        "EnvironmentData.json"
+                    )
+
+            do {
+                try fileManager.createDirectory(
+                    at:
+                        activeEnvironmentDirectory,
+                    withIntermediateDirectories:
+                        true
+                )
+
+                if
+                    !fileManager.fileExists(
+                        atPath:
+                            environmentDataFileURL
+                                .path
+                    )
+                {
+                    if
+                        fileManager.fileExists(
+                            atPath:
+                                legacyDataFileURL
+                                    .path
+                        )
+                    {
+                        try fileManager.copyItem(
+                            at:
+                                legacyDataFileURL,
+                            to:
+                                environmentDataFileURL
+                        )
+
+                        print(
+                            "DReport: migrated legacy database to Environment:",
+                            environmentDataFileURL.path
+                        )
+                    }
+                }
+
+                if
+                    fileManager.fileExists(
+                        atPath:
+                            environmentDataFileURL
+                                .path
+                    )
+                {
+                    fileURL =
+                        environmentDataFileURL
+                }
+
+            } catch {
+                print(
+                    "DReport: could not prepare Environment database:",
+                    error
+                )
+
+                // Keep using the historical database rather
+                // than risk starting with an empty dataset.
+                fileURL =
+                    legacyDataFileURL
+            }
+        }
+
+
         if
             let storedData = try? Data(contentsOf: fileURL),
             let decoded = Self.decode(storedData)
@@ -56,8 +232,2031 @@ final class DReportStore: ObservableObject {
 
         migrateUsersToPeopleIfNeeded()
         ensureAllPeopleHaveProfiles()
-        restorePersistentSessionIfPossible()
+        migrateLegacyDataToWorkEnvironmentsIfNeeded()
+
+        // Phase 2A:
+        // extract application-owned state from the legacy
+        // combined database into ApplicationData.json.
+        migrateApplicationMetadataIfNeeded()
+
+        configureActiveEnvironmentDirectoryIfNeeded()
+
+        // Phase 2C:
+        // move the machine-local identity link out of the
+        // portable Environment database.
+        migrateEnvironmentAccessLinksIfNeeded()
+
+        ensureEnvironmentManifestIfNeeded()
+
+        removeApplicationMetadataFromEnvironmentDatabaseIfNeeded()
+
+        // Application launch no longer restores a global login.
+        //
+        // Legacy credentials remain temporarily inside old
+        // Environment databases only for Environment entry.
+        PersistentSession.clear()
+        currentUserID = nil
+        environmentSessionIsOpen = false
     }
+
+    // ========================================================
+    // MARK: Legacy schema 6 -> Work Environment schema 7
+    // ========================================================
+
+    private func migrateLegacyDataToWorkEnvironmentsIfNeeded() {
+        guard
+            data.schemaVersion < 7
+        else {
+            return
+        }
+
+
+        // ----------------------------------------------------
+        // The entire legacy database becomes one Environment.
+        //
+        // We intentionally do NOT assign an external directory
+        // path here. That requires an explicit user choice.
+        // ----------------------------------------------------
+
+        let environment =
+            WorkEnvironment(
+                name:
+                    "Test Environment"
+            )
+
+        data.workEnvironments =
+            [
+                environment
+            ]
+
+        data.activeEnvironmentID =
+            environment.id
+
+
+        // ----------------------------------------------------
+        // Determine which legacy account corresponds to the
+        // owner of this local app installation.
+        //
+        // Priority:
+        //   1. persisted/current legacy account
+        //   2. first active Administrator
+        //   3. first legacy user
+        // ----------------------------------------------------
+
+        let persistedUserID =
+            PersistentSession
+                .loadUserID()
+
+        let ownerUser =
+            data.users.first(
+                where: {
+                    $0.id
+                        == persistedUserID
+                }
+            )
+            ?? data.users.first(
+                where: {
+                    $0.role
+                        == .administrator
+                    && $0.isActive
+                }
+            )
+            ?? data.users.first
+
+
+        // ----------------------------------------------------
+        // Create the application-level LocalUserProfile.
+        //
+        // Prefer the linked PersonProfile, because it contains
+        // the richer People-compatible profile information.
+        // ----------------------------------------------------
+
+        var localProfile:
+            LocalUserProfile?
+
+        if let ownerUser {
+            var profile =
+                LocalUserProfile()
+
+            if
+                let personEntityID =
+                    ownerUser.personEntityID,
+                let personProfile =
+                    data.personProfiles.first(
+                        where: {
+                            $0.entityID
+                                == personEntityID
+                        }
+                    )
+            {
+                profile.firstName =
+                    personProfile.firstName
+
+                profile.middleName =
+                    personProfile.middleName
+
+                profile.lastName =
+                    personProfile.lastName
+
+                profile.preferredName =
+                    personProfile.preferredName
+
+                profile.jobTitle =
+                    personProfile.jobTitle
+
+                profile.professionalEmail =
+                    personProfile
+                        .professionalEmail
+
+                profile.secondaryProfessionalEmail =
+                    personProfile
+                        .secondaryProfessionalEmail
+
+                profile.professionalPhone =
+                    personProfile
+                        .professionalPhone
+
+                profile.secondaryPhone =
+                    personProfile
+                        .secondaryPhone
+
+                profile.office =
+                    personProfile.office
+
+                profile.employeeID =
+                    personProfile.employeeID
+
+                profile.website =
+                    personProfile.website
+
+                profile.orcid =
+                    personProfile.orcid
+
+                profile.linkedIn =
+                    personProfile.linkedIn
+
+                profile.github =
+                    personProfile.github
+
+                profile.professionalFields =
+                    personProfile
+                        .professionalFields
+
+                profile.responsibilities =
+                    personProfile
+                        .responsibilities
+
+                profile.notes =
+                    personProfile.notes
+
+                profile.avatarData =
+                    personProfile.avatarData
+
+                profile.academicTitle =
+                    personProfile
+                        .academicTitle
+
+                profile.professionalAddress =
+                    personProfile
+                        .professionalAddress
+
+                profile.city =
+                    personProfile.city
+
+                profile.postalCode =
+                    personProfile.postalCode
+
+                profile.country =
+                    personProfile.country
+
+                profile.researcherID =
+                    personProfile.researcherID
+
+                profile.scopusAuthorID =
+                    personProfile
+                        .scopusAuthorID
+
+                profile.googleScholarURL =
+                    personProfile
+                        .googleScholarURL
+
+                profile.preferredLanguage =
+                    personProfile
+                        .preferredLanguage
+
+                profile.timeZone =
+                    personProfile.timeZone
+
+                profile.assistantContact =
+                    personProfile
+                        .assistantContact
+
+                profile.tags =
+                    personProfile.tags
+
+                profile.createdAt =
+                    personProfile.createdAt
+
+                profile.updatedAt =
+                    personProfile.updatedAt
+            } else {
+                profile.firstName =
+                    ownerUser.firstName
+
+                profile.lastName =
+                    ownerUser.lastName
+
+                profile.avatarData =
+                    ownerUser.avatarData
+
+                profile.createdAt =
+                    ownerUser.createdAt
+
+                profile.updatedAt =
+                    Date()
+            }
+
+            data.localUserProfile =
+                profile
+
+            localProfile =
+                profile
+        }
+
+
+        // ----------------------------------------------------
+        // Every legacy account becomes a membership of the
+        // migrated Test Environment.
+        //
+        // Legacy .member maps to the new Environment .user.
+        //
+        // Password hashes remain only in the legacy user model
+        // for now. Authentication will move to Environment
+        // entry / directory access in a later phase.
+        // ----------------------------------------------------
+
+        data.environmentMemberships =
+            data.users.map {
+                legacyUser in
+
+                let role:
+                    EnvironmentRole =
+                        legacyUser.role
+                            == .administrator
+                        ? .administrator
+                        : .user
+
+                return
+                    EnvironmentMembership(
+                        environmentID:
+                            environment.id,
+                        localUserProfileID:
+                            legacyUser.id
+                                == ownerUser?.id
+                            ? localProfile?.id
+                            : nil,
+                        personEntityID:
+                            legacyUser
+                                .personEntityID,
+                        directoryUserIdentifier:
+                            legacyUser.username,
+                        firstName:
+                            legacyUser.firstName,
+                        lastName:
+                            legacyUser.lastName,
+                        role:
+                            role,
+                        isActive:
+                            legacyUser.isActive,
+                        createdAt:
+                            legacyUser.createdAt,
+                        lastAccessAt:
+                            legacyUser
+                                .lastLoginAt
+                    )
+            }
+
+
+        data.schemaVersion = 7
+
+        save()
+    }
+
+
+    // ========================================================
+    // MARK: Combined database -> application registry
+    // ========================================================
+
+    private func migrateApplicationMetadataIfNeeded() {
+        var changed =
+            false
+
+
+        // Local profile belongs to the application installation,
+        // not to an Environment.
+        if
+            applicationData
+                .localUserProfile == nil,
+            let profile =
+                data.localUserProfile
+        {
+            applicationData
+                .localUserProfile =
+                profile
+
+            changed =
+                true
+        }
+
+
+        // The Work Environment list is an application-level
+        // registry telling this installation which Environments
+        // it knows how to open.
+        if
+            applicationData
+                .workEnvironments
+                .isEmpty,
+            !data.workEnvironments
+                .isEmpty
+        {
+            applicationData
+                .workEnvironments =
+                data.workEnvironments
+
+            changed =
+                true
+        }
+
+
+        // Active Environment is local UI/application state.
+        if
+            applicationData
+                .activeEnvironmentID == nil,
+            let activeID =
+                data.activeEnvironmentID
+        {
+            applicationData
+                .activeEnvironmentID =
+                activeID
+
+            changed =
+                true
+        }
+
+
+        // Defensive repair:
+        // if the stored active Environment disappeared,
+        // fall back to the first known Environment.
+        if
+            let activeID =
+                applicationData
+                    .activeEnvironmentID,
+            !applicationData
+                .workEnvironments
+                .contains(
+                    where: {
+                        $0.id
+                            == activeID
+                    }
+                )
+        {
+            applicationData
+                .activeEnvironmentID =
+                applicationData
+                    .workEnvironments
+                    .first?
+                    .id
+
+            changed =
+                true
+        }
+
+
+        if
+            applicationData
+                .activeEnvironmentID == nil,
+            let first =
+                applicationData
+                    .workEnvironments
+                    .first
+        {
+            applicationData
+                .activeEnvironmentID =
+                first.id
+
+            changed =
+                true
+        }
+
+
+        if changed {
+            saveApplicationData()
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Application / Environment context
+    // ========================================================
+
+    var localUserProfile:
+        LocalUserProfile?
+    {
+        applicationData
+            .localUserProfile
+    }
+
+
+    var workEnvironments:
+        [WorkEnvironment]
+    {
+        applicationData
+            .workEnvironments
+    }
+
+
+    var activeEnvironmentID:
+        UUID?
+    {
+        applicationData
+            .activeEnvironmentID
+    }
+
+
+    var activeWorkEnvironment:
+        WorkEnvironment?
+    {
+        guard
+            let activeEnvironmentID
+        else {
+            return nil
+        }
+
+        return
+            applicationData
+                .workEnvironments
+                .first {
+                    $0.id
+                        == activeEnvironmentID
+                }
+    }
+
+
+    var currentEnvironmentMembership:
+        EnvironmentMembership?
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID,
+            let membershipID =
+                applicationData
+                    .environmentAccesses
+                    .first(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )?
+                    .membershipID
+        else {
+            return nil
+        }
+
+        return
+            data.environmentMemberships
+                .first {
+                    $0.id
+                        == membershipID
+                    && $0.environmentID
+                        == environmentID
+                }
+    }
+
+
+    var currentEnvironmentRole:
+        EnvironmentRole?
+    {
+        currentEnvironmentMembership?
+            .role
+    }
+
+
+    var currentEnvironmentUserIsAdministrator:
+        Bool
+    {
+        currentEnvironmentRole
+            == .administrator
+    }
+
+
+    // ========================================================
+    // MARK: Local identity ↔ Environment identity
+    // ========================================================
+
+    private func migrateEnvironmentAccessLinksIfNeeded() {
+        guard
+            let environmentID =
+                applicationData
+                    .activeEnvironmentID
+        else {
+            return
+        }
+
+
+        var applicationChanged =
+            false
+
+        var environmentChanged =
+            false
+
+
+        // ----------------------------------------------------
+        // Legacy schema-7 installations stored the app-local
+        // LocalUserProfile UUID directly inside a portable
+        // EnvironmentMembership.
+        //
+        // Move that relationship into ApplicationData.
+        // ----------------------------------------------------
+
+        if
+            !applicationData
+                .environmentAccesses
+                .contains(
+                    where: {
+                        $0.environmentID
+                            == environmentID
+                    }
+                )
+        {
+            var resolvedMembershipID:
+                UUID?
+
+
+            if
+                let localProfileID =
+                    applicationData
+                        .localUserProfile?
+                        .id
+            {
+                resolvedMembershipID =
+                    data.environmentMemberships
+                        .first(
+                            where: {
+                                $0.environmentID
+                                    == environmentID
+                                && $0.localUserProfileID
+                                    == localProfileID
+                            }
+                        )?
+                        .id
+            }
+
+
+            // Defensive migration fallback for databases in
+            // which the explicit local link was unavailable.
+            if resolvedMembershipID == nil {
+                let persistedLegacyUserID =
+                    PersistentSession
+                        .loadUserID()
+
+                if
+                    let legacyUser =
+                        data.users.first(
+                            where: {
+                                $0.id
+                                    == persistedLegacyUserID
+                            }
+                        )
+                        ?? data.users.first(
+                            where: {
+                                $0.role
+                                    == .administrator
+                                && $0.isActive
+                            }
+                        )
+                {
+                    resolvedMembershipID =
+                        data.environmentMemberships
+                            .first(
+                                where: {
+                                    guard
+                                        $0.environmentID
+                                            == environmentID
+                                    else {
+                                        return false
+                                    }
+
+                                    if
+                                        let personID =
+                                            legacyUser
+                                                .personEntityID,
+                                        $0.personEntityID
+                                            == personID
+                                    {
+                                        return true
+                                    }
+
+                                    return
+                                        $0.directoryUserIdentifier?
+                                            .caseInsensitiveCompare(
+                                                legacyUser.username
+                                            )
+                                            == .orderedSame
+                                }
+                            )?
+                            .id
+                }
+            }
+
+
+            applicationData
+                .environmentAccesses
+                .append(
+                    EnvironmentAccess(
+                        environmentID:
+                            environmentID,
+                        membershipID:
+                            resolvedMembershipID,
+                        lastOpenedAt:
+                            Date()
+                    )
+                )
+
+            applicationChanged =
+                true
+        }
+
+
+        // ----------------------------------------------------
+        // EnvironmentData must not retain a machine-local
+        // LocalUserProfile UUID.
+        // ----------------------------------------------------
+
+        for index in
+            data.environmentMemberships.indices
+        {
+            if
+                data.environmentMemberships[index]
+                    .localUserProfileID != nil
+            {
+                data.environmentMemberships[index]
+                    .localUserProfileID =
+                    nil
+
+                environmentChanged =
+                    true
+            }
+        }
+
+
+        if applicationChanged {
+            applicationData.schemaVersion =
+                max(
+                    applicationData.schemaVersion,
+                    2
+                )
+
+            saveApplicationData()
+        }
+
+
+        if environmentChanged {
+            save()
+        }
+    }
+
+
+    private func ensureEnvironmentManifestIfNeeded() {
+        guard
+            let environment =
+                activeWorkEnvironment,
+            fileURL.lastPathComponent
+                == "EnvironmentData.json"
+        else {
+            return
+        }
+
+
+        let manifestURL =
+            fileURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+
+        let manifest =
+            EnvironmentManifest(
+                schemaVersion:
+                    1,
+                environmentID:
+                    environment.id,
+                name:
+                    environment.name,
+                createdAt:
+                    environment.createdAt,
+                updatedAt:
+                    environment.updatedAt
+            )
+
+
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting = [
+            .prettyPrinted,
+            .sortedKeys
+        ]
+
+        encoder.dateEncodingStrategy =
+            .iso8601
+
+
+        do {
+            let encoded =
+                try encoder.encode(
+                    manifest
+                )
+
+            // Rewrite as well as create, so the manifest follows
+            // future Environment renames.
+            try encoded.write(
+                to:
+                    manifestURL,
+                options:
+                    .atomic
+            )
+        } catch {
+            print(
+                "DReport: could not write Environment manifest:",
+                error
+            )
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Application user profile
+    // ========================================================
+
+    @discardableResult
+    func saveLocalUserProfile(
+        _ profile:
+            LocalUserProfile
+    ) -> String? {
+        var profile =
+            profile
+
+        profile.firstName =
+            profile.firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        profile.middleName =
+            profile.middleName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        profile.lastName =
+            profile.lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        profile.preferredName =
+            profile.preferredName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        guard
+            !profile.firstName.isEmpty
+        else {
+            return
+                "First name is required."
+        }
+
+
+        guard
+            !profile.lastName.isEmpty
+        else {
+            return
+                "Last name is required."
+        }
+
+
+        let now =
+            Date()
+
+        if
+            let existing =
+                applicationData
+                    .localUserProfile
+        {
+            profile.id =
+                existing.id
+
+            profile.createdAt =
+                existing.createdAt
+        } else {
+            profile.createdAt =
+                now
+        }
+
+        profile.updatedAt =
+            now
+
+
+        applicationData
+            .localUserProfile =
+            profile
+
+        saveApplicationData()
+
+        return nil
+    }
+
+
+    // ========================================================
+    // MARK: Work Environment creation
+    // ========================================================
+
+    @discardableResult
+    func createWorkEnvironment(
+        name: String
+    ) -> String? {
+        guard
+            let localProfile =
+                applicationData
+                    .localUserProfile
+        else {
+            return
+                "Create your application profile first."
+        }
+
+
+        let cleanedName =
+            name.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+
+        guard !cleanedName.isEmpty else {
+            return
+                "Environment name is required."
+        }
+
+
+        let duplicate =
+            applicationData
+                .workEnvironments
+                .contains {
+                    $0.name
+                        .caseInsensitiveCompare(
+                            cleanedName
+                        )
+                        == .orderedSame
+                }
+
+
+        guard !duplicate else {
+            return
+                "A Work Environment with that name already exists."
+        }
+
+
+        let environmentID =
+            UUID()
+
+        let now =
+            Date()
+
+        let directoryURL =
+            managedEnvironmentDirectoryURL(
+                for:
+                    environmentID
+            )
+
+        let dataURL =
+            directoryURL
+                .appendingPathComponent(
+                    "EnvironmentData.json"
+                )
+
+        let manifestURL =
+            directoryURL
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+
+        let membership =
+            EnvironmentMembership(
+                environmentID:
+                    environmentID,
+                localUserProfileID:
+                    nil,
+                personEntityID:
+                    nil,
+                directoryUserIdentifier:
+                    nil,
+                firstName:
+                    localProfile.firstName,
+                lastName:
+                    localProfile.lastName,
+                role:
+                    .administrator,
+                isActive:
+                    true,
+                createdAt:
+                    now,
+                lastAccessAt:
+                    now
+            )
+
+
+        var newData =
+            DReportData()
+
+        newData.schemaVersion =
+            max(
+                newData.schemaVersion,
+                7
+            )
+
+        newData
+            .environmentMemberships =
+            [
+                membership
+            ]
+
+
+        let directory =
+            EnvironmentDirectoryConfiguration(
+                kind:
+                    .localFolder,
+                displayName:
+                    cleanedName,
+                path:
+                    directoryURL.path,
+                bookmarkData:
+                    nil,
+                createdAt:
+                    now,
+                updatedAt:
+                    now,
+                lastConnectedAt:
+                    now
+            )
+
+
+        let environment =
+            WorkEnvironment(
+                id:
+                    environmentID,
+                name:
+                    cleanedName,
+                directory:
+                    directory,
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
+        let manifest =
+            EnvironmentManifest(
+                schemaVersion:
+                    1,
+                environmentID:
+                    environmentID,
+                name:
+                    cleanedName,
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
+        do {
+            try FileManager.default
+                .createDirectory(
+                    at:
+                        directoryURL,
+                    withIntermediateDirectories:
+                        true
+                )
+
+
+            let dataEncoder =
+                JSONEncoder()
+
+            dataEncoder.outputFormatting = [
+                .prettyPrinted,
+                .sortedKeys
+            ]
+
+            dataEncoder.dateEncodingStrategy =
+                .iso8601
+
+
+            try dataEncoder
+                .encode(
+                    newData
+                )
+                .write(
+                    to:
+                        dataURL,
+                    options:
+                        .atomic
+                )
+
+
+            try dataEncoder
+                .encode(
+                    manifest
+                )
+                .write(
+                    to:
+                        manifestURL,
+                    options:
+                        .atomic
+                )
+
+        } catch {
+            return
+                "The Work Environment could not be created: \(error.localizedDescription)"
+        }
+
+
+        applicationData
+            .workEnvironments
+            .append(
+                environment
+            )
+
+
+        applicationData
+            .environmentAccesses
+            .append(
+                EnvironmentAccess(
+                    environmentID:
+                        environmentID,
+                    membershipID:
+                        membership.id,
+                    lastOpenedAt:
+                        now
+                )
+            )
+
+
+        applicationData
+            .activeEnvironmentID =
+            environmentID
+
+
+        applicationData.schemaVersion =
+            max(
+                applicationData.schemaVersion,
+                2
+            )
+
+
+        fileURL =
+            dataURL
+
+        data =
+            newData
+
+        currentUserID =
+            nil
+
+        environmentSessionIsOpen =
+            true
+
+
+        saveApplicationData()
+
+        return nil
+    }
+
+
+    // ========================================================
+    // MARK: Register Environment from a directory
+    // ========================================================
+
+    func registerWorkEnvironment(
+        from directoryURL:
+            URL
+    ) -> (
+        environmentID: UUID?,
+        error: String?
+    ) {
+        let manifestURL =
+            directoryURL
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+        let dataURL =
+            directoryURL
+                .appendingPathComponent(
+                    "EnvironmentData.json"
+                )
+
+
+        guard
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        manifestURL.path
+                )
+        else {
+            return (
+                nil,
+                "This folder does not contain EnvironmentManifest.json."
+            )
+        }
+
+
+        guard
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        dataURL.path
+                )
+        else {
+            return (
+                nil,
+                "This folder does not contain EnvironmentData.json."
+            )
+        }
+
+
+        let manifestDecoder =
+            JSONDecoder()
+
+        manifestDecoder.dateDecodingStrategy =
+            .iso8601
+
+
+        let manifest:
+            EnvironmentManifest
+
+        do {
+            manifest =
+                try manifestDecoder.decode(
+                    EnvironmentManifest.self,
+                    from:
+                        Data(
+                            contentsOf:
+                                manifestURL
+                        )
+                )
+        } catch {
+            return (
+                nil,
+                "The Environment manifest could not be read."
+            )
+        }
+
+
+        guard
+            let environmentRawData =
+                try? Data(
+                    contentsOf:
+                        dataURL
+                ),
+            let environmentData =
+                Self.decode(
+                    environmentRawData
+                )
+        else {
+            return (
+                nil,
+                "The Environment database could not be read."
+            )
+        }
+
+
+        let invalidMembership =
+            environmentData
+                .environmentMemberships
+                .contains {
+                    $0.environmentID
+                        != manifest.environmentID
+                }
+
+
+        guard !invalidMembership else {
+            return (
+                nil,
+                "The Environment database does not match its manifest."
+            )
+        }
+
+
+        let now =
+            Date()
+
+        let directory =
+            EnvironmentDirectoryConfiguration(
+                kind:
+                    .localFolder,
+                displayName:
+                    manifest.name,
+                path:
+                    directoryURL.path,
+                bookmarkData:
+                    nil,
+                createdAt:
+                    manifest.createdAt,
+                updatedAt:
+                    now,
+                lastConnectedAt:
+                    now
+            )
+
+
+        if
+            let index =
+                applicationData
+                    .workEnvironments
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == manifest.environmentID
+                        }
+                    )
+        {
+            applicationData
+                .workEnvironments[index]
+                .name =
+                manifest.name
+
+            applicationData
+                .workEnvironments[index]
+                .directory =
+                directory
+
+            applicationData
+                .workEnvironments[index]
+                .updatedAt =
+                now
+        } else {
+            applicationData
+                .workEnvironments
+                .append(
+                    WorkEnvironment(
+                        id:
+                            manifest.environmentID,
+                        name:
+                            manifest.name,
+                        directory:
+                            directory,
+                        createdAt:
+                            manifest.createdAt,
+                        updatedAt:
+                            manifest.updatedAt
+                    )
+                )
+        }
+
+
+        applicationData
+            .activeEnvironmentID =
+            manifest.environmentID
+
+        saveApplicationData()
+
+
+        return (
+            manifest.environmentID,
+            nil
+        )
+    }
+
+
+    // ========================================================
+    // MARK: Environment entry
+    // ========================================================
+
+    var activeEnvironmentMemberships:
+        [EnvironmentMembership]
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return []
+        }
+
+        return
+            data.environmentMemberships
+                .filter {
+                    $0.environmentID
+                        == environmentID
+                    && $0.isActive
+                }
+                .sorted {
+                    $0.displayName
+                        .localizedCaseInsensitiveCompare(
+                            $1.displayName
+                        )
+                        == .orderedAscending
+                }
+    }
+
+
+    private func legacyUser(
+        for membership:
+            EnvironmentMembership
+    ) -> DReportUser? {
+
+        if
+            let personID =
+                membership
+                    .personEntityID,
+            let user =
+                data.users.first(
+                    where: {
+                        $0.personEntityID
+                            == personID
+                    }
+                )
+        {
+            return user
+        }
+
+
+        if
+            let identifier =
+                membership
+                    .directoryUserIdentifier
+        {
+            return
+                data.users.first {
+                    $0.username
+                        .caseInsensitiveCompare(
+                            identifier
+                        )
+                        == .orderedSame
+                }
+        }
+
+
+        return nil
+    }
+
+
+    func environmentMembershipNeedsPassword(
+        id membershipID:
+            UUID
+    ) -> Bool {
+        guard
+            let membership =
+                data.environmentMemberships
+                    .first(
+                        where: {
+                            $0.id
+                                == membershipID
+                        }
+                    )
+        else {
+            return false
+        }
+
+        return
+            legacyUser(
+                for:
+                    membership
+            ) != nil
+    }
+
+
+    @discardableResult
+    func openWorkEnvironment(
+        id environmentID:
+            UUID
+    ) -> EnvironmentOpenOutcome {
+
+        if
+            let error =
+                activateEnvironment(
+                    id:
+                        environmentID
+                )
+        {
+            return
+                .failed(
+                    error
+                )
+        }
+
+
+        guard
+            let access =
+                applicationData
+                    .environmentAccesses
+                    .first(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    ),
+            let membershipID =
+                access.membershipID,
+            let membership =
+                data.environmentMemberships
+                    .first(
+                        where: {
+                            $0.id
+                                == membershipID
+                            && $0.environmentID
+                                == environmentID
+                        }
+                    ),
+            membership.isActive
+        else {
+            currentUserID =
+                nil
+
+            environmentSessionIsOpen =
+                false
+
+            return
+                .identityRequired
+        }
+
+
+        currentUserID =
+            legacyUser(
+                for:
+                    membership
+            )?
+            .id
+
+
+        if
+            let accessIndex =
+                applicationData
+                    .environmentAccesses
+                    .firstIndex(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )
+        {
+            applicationData
+                .environmentAccesses[accessIndex]
+                .lastOpenedAt =
+                Date()
+        }
+
+
+        if
+            let membershipIndex =
+                data.environmentMemberships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == membership.id
+                        }
+                    )
+        {
+            data.environmentMemberships[
+                membershipIndex
+            ]
+            .lastAccessAt =
+                Date()
+
+            save()
+        }
+
+
+        PersistentSession.clear()
+
+        saveApplicationData()
+
+        environmentSessionIsOpen =
+            true
+
+        return
+            .opened
+    }
+
+
+    @discardableResult
+    func enterActiveEnvironment(
+        membershipID:
+            UUID,
+        password:
+            String
+    ) -> String? {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return
+                "No Work Environment is active."
+        }
+
+
+        guard
+            let membershipIndex =
+                data.environmentMemberships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == membershipID
+                            && $0.environmentID
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "Environment membership not found."
+        }
+
+
+        let membership =
+            data.environmentMemberships[
+                membershipIndex
+            ]
+
+
+        guard membership.isActive else {
+            return
+                "This Environment membership is disabled."
+        }
+
+
+        let legacyUser =
+            legacyUser(
+                for:
+                    membership
+            )
+
+
+        if let legacyUser {
+            guard legacyUser.isActive else {
+                return
+                    "This Environment account is disabled."
+            }
+
+
+            guard
+                PasswordHasher.verify(
+                    password:
+                        password,
+                    saltBase64:
+                        legacyUser
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        legacyUser
+                            .passwordHashBase64,
+                    iterations:
+                        legacyUser
+                            .passwordIterations
+                )
+            else {
+                return
+                    "Incorrect password."
+            }
+        }
+
+
+        if
+            let index =
+                applicationData
+                    .environmentAccesses
+                    .firstIndex(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )
+        {
+            applicationData
+                .environmentAccesses[index]
+                .membershipID =
+                membershipID
+
+            applicationData
+                .environmentAccesses[index]
+                .lastOpenedAt =
+                Date()
+        } else {
+            applicationData
+                .environmentAccesses
+                .append(
+                    EnvironmentAccess(
+                        environmentID:
+                            environmentID,
+                        membershipID:
+                            membershipID,
+                        lastOpenedAt:
+                            Date()
+                    )
+                )
+        }
+
+
+        data.environmentMemberships[
+            membershipIndex
+        ]
+        .lastAccessAt =
+            Date()
+
+
+        currentUserID =
+            legacyUser?
+                .id
+
+        environmentSessionIsOpen =
+            true
+
+
+        PersistentSession.clear()
+
+        saveApplicationData()
+        save()
+
+        return nil
+    }
+
+
+    func closeWorkEnvironment() {
+        environmentSessionIsOpen =
+            false
+
+        currentUserID =
+            nil
+
+        PersistentSession.clear()
+    }
+
+
+    // ========================================================
+    // MARK: Environment database storage
+    // ========================================================
+
+    private func managedEnvironmentDirectoryURL(
+        for environmentID:
+            UUID
+    ) -> URL {
+        applicationFileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "Environments",
+                isDirectory:
+                    true
+            )
+            .appendingPathComponent(
+                environmentID
+                    .uuidString,
+                isDirectory:
+                    true
+            )
+    }
+
+
+    private func environmentDataURL(
+        for environment:
+            WorkEnvironment
+    ) -> URL {
+
+        // A configured Environment directory always wins.
+        //
+        // Later, external directories will also use their
+        // bookmarkData here to restore security-scoped access.
+        if
+            let configuredPath =
+                environment
+                    .directory?
+                    .path?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !configuredPath.isEmpty
+        {
+            return
+                URL(
+                    fileURLWithPath:
+                        configuredPath,
+                    isDirectory:
+                        true
+                )
+                .appendingPathComponent(
+                    "EnvironmentData.json"
+                )
+        }
+
+        return
+            managedEnvironmentDirectoryURL(
+                for:
+                    environment.id
+            )
+            .appendingPathComponent(
+                "EnvironmentData.json"
+            )
+    }
+
+
+    private func configureActiveEnvironmentDirectoryIfNeeded() {
+        guard
+            fileURL.lastPathComponent
+                == "EnvironmentData.json",
+            let environmentID =
+                applicationData
+                    .activeEnvironmentID,
+            let index =
+                applicationData
+                    .workEnvironments
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+        }
+
+
+        let environmentDirectory =
+            fileURL
+                .deletingLastPathComponent()
+
+
+        let existingPath =
+            applicationData
+                .workEnvironments[index]
+                .directory?
+                .path?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        guard
+            existingPath == nil
+            || existingPath?.isEmpty
+                == true
+        else {
+            return
+        }
+
+
+        let environmentName =
+            applicationData
+                .workEnvironments[index]
+                .name
+
+
+        applicationData
+            .workEnvironments[index]
+            .directory =
+            EnvironmentDirectoryConfiguration(
+                kind:
+                    .localFolder,
+                displayName:
+                    environmentName,
+                path:
+                    environmentDirectory.path,
+                bookmarkData:
+                    nil,
+                createdAt:
+                    Date(),
+                updatedAt:
+                    Date(),
+                lastConnectedAt:
+                    Date()
+            )
+
+
+        applicationData
+            .workEnvironments[index]
+            .updatedAt =
+            Date()
+
+
+        saveApplicationData()
+    }
+
+
+    private func removeApplicationMetadataFromEnvironmentDatabaseIfNeeded() {
+        guard
+            fileURL.lastPathComponent
+                == "EnvironmentData.json"
+        else {
+            return
+        }
+
+
+        let containsApplicationMetadata =
+            data.localUserProfile != nil
+            || !data.workEnvironments.isEmpty
+            || data.activeEnvironmentID != nil
+
+
+        guard containsApplicationMetadata else {
+            return
+        }
+
+
+        // These values now live exclusively in
+        // ApplicationData.json.
+        data.localUserProfile =
+            nil
+
+        data.workEnvironments =
+            []
+
+        data.activeEnvironmentID =
+            nil
+
+
+        save()
+    }
+
+
+    // ========================================================
+    // MARK: Environment switching
+    //
+    // No UI invokes this yet.
+    //
+    // The Environment chooser introduced later will call this
+    // after resolving the user's membership / authentication.
+    // ========================================================
+
+    @discardableResult
+    func activateEnvironment(
+        id environmentID:
+            UUID
+    ) -> String? {
+        guard
+            let environment =
+                applicationData
+                    .workEnvironments
+                    .first(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "Work Environment not found."
+        }
+
+
+        let targetURL =
+            environmentDataURL(
+                for:
+                    environment
+            )
+
+
+        guard
+            FileManager.default
+                .fileExists(
+                    atPath:
+                        targetURL.path
+                )
+        else {
+            return
+                "The Work Environment database could not be found."
+        }
+
+
+        guard
+            let rawData =
+                try? Data(
+                    contentsOf:
+                        targetURL
+                ),
+            let decoded =
+                Self.decode(
+                    rawData
+                )
+        else {
+            return
+                "The Work Environment database could not be read."
+        }
+
+
+        // Persist the currently open Environment first.
+        save()
+
+
+        fileURL =
+            targetURL
+
+        data =
+            decoded
+
+
+        applicationData
+            .activeEnvironmentID =
+            environmentID
+
+
+        if
+            let accessIndex =
+                applicationData
+                    .environmentAccesses
+                    .firstIndex(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )
+        {
+            applicationData
+                .environmentAccesses[accessIndex]
+                .lastOpenedAt =
+                Date()
+        }
+
+
+        saveApplicationData()
+
+
+        migrateUsersToPeopleIfNeeded()
+        ensureAllPeopleHaveProfiles()
+
+        migrateEnvironmentAccessLinksIfNeeded()
+        ensureEnvironmentManifestIfNeeded()
+
+        removeApplicationMetadataFromEnvironmentDatabaseIfNeeded()
+
+
+        // Legacy authentication is temporary.
+        //
+        // Until Environment entry/authentication replaces the
+        // old global login UI, never keep a legacy currentUserID
+        // that does not exist in the newly loaded Environment.
+        if
+            let currentUserID,
+            !data.users.contains(
+                where: {
+                    $0.id
+                        == currentUserID
+                }
+            )
+        {
+            self.currentUserID =
+                nil
+
+            PersistentSession.clear()
+        }
+
+
+        return nil
+    }
+
+
+    private static func decodeApplicationData(
+        _ rawData:
+            Data
+    ) -> ApplicationData? {
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
+
+        do {
+            return
+                try decoder.decode(
+                    ApplicationData.self,
+                    from:
+                        rawData
+                )
+        } catch {
+            print(
+                "DReport: could not decode application data:",
+                error
+            )
+
+            return nil
+        }
+    }
+
 
     private static func decode(
         _ rawData: Data
@@ -78,6 +2277,39 @@ final class DReportStore: ObservableObject {
             return nil
         }
     }
+
+    private func saveApplicationData() {
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting = [
+            .prettyPrinted,
+            .sortedKeys
+        ]
+
+        encoder.dateEncodingStrategy =
+            .iso8601
+
+        do {
+            let encoded =
+                try encoder.encode(
+                    applicationData
+                )
+
+            try encoded.write(
+                to:
+                    applicationFileURL,
+                options:
+                    .atomic
+            )
+        } catch {
+            print(
+                "DReport: could not save application data:",
+                error
+            )
+        }
+    }
+
 
     private func save() {
         let encoder = JSONEncoder()
@@ -162,6 +2394,13 @@ final class DReportStore: ObservableObject {
         data.themes.removeAll {
             allThemeIDs.contains($0.id)
         }
+
+        data.themeEntityRelationships
+            .removeAll {
+                allThemeIDs.contains(
+                    $0.themeID
+                )
+            }
 
         save()
     }
@@ -416,6 +2655,14 @@ final class DReportStore: ObservableObject {
             return
         }
 
+        if
+            status == .closed,
+            data.workItems[index]
+                .parentWorkItemID != nil
+        {
+            return
+        }
+
         let previous =
             data.workItems[index].status
 
@@ -466,7 +2713,7 @@ final class DReportStore: ObservableObject {
             data.workItems[index]
                 .completedTimeZoneID =
                 currentTimeZoneID
-        } else {
+        } else if status != .closed {
             data.workItems[index].completedAt =
                 nil
 
@@ -638,18 +2885,19 @@ final class DReportStore: ObservableObject {
             }
     }
 
+    @discardableResult
     func createEntity(
         kind: EntityKind,
         name: String,
         initialContainerID: UUID?
-    ) {
+    ) -> UUID? {
         let cleaned =
             name.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
 
         guard !cleaned.isEmpty else {
-            return
+            return nil
         }
 
         let entity =
@@ -682,7 +2930,76 @@ final class DReportStore: ObservableObject {
         }
 
         save()
+
+        return entity.id
     }
+
+    @discardableResult
+    func createPersonEntity(
+        firstName: String,
+        lastName: String
+    ) -> UUID? {
+        let cleanedFirst =
+            firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedLast =
+            lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let displayName =
+            [
+                cleanedFirst,
+                cleanedLast
+            ]
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(
+                separator:
+                    " "
+            )
+
+        guard
+            !displayName.isEmpty
+        else {
+            return nil
+        }
+
+        guard
+            let entityID =
+                createEntity(
+                    kind:
+                        .person,
+                    name:
+                        displayName,
+                    initialContainerID:
+                        nil
+                )
+        else {
+            return nil
+        }
+
+        savePersonProfile(
+            PersonProfile(
+                entityID:
+                    entityID,
+                firstName:
+                    cleanedFirst,
+                lastName:
+                    cleanedLast
+            )
+        )
+
+        return entityID
+    }
+
 
     func removeMembership(
         memberID: UUID,
@@ -741,6 +3058,10 @@ final class DReportStore: ObservableObject {
         }
 
         data.workEntityRelationships.removeAll {
+            $0.entityID == id
+        }
+
+        data.themeEntityRelationships.removeAll {
             $0.entityID == id
         }
 
@@ -1044,7 +3365,7 @@ extension DReportStore {
         password: String,
         personEntityID: UUID
     ) -> String? {
-        guard currentUserIsAdministrator else {
+        guard currentEnvironmentUserIsAdministrator else {
             return "Administrator rights are required."
         }
 
@@ -1292,7 +3613,7 @@ extension DReportStore {
         username: String
     ) -> String? {
         guard
-            currentUserIsAdministrator
+            currentEnvironmentUserIsAdministrator
         else {
             return
                 "Administrator rights are required."
@@ -1355,7 +3676,7 @@ extension DReportStore {
         newPassword: String
     ) -> String? {
         guard
-            currentUserIsAdministrator
+            currentEnvironmentUserIsAdministrator
         else {
             return
                 "Administrator rights are required."
@@ -1430,7 +3751,7 @@ extension DReportStore {
         toPerson personEntityID: UUID
     ) -> String? {
         guard
-            currentUserIsAdministrator
+            currentEnvironmentUserIsAdministrator
         else {
             return
                 "Administrator rights are required."
@@ -1514,7 +3835,7 @@ extension DReportStore {
         isActive: Bool
     ) -> String? {
         guard
-            currentUserIsAdministrator
+            currentEnvironmentUserIsAdministrator
         else {
             return
                 "Administrator rights are required."
@@ -1648,7 +3969,7 @@ extension DReportStore {
         avatarData: Data?
     ) -> String? {
         guard
-            currentUserIsAdministrator
+            currentEnvironmentUserIsAdministrator
         else {
             return
                 "Administrator rights are required."
@@ -1918,18 +4239,30 @@ extension DReportStore {
 
 
 extension DReportStore {
-    func resetApplication() {
-        guard currentUserIsAdministrator else {
-            return
-        }
 
+    // ========================================================
+    // MARK: Reset local application state
+    //
+    // This concerns the installed application only.
+    //
+    // It deliberately does NOT delete any Environment database.
+    // Managed or external Environment directories remain intact
+    // and may be loaded again later.
+    // ========================================================
+
+    func resetApplication() {
         PersistentSession.clear()
 
-        currentUserID = nil
+        currentUserID =
+            nil
 
-        data = DReportData()
+        environmentSessionIsOpen =
+            false
 
-        save()
+        applicationData =
+            ApplicationData()
+
+        saveApplicationData()
     }
 }
 
@@ -1958,6 +4291,14 @@ extension DReportStore {
                 )
         else {
             return "Work item not found."
+        }
+
+        if
+            status == .closed,
+            parentWorkItemID != nil
+        {
+            return
+                "Only top-level Tasks can be Closed."
         }
 
         if let themeID {
@@ -2138,6 +4479,8 @@ extension DReportStore {
             if
                 newStatus
                     != .completed,
+                newStatus
+                    != .closed,
                 oldStatus
                     == .completed
             {
@@ -3377,6 +5720,10 @@ extension DReportStore {
 
         // Remove Work relationships involving it.
         data.workEntityRelationships.removeAll {
+            $0.entityID == id
+        }
+
+        data.themeEntityRelationships.removeAll {
             $0.entityID == id
         }
 
@@ -5240,5 +7587,415 @@ extension DReportStore {
                     )
             }
         }
+    }
+}
+
+// ============================================================
+// MARK: - Work Item Theme Membership
+// ============================================================
+
+extension DReportStore {
+
+    func workThemes(
+        for workItemID: UUID
+    ) -> [Theme] {
+        guard
+            let item =
+                workItem(
+                    id:
+                        workItemID
+                )
+        else {
+            return []
+        }
+
+        let ids:
+            [UUID]
+
+        if let explicit =
+            item.themeIDs
+        {
+            ids =
+                explicit
+
+        } else if let legacy =
+            item.themeID
+        {
+            ids =
+                [legacy]
+
+        } else {
+            ids =
+                []
+        }
+
+        let idSet =
+            Set(ids)
+
+        return data.themes
+            .filter {
+                idSet.contains(
+                    $0.id
+                )
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+
+    func workItem(
+        _ item: WorkItem,
+        belongsToThemeID themeID: UUID
+    ) -> Bool {
+        if let explicit =
+            item.themeIDs
+        {
+            return explicit
+                .contains(
+                    themeID
+                )
+        }
+
+        return
+            item.themeID
+            == themeID
+    }
+
+
+    @discardableResult
+    func setWorkThemes(
+        workItemID: UUID,
+        themeIDs: Set<UUID>
+    ) -> String? {
+        guard
+            let index =
+                data.workItems
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == workItemID
+                        }
+                    )
+        else {
+            return
+                "Work item not found."
+        }
+
+        let validIDs =
+            Set(
+                data.themes
+                    .map(\.id)
+            )
+
+        guard
+            themeIDs
+                .isSubset(
+                    of:
+                        validIDs
+                )
+        else {
+            return
+                "One or more Themes no longer exist."
+        }
+
+        let orderedIDs =
+            data.themes
+                .filter {
+                    themeIDs
+                        .contains(
+                            $0.id
+                        )
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+                .map(\.id)
+
+        data.workItems[index]
+            .themeIDs =
+            orderedIDs
+
+        /*
+         Keep the old single-theme field populated
+         with one selected Theme for compatibility
+         with code that has not yet migrated to
+         multi-Theme membership.
+
+         It is NOT the authoritative membership
+         once themeIDs is non-nil.
+        */
+        data.workItems[index]
+            .themeID =
+            orderedIDs.first
+
+        data.workItems[index]
+            .updatedAt =
+            Date()
+
+        save()
+
+        return nil
+    }
+}
+
+
+
+
+// ============================================================
+// MARK: - Work Archive Semantics
+// ============================================================
+
+extension DReportStore {
+
+    func archivedRootTasks()
+        -> [WorkItem]
+    {
+        data.workItems
+            .filter {
+                $0.kind == .task
+                && $0.parentWorkItemID == nil
+                && $0.status == .closed
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+
+
+    func archivedRootID(
+        for item: WorkItem
+    ) -> UUID? {
+        var current:
+            WorkItem? = item
+
+        var visited =
+            Set<UUID>()
+
+        while let work = current {
+            guard
+                !visited.contains(
+                    work.id
+                )
+            else {
+                return nil
+            }
+
+            visited.insert(
+                work.id
+            )
+
+            if
+                work.kind == .task,
+                work.parentWorkItemID == nil,
+                work.status == .closed
+            {
+                return work.id
+            }
+
+            guard
+                let parentID =
+                    work.parentWorkItemID
+            else {
+                return nil
+            }
+
+            current =
+                workItem(
+                    id:
+                        parentID
+                )
+        }
+
+        return nil
+    }
+
+
+    func isArchivedWorkItem(
+        _ item: WorkItem
+    ) -> Bool {
+        archivedRootID(
+            for:
+                item
+        ) != nil
+    }
+
+
+    var activeWorkItems:
+        [WorkItem]
+    {
+        data.workItems
+            .filter {
+                !isArchivedWorkItem(
+                    $0
+                )
+            }
+    }
+}
+
+
+// ============================================================
+// MARK: - Theme ↔ People / Groups / Organizations
+// ============================================================
+
+extension DReportStore {
+
+    func relatedEntities(
+        forThemeID themeID: UUID
+    ) -> [Entity] {
+        let ids =
+            Set(
+                data
+                    .themeEntityRelationships
+                    .filter {
+                        $0.themeID
+                            == themeID
+                    }
+                    .map(
+                        \.entityID
+                    )
+            )
+
+        return data.entities
+            .filter {
+                ids.contains(
+                    $0.id
+                )
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+
+    @discardableResult
+    func setThemeRelatedEntities(
+        themeID: UUID,
+        entityIDs: Set<UUID>
+    ) -> String? {
+        guard
+            let themeIndex =
+                data.themes
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == themeID
+                        }
+                    )
+        else {
+            return
+                "Theme not found."
+        }
+
+        let knownEntityIDs =
+            Set(
+                data.entities
+                    .map(
+                        \.id
+                    )
+            )
+
+        guard
+            entityIDs
+                .isSubset(
+                    of:
+                        knownEntityIDs
+                )
+        else {
+            return
+                "One or more related entities could not be found."
+        }
+
+        let existing =
+            data
+                .themeEntityRelationships
+                .filter {
+                    $0.themeID
+                        == themeID
+                }
+
+        let now =
+            Date()
+
+        var rebuilt:
+            [ThemeEntityRelationship] = []
+
+        let orderedEntities =
+            data.entities
+                .filter {
+                    entityIDs
+                        .contains(
+                            $0.id
+                        )
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+
+        for entity in orderedEntities {
+            if
+                let old =
+                    existing.first(
+                        where: {
+                            $0.entityID
+                                == entity.id
+                        }
+                    )
+            {
+                rebuilt.append(
+                    old
+                )
+            } else {
+                rebuilt.append(
+                    ThemeEntityRelationship(
+                        themeID:
+                            themeID,
+                        entityID:
+                            entity.id,
+                        createdAt:
+                            now
+                    )
+                )
+            }
+        }
+
+        data
+            .themeEntityRelationships
+            .removeAll {
+                $0.themeID
+                    == themeID
+            }
+
+        data
+            .themeEntityRelationships
+            .append(
+                contentsOf:
+                    rebuilt
+            )
+
+        data.themes[themeIndex]
+            .updatedAt =
+            now
+
+        save()
+
+        return nil
     }
 }

@@ -189,6 +189,25 @@ struct RichThemeDetailView: View {
 
     let themeID: UUID
 
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        themeID: UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.themeID =
+            themeID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
+
     @State
     private var editingField:
         EditableField?
@@ -317,6 +336,10 @@ struct RichThemeDetailView: View {
                             }
                         }
 
+                        relatedEntitiesSection(
+                            theme
+                        )
+
                         StructureInspectorSection(
                             title:
                                 "Schedule"
@@ -421,7 +444,17 @@ struct RichThemeDetailView: View {
                                 )
                             }
                         }
-                    }
+
+                        // DETAIL DELETE FOOTER
+                        HStack {
+                            Spacer()
+
+                            detailDeleteFooter
+
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+}
                     .padding(
                         .horizontal,
                         28
@@ -458,6 +491,58 @@ struct RichThemeDetailView: View {
 
 
     @ViewBuilder
+    private func relatedEntitiesSection(
+        _ theme: Theme
+    ) -> some View {
+        let current =
+            store.relatedEntities(
+                forThemeID:
+                    theme.id
+            )
+
+        return StructureInspectorSection(
+            title:
+                "Related People, Groups & Organizations"
+        ) {
+            EntitySelectionSummaryRow(
+                label:
+                    "Related",
+                selectedIDs:
+                    Set(
+                        current.map(
+                            \.id
+                        )
+                    ),
+                tabs:
+                    [
+                        .people,
+                        .groups,
+                        .organizations
+                    ],
+                selectorTitle:
+                    "Related People, Groups & Organizations",
+                selectorMessage:
+                    "Choose People, Groups or Organizations related to this Theme. Existing relationships remain visible in Selected at the top.",
+                emptyText:
+                    "None",
+                buttonSystemImage:
+                    "pencil",
+                onSave: {
+                    selection in
+
+                    store
+                        .setThemeRelatedEntities(
+                            themeID:
+                                theme.id,
+                            entityIDs:
+                                selection
+                        )
+                }
+            )
+        }
+    }
+
+
     private func header(
         _ theme: Theme
     ) -> some View {
@@ -887,14 +972,19 @@ struct RichThemeDetailView: View {
                 )
 
                 if dateEnabledDraft {
-                    DatePicker(
-                        "",
-                        selection:
+                    LargeDateTimeEditor(
+                        date:
                             $dateDraft,
-                        displayedComponents:
-                            [.date]
+                        timeZoneID:
+                            .constant(
+                                DReportTime
+                                    .deviceTimeZoneID
+                            ),
+                        includesTime:
+                            false,
+                        showsTimeZone:
+                            false
                     )
-                    .labelsHidden()
                 }
 
                 StructureEditActions(
@@ -1129,6 +1219,25 @@ struct RichStructureEntityDetailView:
     private var store: DReportStore
 
     let entityID: UUID
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        entityID: UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.entityID =
+            entityID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
 
     @State
     private var editingField:
@@ -1459,7 +1568,17 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
-                    }
+
+                        // DETAIL DELETE FOOTER
+                        HStack {
+                            Spacer()
+
+                            detailDeleteFooter
+
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+}
                     .padding(
                         .horizontal,
                         28
@@ -1858,14 +1977,19 @@ struct RichStructureEntityDetailView:
                 )
 
                 if dateEnabledDraft {
-                    DatePicker(
-                        "",
-                        selection:
+                    LargeDateTimeEditor(
+                        date:
                             $dateDraft,
-                        displayedComponents:
-                            [.date]
+                        timeZoneID:
+                            .constant(
+                                DReportTime
+                                    .deviceTimeZoneID
+                            ),
+                        includesTime:
+                            false,
+                        showsTimeZone:
+                            false
                     )
-                    .labelsHidden()
                 }
 
                 StructureEditActions(
@@ -1940,37 +2064,52 @@ struct RichStructureEntityDetailView:
                 entity
             )
 
+        let tabs:
+            [EntitySelectionTab] =
+            entity.kind == .organization
+            ? [
+                .organizations
+            ]
+            : [
+                .groups,
+                .organizations
+            ]
+
         StructureInspectorSection(
             title:
                 "Structure"
         ) {
-            HierarchicalSelectionSummaryRow(
+            EntitySelectionSummaryRow(
                 label:
                     entity.kind == .organization
                     ? "Parent"
                     : "Containers",
-                selectedTitles:
-                    current.map(\.name),
+                selectedIDs:
+                    Set(
+                        current.map(
+                            \.id
+                        )
+                    ),
+                tabs:
+                    tabs,
+                candidateIDs:
+                    Set(
+                        candidates.map(
+                            \.id
+                        )
+                    ),
                 selectorTitle:
                     entity.kind == .organization
                     ? "Parent Organization"
-                    : "Structural Containers",
+                    : "Group Structure",
                 selectorMessage:
-                    "Organizations and Groups are shown according to their structural hierarchy.",
-                nodes:
-                    HierarchySelectionData
-                        .entityNodes(
-                            store:
-                                store,
-                            candidates:
-                                candidates
-                        ),
-                initialSelection:
-                    Set(
-                        current.map(\.id)
-                    ),
+                    entity.kind == .organization
+                    ? "Choose the parent Organization. Existing selections remain visible in Selected at the top."
+                    : "Choose Groups and Organizations that structurally contain this Group. Existing selections remain visible in Selected at the top.",
+                emptyText:
+                    "Independent",
                 buttonSystemImage:
-                    "plus.circle",
+                    "pencil",
                 onSave: {
                     selection in
 
@@ -1997,31 +2136,47 @@ struct RichStructureEntityDetailView:
                     entity.id
             )
 
+        let peopleIDs =
+            Set(
+                store.data.entities
+                    .filter {
+                        $0.kind
+                            == .person
+                    }
+                    .map(
+                        \.id
+                    )
+            )
+
         StructureInspectorSection(
             title:
                 "Affiliated People"
         ) {
-            HierarchicalSelectionSummaryRow(
+            EntitySelectionSummaryRow(
                 label:
                     "People",
-                selectedTitles:
-                    current.map(\.name),
-                selectorTitle:
-                    "Affiliated People",
-                selectorMessage:
-                    "People are grouped under the existing Organization / Group structure. Use Search for large directories.",
-                nodes:
-                    HierarchySelectionData
-                        .peopleNodes(
-                            store:
-                                store
-                        ),
-                initialSelection:
+                selectedIDs:
                     Set(
-                        current.map(\.id)
+                        current.map(
+                            \.id
+                        )
                     ),
+                tabs:
+                    [
+                        .people
+                    ],
+                candidateIDs:
+                    peopleIDs,
+                selectorTitle:
+                    entity.kind == .organization
+                    ? "People Affiliated with Organization"
+                    : "People Affiliated with Group",
+                selectorMessage:
+                    "People are sorted alphabetically by surname. Existing affiliations remain visible in Selected at the top.",
+                emptyText:
+                    "None",
                 buttonSystemImage:
-                    "plus.circle",
+                    "pencil",
                 onSave: {
                     selection in
 

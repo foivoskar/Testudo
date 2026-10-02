@@ -67,6 +67,9 @@ struct HierarchicalSelectionSummaryRow:
     var buttonSystemImage:
         String = "plus.circle"
 
+    var maximumSelectionCount:
+        Int? = nil
+
     let onSave:
         (Set<UUID>) -> String?
 
@@ -77,95 +80,57 @@ struct HierarchicalSelectionSummaryRow:
 
 
     var body: some View {
-        HStack(
-            alignment:
-                .firstTextBaseline,
-            spacing:
-                14
-        ) {
-            Text(label)
-                .foregroundStyle(
-                    .secondary
-                )
-                .frame(
-                    width: 120,
-                    alignment: .leading
-                )
-
-            Text(summaryText)
-                .foregroundStyle(
-                    selectedTitles.isEmpty
-                    ? Color.secondary
-                        .opacity(0.65)
-                    : Color.primary
-                )
-                .lineLimit(2)
-                .textSelection(
-                    .enabled
-                )
-
-            Spacer(
-                minLength: 8
-            )
-
-            Button {
+        DetailSelectionRow(
+            label:
+                label,
+            valueText:
+                summaryText,
+            valueIsEmpty:
+                selectedTitles.isEmpty,
+            buttonSystemImage:
+                buttonSystemImage,
+            helpText:
+                "Edit \(label)",
+            isPresented:
+                $showingSelector,
+            onEdit: {
                 showingSelector =
                     true
-            } label: {
-                Image(
-                    systemName:
-                        buttonSystemImage
-                )
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .medium
-                    )
-                )
             }
-            .buttonStyle(.plain)
-            .help(
-                "Edit \(label)"
-            )
-            .popover(
-                isPresented:
-                    $showingSelector,
-                arrowEdge:
-                    .trailing
-            ) {
-                HierarchicalSelectionPanel(
-                    title:
-                        selectorTitle,
-                    message:
-                        selectorMessage,
-                    nodes:
-                        nodes,
-                    initialSelection:
-                        initialSelection,
-                    onCancel: {
+        ) {
+            HierarchicalSelectionPanel(
+                title:
+                    selectorTitle,
+                message:
+                    selectorMessage,
+                nodes:
+                    nodes,
+                initialSelection:
+                    initialSelection,
+                maximumSelectionCount:
+                    maximumSelectionCount,
+                onCancel: {
+                    showingSelector =
+                        false
+                },
+                onSave: {
+                    selection in
+
+                    let error =
+                        onSave(
+                            selection
+                        )
+
+                    if error == nil {
                         showingSelector =
                             false
-                    },
-                    onSave: {
-                        selection in
-
-                        let error =
-                            onSave(
-                                selection
-                            )
-
-                        if error == nil {
-                            showingSelector =
-                                false
-                        }
-
-                        return error
                     }
-                )
-                .id(selectionIdentity)
-            }
+
+                    return error
+                }
+            )
+            .id(selectionIdentity)
         }
-        .font(.callout)
     }
 
 
@@ -226,6 +191,9 @@ private struct HierarchicalSelectionPanel:
     let nodes:
         [HierarchySelectionNode]
 
+    let maximumSelectionCount:
+        Int?
+
     let onCancel:
         () -> Void
 
@@ -255,6 +223,8 @@ private struct HierarchicalSelectionPanel:
             [HierarchySelectionNode],
         initialSelection:
             Set<UUID>,
+        maximumSelectionCount:
+            Int?,
         onCancel:
             @escaping () -> Void,
         onSave:
@@ -268,6 +238,9 @@ private struct HierarchicalSelectionPanel:
 
         self.nodes =
             nodes
+
+        self.maximumSelectionCount =
+            maximumSelectionCount
 
         self.onCancel =
             onCancel
@@ -551,6 +524,14 @@ private struct HierarchicalSelectionPanel:
                 selection.remove(
                     selectionID
                 )
+            } else if
+                maximumSelectionCount
+                    == 1
+            {
+                selection =
+                    Set(
+                        [selectionID]
+                    )
             } else {
                 selection.insert(
                     selectionID
@@ -571,7 +552,15 @@ private struct HierarchicalSelectionPanel:
                 enabled in
 
                 if enabled {
-                    selection.insert(id)
+                    if
+                        maximumSelectionCount
+                            == 1
+                    {
+                        selection =
+                            Set([id])
+                    } else {
+                        selection.insert(id)
+                    }
                 } else {
                     selection.remove(id)
                 }
@@ -713,12 +702,18 @@ enum HierarchySelectionData {
     // --------------------------------------------------------
 
     static func taskNodes(
-        store: DReportStore
+        store: DReportStore,
+        excludingWorkItemIDs:
+            Set<UUID> = []
     ) -> [HierarchySelectionNode] {
         let tasks =
             store.data.workItems
                 .filter {
                     $0.kind == .task
+                    && !excludingWorkItemIDs
+                        .contains(
+                            $0.id
+                        )
                 }
 
         let taskIDs =

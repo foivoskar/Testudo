@@ -1219,6 +1219,9 @@ struct WorkGuideRow: View {
             switch item.status {
             case .completed:
                 return "checkmark.circle"
+
+            case .closed:
+                return "archivebox"
             case .inProgress:
                 return "clock"
             case .todo, nil:
@@ -1253,6 +1256,30 @@ struct WorkItemDetailView: View {
     @Binding
     var selectedWorkItemID:
         UUID?
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        itemID: UUID,
+        selectedWorkItemID:
+            Binding<UUID?>,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.itemID =
+            itemID
+
+        self._selectedWorkItemID =
+            selectedWorkItemID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
 
     @State
     private var editingField:
@@ -1420,7 +1447,17 @@ struct WorkItemDetailView: View {
                         historySection(
                             item
                         )
-                    }
+
+                        // DETAIL DELETE FOOTER
+                        HStack {
+                            Spacer()
+
+                            detailDeleteFooter
+
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+}
                     .padding(
                         .horizontal,
                         28
@@ -1588,31 +1625,88 @@ struct WorkItemDetailView: View {
                 editingField
                     == .body
             {
-                TextEditor(
-                    text:
-                        $textDraft
-                )
-                .frame(
-                    minHeight: 130
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 6
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    TextEditor(
+                        text:
+                            $textDraft
                     )
-                    .stroke(
-                        Color.secondary
-                            .opacity(0.18)
+                    .font(.body)
+                    .scrollContentBackground(
+                        .hidden
                     )
-                }
-
-                InlineEditActions(
-                    onCancel:
-                        cancelEdit,
-                    onSave: {
-                        saveBody(
-                            item
+                    .padding(
+                        .horizontal,
+                        10
+                    )
+                    .padding(
+                        .vertical,
+                        8
+                    )
+                    .frame(
+                        minHeight: 96,
+                        idealHeight: 110,
+                        maxHeight: 140
+                    )
+                    .background(
+                        Color(
+                            nsColor:
+                                .textBackgroundColor
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 10,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.primary
+                                .opacity(0.12),
+                            lineWidth: 1
                         )
                     }
+
+                    HStack(
+                        spacing: 10
+                    ) {
+                        Spacer()
+
+                        Button(
+                            "Cancel"
+                        ) {
+                            cancelEdit()
+                        }
+                        .keyboardShortcut(
+                            .cancelAction
+                        )
+
+                        Button(
+                            "Save"
+                        ) {
+                            saveBody(
+                                item
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .keyboardShortcut(
+                            .defaultAction
+                        )
+                    }
+                }
+                .padding(
+                    .top,
+                    2
                 )
             } else {
                 HStack(
@@ -1707,330 +1801,278 @@ struct WorkItemDetailView: View {
     private func themeRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .theme
-        {
-            InlineEditorRow(
-                label: "Theme"
-            ) {
-                Picker(
-                    "",
-                    selection:
-                        $uuidDraft
-                ) {
-                    Text("No Theme")
-                        .tag(
-                            Optional<UUID>.none
-                        )
+        let current =
+            store.workThemes(
+                for:
+                    item.id
+            )
 
-                    ForEach(
-                        sortedThemes
-                    ) { theme in
-                        Text(theme.name)
-                            .tag(
-                                Optional(
-                                    theme.id
-                                )
-                            )
-                    }
-                }
-                .labelsHidden()
-                .frame(
-                    maxWidth: 280
-                )
+        HierarchicalSelectionSummaryRow(
+            label:
+                "Theme",
+            selectedTitles:
+                current.map(\.name),
+            selectorTitle:
+                "Themes",
+            selectorMessage:
+                "Themes are shown in their real hierarchy: Theme → Sub-theme → deeper levels.",
+            nodes:
+                HierarchySelectionData
+                    .themeNodes(
+                        store:
+                            store
+                    ),
+            initialSelection:
+                Set(
+                    current.map(\.id)
+                ),
+            buttonSystemImage:
+                "pencil",
+            onSave: {
+                selection in
 
-                InlineEditActions(
-                    onCancel:
-                        cancelEdit,
-                    onSave: {
-                        saveTheme(
-                            item
-                        )
-                    }
+                store.setWorkThemes(
+                    workItemID:
+                        item.id,
+                    themeIDs:
+                        selection
                 )
             }
-        } else {
-            EditableValueRow(
-                label: "Theme",
-                value:
-                    item.themeID
-                        .flatMap {
-                            store.theme(
-                                id: $0
-                            )?.name
-                        }
-                    ?? "No Theme",
-                onEdit: {
-                    uuidDraft =
-                        item.themeID
-
-                    editingField =
-                        .theme
-                }
-            )
-        }
+        )
     }
 
     @ViewBuilder
     private func parentRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .parent
-        {
-            InlineEditorRow(
-                label: "Parent"
-            ) {
-                Picker(
-                    "",
-                    selection:
-                        $uuidDraft
-                ) {
-                    Text("No Parent")
-                        .tag(
-                            Optional<UUID>
-                                .none
-                        )
-
-                    ForEach(
-                        availableParentTasks(
-                            for:
-                                item.id
-                        )
-                    ) { parent in
-                        Text(
-                            displayTitle(
-                                parent
-                            )
-                        )
-                        .tag(
-                            Optional(
-                                parent.id
-                            )
-                        )
-                    }
+        let currentParent =
+            item.parentWorkItemID
+                .flatMap {
+                    store.workItem(
+                        id:
+                            $0
+                    )
                 }
-                .labelsHidden()
-                .frame(
-                    maxWidth: 300
-                )
 
-                InlineEditActions(
-                    onCancel:
-                        cancelEdit,
-                    onSave: {
-                        saveParent(
-                            item
-                        )
+        let excluded =
+            descendantIDs(
+                of:
+                    item.id
+            )
+            .union(
+                [item.id]
+            )
+
+        HierarchicalSelectionSummaryRow(
+            label:
+                "Parent",
+            selectedTitles:
+                currentParent
+                    .map {
+                        [
+                            displayTitle(
+                                $0
+                            )
+                        ]
                     }
+                ?? [],
+            selectorTitle:
+                "Parent Task",
+            selectorMessage:
+                "Tasks are shown in their real hierarchy. A work item can have only one Parent Task.",
+            nodes:
+                HierarchySelectionData
+                    .taskNodes(
+                        store:
+                            store,
+                        excludingWorkItemIDs:
+                            excluded
+                    ),
+            initialSelection:
+                Set(
+                    currentParent
+                        .map {
+                            [$0.id]
+                        }
+                    ?? []
+                ),
+            buttonSystemImage:
+                "pencil",
+            maximumSelectionCount:
+                1,
+            onSave: {
+                selection in
+
+                update(
+                    item,
+                    parentID:
+                        selection.first,
+                    parentWasEdited:
+                        true
                 )
             }
-        } else {
-            EditableValueRow(
-                label: "Parent",
-                value:
-                    parentName(
-                        item
-                    ),
-                onEdit: {
-                    uuidDraft =
-                        item
-                            .parentWorkItemID
-
-                    editingField =
-                        .parent
-                }
-            )
-        }
+        )
     }
 
     @ViewBuilder
     private func statusRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .status
-        {
-            InlineEditorRow(
-                label: "Status"
-            ) {
-                Picker(
-                    "",
-                    selection:
-                        $statusDraft
-                ) {
-                    Text("To Do")
-                        .tag(
-                            TaskStatus.todo
-                        )
+        TaskStatusSelectorRow(
+            status:
+                item.status
+                ?? .todo,
+            allowsClosed:
+                item.parentWorkItemID
+                    == nil,
+            onSave: {
+                selectedStatus in
 
-                    Text("In Progress")
-                        .tag(
-                            TaskStatus
-                                .inProgress
-                        )
-
-                    Text("Completed")
-                        .tag(
-                            TaskStatus
-                                .completed
-                        )
-                }
-                .labelsHidden()
-                .frame(
-                    maxWidth: 220
-                )
-
-                InlineEditActions(
-                    onCancel:
-                        cancelEdit,
-                    onSave: {
-                        saveStatus(
-                            item
-                        )
-                    }
+                update(
+                    item,
+                    status:
+                        selectedStatus
                 )
             }
-        } else {
-            EditableValueRow(
-                label: "Status",
-                value:
-                    item.status?
-                        .displayName
-                    ?? "To Do",
-                onEdit: {
-                    statusDraft =
-                        item.status
-                        ?? .todo
-
-                    editingField =
-                        .status
-                }
-            )
-        }
+        )
     }
 
     @ViewBuilder
     private func deadlineRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .deadline
-        {
-            dateEditorRow(
-                label: "Deadline",
-                field: .deadline,
-                item: item
-            )
-        } else {
-            EditableValueRow(
-                label: "Deadline",
-                value:
-                    item.deadlineAt
-                        .map {
-                            DReportTime
-                                .displayDateTime(
-                                    $0,
-                                    sourceTimeZoneID:
-                                        item.deadlineTimeZoneID
-                                )
-                        }
-                    ?? "None",
-                onEdit: {
-                    beginDateEdit(
-                        .deadline,
-                        date:
-                            item.deadlineAt,
-                        timeZoneID:
-                            item.deadlineTimeZoneID
-                    )
-                }
-            )
-        }
+        DateTimeSelectorRow(
+            label:
+                "Deadline",
+            value:
+                item.deadlineAt,
+            valueText:
+                item.deadlineAt
+                    .map {
+                        DReportTime
+                            .displayDateTime(
+                                $0,
+                                sourceTimeZoneID:
+                                    item
+                                        .deadlineTimeZoneID
+                            )
+                    }
+                ?? "None",
+            timeZoneID:
+                item.deadlineTimeZoneID,
+            allowsEmpty:
+                true,
+            selectorTitle:
+                "Deadline",
+            selectorMessage:
+                "Choose the deadline date, time and source time zone.",
+            onSave: {
+                date,
+                timeZoneID in
+
+                update(
+                    item,
+                    deadline:
+                        date,
+                    deadlineTimeZoneID:
+                        timeZoneID,
+                    deadlineWasEdited:
+                        true
+                )
+            }
+        )
     }
 
     @ViewBuilder
     private func reminderRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .reminder
-        {
-            dateEditorRow(
-                label: "Reminder",
-                field: .reminder,
-                item: item
-            )
-        } else {
-            EditableValueRow(
-                label: "Reminder",
-                value:
-                    item.reminderAt
-                        .map {
-                            DReportTime
-                                .displayDateTime(
-                                    $0,
-                                    sourceTimeZoneID:
-                                        item.reminderTimeZoneID
-                                )
-                        }
-                    ?? "None",
-                onEdit: {
-                    beginDateEdit(
-                        .reminder,
-                        date:
-                            item.reminderAt,
-                        timeZoneID:
-                            item.reminderTimeZoneID
-                    )
-                }
-            )
-        }
+        DateTimeSelectorRow(
+            label:
+                "Reminder",
+            value:
+                item.reminderAt,
+            valueText:
+                item.reminderAt
+                    .map {
+                        DReportTime
+                            .displayDateTime(
+                                $0,
+                                sourceTimeZoneID:
+                                    item
+                                        .reminderTimeZoneID
+                            )
+                    }
+                ?? "None",
+            timeZoneID:
+                item.reminderTimeZoneID,
+            allowsEmpty:
+                true,
+            selectorTitle:
+                "Reminder",
+            selectorMessage:
+                "Choose the reminder date, time and source time zone.",
+            onSave: {
+                date,
+                timeZoneID in
+
+                update(
+                    item,
+                    reminder:
+                        date,
+                    reminderTimeZoneID:
+                        timeZoneID,
+                    reminderWasEdited:
+                        true
+                )
+            }
+        )
     }
 
     @ViewBuilder
     private func occurredRow(
         _ item: WorkItem
     ) -> some View {
-        if
-            editingField
-                == .eventDate
-        {
-            dateEditorRow(
-                label: "Occurred",
-                field: .eventDate,
-                item: item
-            )
-        } else {
-            EditableValueRow(
-                label: "Occurred",
-                value:
-                    item.loggedAt
-                        .map {
-                            DReportTime
-                                .displayDateTime(
-                                    $0,
-                                    sourceTimeZoneID:
-                                        item.loggedTimeZoneID
-                                )
-                        }
-                    ?? "Unknown",
-                onEdit: {
-                    beginDateEdit(
-                        .eventDate,
-                        date:
-                            item.loggedAt,
-                        timeZoneID:
-                            item.loggedTimeZoneID
-                    )
-                }
-            )
-        }
+        DateTimeSelectorRow(
+            label:
+                "Occurred",
+            value:
+                item.loggedAt,
+            valueText:
+                item.loggedAt
+                    .map {
+                        DReportTime
+                            .displayDateTime(
+                                $0,
+                                sourceTimeZoneID:
+                                    item
+                                        .loggedTimeZoneID
+                            )
+                    }
+                ?? "Unknown",
+            timeZoneID:
+                item.loggedTimeZoneID,
+            allowsEmpty:
+                false,
+            selectorTitle:
+                "Occurred",
+            selectorMessage:
+                "Choose when this Event occurred and the source time zone.",
+            onSave: {
+                date,
+                timeZoneID in
+
+                update(
+                    item,
+                    loggedAt:
+                        date,
+                    loggedTimeZoneID:
+                        timeZoneID,
+                    loggedAtWasEdited:
+                        true
+                )
+            }
+        )
     }
 
     private func dateEditorRow(
@@ -2987,6 +3029,9 @@ struct WorkItemDetailView: View {
             case .completed:
                 return "checkmark.circle"
 
+            case .closed:
+                return "archivebox"
+
             case .inProgress:
                 return "clock"
 
@@ -3009,7 +3054,7 @@ struct WorkItemDetailView: View {
     ) -> some View {
         InspectorSection(
             title:
-                "Related People & Organizations"
+                "Related People, Groups & Organizations"
         ) {
             VStack(
                 alignment: .leading,
@@ -3239,59 +3284,87 @@ struct WorkItemDetailView: View {
         item: WorkItem,
         role: WorkRelationshipRole
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 9
-        ) {
-            HStack(
-                spacing: 10
-            ) {
-                Picker(
-                    "",
-                    selection:
-                        $newRelationshipEntityDraft
-                ) {
-                    Text(
-                        "Choose person or organization…"
-                    )
-                    .tag(
-                        Optional<UUID>
-                            .none
-                    )
-
-                    ForEach(
-                        sortedEntities
-                    ) { entity in
-                        Text(
-                            entity.name
-                        )
-                        .tag(
-                            Optional(
-                                entity.id
-                            )
-                        )
-                    }
+        let directRelationships =
+            store.data
+                .workEntityRelationships
+                .filter {
+                    $0.workItemID
+                        == item.id
+                    && $0.role
+                        == role
                 }
-                .labelsHidden()
-                .frame(
-                    maxWidth: 330
-                )
 
-                Spacer()
-            }
+        let selectedIDs =
+            Set(
+                directRelationships
+                    .map(
+                        \.entityID
+                    )
+            )
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                10
+        ) {
+            EntitySelectionButton(
+                title:
+                    role.displayName,
+                selectedIDs:
+                    selectedIDs,
+                tabs:
+                    [
+                        .people,
+                        .groups,
+                        .organizations
+                    ],
+                maximumSelectionCount:
+                    nil,
+                placeholder:
+                    "Choose people, groups or organizations…",
+                selectorMessage:
+                    "Already linked entities appear in Selected at the top. Remove them there, or choose additional People, Groups or Organizations below.",
+                onSave: {
+                    selection in
+
+                    syncRelationshipSelection(
+                        for:
+                            item,
+                        role:
+                            role,
+                        selectedIDs:
+                            selection
+                    )
+                }
+            )
 
             Toggle(
-                "Inherited by child items",
+                "Inherited by child items for newly added relationships",
                 isOn:
                     $newRelationshipInheritedByChildren
             )
-            .font(.caption)
+            .font(
+                .caption
+            )
+
+            Text(
+                "Existing relationships keep their current inheritance setting. The option above applies only to newly added entities."
+            )
+            .font(
+                .caption2
+            )
+            .foregroundStyle(
+                .secondary
+            )
 
             if let errorMessage {
                 Text(
                     errorMessage
                 )
-                .font(.caption)
+                .font(
+                    .caption
+                )
                 .foregroundStyle(
                     .red
                 )
@@ -3301,44 +3374,15 @@ struct WorkItemDetailView: View {
                 Spacer()
 
                 Button(
-                    "Cancel"
+                    "Close"
                 ) {
                     cancelAddingRelationship()
                 }
                 .buttonStyle(
                     .borderless
                 )
-
-                Button(
-                    "Add"
-                ) {
-                    addRelationship(
-                        to:
-                            item,
-                        role:
-                            role
-                    )
-                }
-                .buttonStyle(
-                    .borderless
-                )
-                .fontWeight(
-                    .medium
-                )
-                .disabled(
-                    newRelationshipEntityDraft
-                        == nil
-                )
             }
         }
-        .padding(
-            .leading,
-            157
-        )
-        .padding(
-            .vertical,
-            3
-        )
     }
 
 
@@ -3438,50 +3482,98 @@ struct WorkItemDetailView: View {
     }
 
 
-    private func addRelationship(
-        to item:
-            WorkItem,
-        role:
-            WorkRelationshipRole
-    ) {
-        guard
-            let entityID =
-                newRelationshipEntityDraft
-        else {
-            errorMessage =
-                "Select a person or organization."
-            return
-        }
+    private func syncRelationshipSelection(
+        for item: WorkItem,
+        role: WorkRelationshipRole,
+        selectedIDs: Set<UUID>
+    ) -> String? {
+        let existing =
+            store.data
+                .workEntityRelationships
+                .filter {
+                    $0.workItemID
+                        == item.id
+                    && $0.role
+                        == role
+                }
 
-        let error =
-            store.addWorkRelationship(
-                workItemID:
-                    item.id,
-                entityID:
-                    entityID,
-                role:
-                    role,
-                inheritedByChildren:
-                    newRelationshipInheritedByChildren
+        let existingIDs =
+            Set(
+                existing.map(
+                    \.entityID
+                )
             )
 
-        if let error {
-            errorMessage =
-                error
-            return
+        let additions =
+            selectedIDs
+                .subtracting(
+                    existingIDs
+                )
+                .sorted {
+                    $0.uuidString
+                        < $1.uuidString
+                }
+
+        /*
+         Add first.
+
+         If validation fails, we have not removed any existing
+         relationship yet.
+        */
+        for entityID in additions {
+            if
+                let error =
+                    store
+                        .addWorkRelationship(
+                            workItemID:
+                                item.id,
+                            entityID:
+                                entityID,
+                            role:
+                                role,
+                            inheritedByChildren:
+                                newRelationshipInheritedByChildren
+                        )
+            {
+                errorMessage =
+                    error
+
+                return error
+            }
         }
+
+        /*
+         Remove direct relationships that the user unchecked
+         in the selector.
+
+         We deliberately operate only on relationships whose
+         workItemID is this item, so inherited relationships
+         belonging to parent Tasks are never deleted here.
+        */
+        let removals =
+            existing
+                .filter {
+                    !selectedIDs
+                        .contains(
+                            $0.entityID
+                        )
+                }
+
+        for relationship in removals {
+            store
+                .removeWorkRelationship(
+                    relationshipID:
+                        relationship.id
+                )
+        }
+
+        errorMessage =
+            nil
 
         showingRelationshipComposer =
             false
 
-        newRelationshipEntityDraft =
-            nil
-
-        newRelationshipInheritedByChildren =
-            true
-
-        errorMessage =
-            nil
+        return nil
     }
 
 
@@ -3536,25 +3628,36 @@ struct WorkItemDetailView: View {
                         width: 140
                     )
 
-                    Picker(
-                        "",
-                        selection:
-                            $relationshipEntityDraft
-                    ) {
-                        ForEach(
-                            sortedEntities
-                        ) { entity in
-                            Text(
-                                entity.name
-                            )
-                            .tag(
-                                Optional(
-                                    entity.id
-                                )
-                            )
+                    EntitySelectionButton(
+                        title:
+                            "Related Entity",
+                        selectedIDs:
+                            relationshipEntityDraft
+                                .map {
+                                    Set([$0])
+                                }
+                            ?? [],
+                        tabs:
+                            [
+                                .people,
+                                .groups,
+                                .organizations
+                            ],
+                        maximumSelectionCount:
+                            1,
+                        placeholder:
+                            "Choose person, group or organization…",
+                        selectorMessage:
+                            "Choose the Person, Group or Organization for this relationship.",
+                        onSave: {
+                            selection in
+
+                            relationshipEntityDraft =
+                                selection.first
+
+                            return nil
                         }
-                    }
-                    .labelsHidden()
+                    )
 
                     Spacer()
                 }
@@ -4792,6 +4895,9 @@ struct WorkItemDetailView: View {
             case .completed:
                 return "checkmark.circle"
 
+            case .closed:
+                return "archivebox"
+
             case .inProgress:
                 return "clock"
 
@@ -4978,7 +5084,7 @@ private struct InlineEditorRow<
     }
 }
 
-private struct InlineEditButton:
+struct InlineEditButton:
     View
 {
     let action: () -> Void
@@ -6098,6 +6204,11 @@ struct WorkDetailRouterView: View {
                     CalendarEventDetailView(
                         eventID:
                             selectedCalendarEventID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedCalendarEventID
                     )
 
                 } else if
@@ -6123,6 +6234,11 @@ struct WorkDetailRouterView: View {
                             selectedWorkItemID,
                         selectedWorkItemID:
                             $selectedWorkItemID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedWorkItemID
                     )
 
                 } else if
@@ -6132,6 +6248,11 @@ struct WorkDetailRouterView: View {
                     RichThemeDetailView(
                         themeID:
                             selectedThemeID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedThemeID
                     )
                 } else if
                     section
@@ -6141,6 +6262,11 @@ struct WorkDetailRouterView: View {
                     RichStructureEntityDetailView(
                         entityID:
                             selectedOrganizationID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedOrganizationID
                     )
                 } else if
                     section
@@ -6150,6 +6276,11 @@ struct WorkDetailRouterView: View {
                     RichStructureEntityDetailView(
                         entityID:
                             selectedGroupID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedGroupID
                     )
                 } else if
                     section == .people,
@@ -6158,6 +6289,11 @@ struct WorkDetailRouterView: View {
                     PersonDetailView(
                         personID:
                             selectedPersonID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedPersonID
                     )
                 } else if
                     isWorkSection,
@@ -6168,6 +6304,11 @@ struct WorkDetailRouterView: View {
                             selectedWorkItemID,
                         selectedWorkItemID:
                             $selectedWorkItemID
+                    ) {
+                        deleteFooter
+                    }
+                    .id(
+                        selectedWorkItemID
                     )
                 } else {
                     DetailPlaceholderView()
@@ -6186,15 +6327,7 @@ struct WorkDetailRouterView: View {
             DReportStyle
                 .contentBackground
         )
-    
-        .safeAreaInset(
-            edge:
-                .bottom,
-            spacing:
-                0
-        ) {
-            deleteFooter
-        }
+
 }
 
     private var isWorkSection: Bool {

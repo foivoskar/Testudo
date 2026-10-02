@@ -513,6 +513,14 @@ struct WorkCalendarView: View {
                                 event:
                                     event
                             )
+                            .middleColumnSelectionStyle(
+                                selectedCalendarEventID
+                                    == event.id,
+                                leadingExtension:
+                                    4,
+                                trailingExtension:
+                                    4
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -561,6 +569,14 @@ struct WorkCalendarView: View {
                                 occurrence.item,
                             context:
                                 occurrence.context
+                        )
+                        .middleColumnSelectionStyle(
+                            selectedWorkItemID
+                                == occurrence.item.id,
+                            leadingExtension:
+                                4,
+                            trailingExtension:
+                                4
                         )
                     }
                     .buttonStyle(.plain)

@@ -1,5 +1,6 @@
 import SwiftUI
 
+
 struct AdminToolsView: View {
     @EnvironmentObject
     private var store: DReportStore
@@ -8,184 +9,252 @@ struct AdminToolsView: View {
     private var dismiss
 
     @State
-    private var showingResetConfirmation =
+    private var showingUsers =
         false
 
+
     var body: some View {
-        if store.currentUserIsAdministrator {
+        if
+            store
+                .currentEnvironmentUserIsAdministrator,
+            let environment =
+                store.activeWorkEnvironment
+        {
             VStack(
                 alignment: .leading,
                 spacing: 24
             ) {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Admin Tools")
-                            .font(.title2)
-                            .fontWeight(.semibold)
+                header(
+                    environment
+                )
 
-                        Text(
-                            "Administrative operations for this DReport installation."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
+                Divider()
 
-                    Spacer()
+                environmentSection(
+                    environment
+                )
 
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+                directorySection(
+                    environment
+                )
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    Text("Application")
-                        .font(.headline)
-
-                    Text(
-                        "Reset DReport to its initial state and remove all locally stored application data and user accounts."
-                    )
-                    .font(.callout)
-                    .foregroundStyle(
-                        .secondary
-                    )
-
-                    Button(
-                        role: .destructive
-                    ) {
-                        showingResetConfirmation =
-                            true
-                    } label: {
-                        Label(
-                            "Reset App…",
-                            systemImage:
-                                "arrow.counterclockwise.circle"
-                        )
-                    }
-                }
+                membersSection
 
                 Spacer()
             }
             .padding(24)
             .frame(
-                width: 520,
-                height: 280
+                width: 560,
+                height: 520
             )
             .sheet(
                 isPresented:
-                    $showingResetConfirmation
+                    $showingUsers
             ) {
-                ResetApplicationView {
-                    store.resetApplication()
-
-                    showingResetConfirmation =
-                        false
-
-                    dismiss()
-                }
+                UserManagementView()
             }
+
         } else {
             ContentUnavailableView(
-                "Administrator Access Required",
+                "Environment Administrator Access Required",
                 systemImage:
-                    "lock"
+                    "lock",
+                description:
+                    Text(
+                        "Admin Tools are available only to Administrators of the active Work Environment."
+                    )
             )
             .frame(
-                width: 480,
-                height: 260
+                width: 520,
+                height: 300
             )
         }
     }
-}
 
-private struct ResetApplicationView: View {
-    @Environment(\.dismiss)
-    private var dismiss
 
-    @State
-    private var confirmation = ""
+    private func header(
+        _ environment:
+            WorkEnvironment
+    ) -> some View {
+        HStack {
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(
+                    "Admin Tools"
+                )
+                .font(.title2)
+                .fontWeight(
+                    .semibold
+                )
 
-    let onReset: () -> Void
+                Text(
+                    "Administration for \(environment.name)"
+                )
+                .font(.callout)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
 
-    private var isConfirmed: Bool {
-        confirmation
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .uppercased()
-            == "RESET"
+            Spacer()
+
+            Button(
+                "Done"
+            ) {
+                dismiss()
+            }
+        }
     }
 
-    var body: some View {
+
+    private func environmentSection(
+        _ environment:
+            WorkEnvironment
+    ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 18
+            spacing: 10
         ) {
-            Label(
-                "Reset DReport",
-                systemImage:
-                    "exclamationmark.triangle.fill"
+            Text(
+                "Work Environment"
             )
-            .font(.title2)
-            .fontWeight(.semibold)
+            .font(.headline)
+
+            LabeledContent(
+                "Name"
+            ) {
+                Text(
+                    environment.name
+                )
+            }
+
+            LabeledContent(
+                "Your role"
+            ) {
+                Text(
+                    store
+                        .currentEnvironmentRole?
+                        .displayName
+                    ?? "Unknown"
+                )
+            }
+
+            LabeledContent(
+                "Environment ID"
+            ) {
+                Text(
+                    environment
+                        .id
+                        .uuidString
+                )
+                .font(.caption)
+                .textSelection(
+                    .enabled
+                )
+            }
+        }
+    }
+
+
+    private func directorySection(
+        _ environment:
+            WorkEnvironment
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(
+                "Directory"
+            )
+            .font(.headline)
+
+            if
+                let directory =
+                    environment.directory
+            {
+                LabeledContent(
+                    "Type"
+                ) {
+                    Text(
+                        directory
+                            .kind
+                            .displayName
+                    )
+                }
+
+                if
+                    let path =
+                        directory.path
+                {
+                    LabeledContent(
+                        "Location"
+                    ) {
+                        Text(path)
+                            .font(
+                                .caption
+                            )
+                            .textSelection(
+                                .enabled
+                            )
+                            .multilineTextAlignment(
+                                .trailing
+                            )
+                    }
+                }
+
+            } else {
+                Text(
+                    "No directory is currently configured for this Environment."
+                )
+                .font(.callout)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+        }
+    }
+
+
+    private var membersSection:
+        some View
+    {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Text(
+                    "Members"
+                )
+                .font(.headline)
+
+                Spacer()
+
+                Text(
+                    "\(store.activeEnvironmentMemberships.count)"
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
 
             Text(
-                "This permanently removes all Tasks, Notes, Events, Themes, Organizations, Groups, People and User accounts, including the Administrator account."
+                "Manage the users and identities that can enter this Work Environment."
             )
-
-            Text(
-                "The saved login session will also be removed. DReport will immediately return to the first-run Administrator setup."
-            )
+            .font(.callout)
             .foregroundStyle(
                 .secondary
             )
 
-            VStack(
-                alignment: .leading,
-                spacing: 6
+            Button(
+                "Manage Environment Users…"
             ) {
-                Text(
-                    "Type RESET to continue:"
-                )
-                .font(.callout)
-                .fontWeight(.medium)
-
-                TextField(
-                    "RESET",
-                    text:
-                        $confirmation
-                )
-                .textFieldStyle(
-                    .roundedBorder
-                )
-            }
-
-            HStack {
-                Spacer()
-
-                Button("Cancel") {
-                    dismiss()
-                }
-
-                Button(
-                    "Reset App",
-                    role: .destructive
-                ) {
-                    onReset()
-                }
-                .disabled(
-                    !isConfirmed
-                )
+                showingUsers =
+                    true
             }
         }
-        .padding(24)
-        .frame(width: 500)
     }
 }

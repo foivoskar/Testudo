@@ -605,38 +605,16 @@ struct CalendarEventCreationView:
         date: Binding<Date>,
         timeZoneID: Binding<String>
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 6
-        ) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
-
-            if isAllDay {
-                DatePicker(
-                    "",
-                    selection: date,
-                    displayedComponents:
-                        [.date]
-                )
-                .labelsHidden()
-            } else {
-                DatePicker(
-                    "",
-                    selection: date,
-                    displayedComponents:
-                        [
-                            .date,
-                            .hourAndMinute
-                        ]
-                )
-                .labelsHidden()
-
-            }
-        }
+        TimeZoneAwareDateEditor(
+            label:
+                label,
+            date:
+                date,
+            timeZoneID:
+                timeZoneID,
+            includesTime:
+                !isAllDay
+        )
     }
 
 
@@ -807,9 +785,13 @@ struct CalendarEventCreationView:
                     isAllDay:
                         isAllDay,
                     startTimeZoneID:
-                        DReportTime.deviceTimeZoneID,
+                        isAllDay
+                        ? nil
+                        : startTimeZoneID,
                     endTimeZoneID:
-                        DReportTime.deviceTimeZoneID
+                        isAllDay
+                        ? nil
+                        : endTimeZoneID
                 )
         else {
             errorMessage =
@@ -869,6 +851,25 @@ struct CalendarEventDetailView:
 
     let eventID:
         UUID
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        eventID: UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.eventID =
+            eventID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
 
     @State
     private var editingField:
@@ -1100,7 +1101,17 @@ struct CalendarEventDetailView:
                                 )
                             }
                         }
-                    }
+
+                        // DETAIL DELETE FOOTER
+                        HStack {
+                            Spacer()
+
+                            detailDeleteFooter
+
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+}
                     .padding(
                         .horizontal,
                         28
@@ -1450,29 +1461,16 @@ struct CalendarEventDetailView:
                         .secondary
                     )
 
-                if event.isAllDay {
-                    DatePicker(
-                        "",
-                        selection:
-                            $dateDraft,
-                        displayedComponents:
-                            [.date]
-                    )
-                    .labelsHidden()
-                } else {
-                    DatePicker(
-                        "",
-                        selection:
-                            $dateDraft,
-                        displayedComponents:
-                            [
-                                .date,
-                                .hourAndMinute
-                            ]
-                    )
-                    .labelsHidden()
-
-                }
+                LargeDateTimeEditor(
+                    date:
+                        $dateDraft,
+                    timeZoneID:
+                        $timeZoneDraft,
+                    includesTime:
+                        !event.isAllDay,
+                    showsTimeZone:
+                        !event.isAllDay
+                )
 
                 CalendarEditActions(
                     cancel:
@@ -1486,13 +1484,17 @@ struct CalendarEventDetailView:
                                 dateDraft
 
                             updated.startTimeZoneID =
-                                DReportTime.deviceTimeZoneID
+                                event.isAllDay
+                                ? nil
+                                : timeZoneDraft
                         } else {
                             updated.endAt =
                                 dateDraft
 
                             updated.endTimeZoneID =
-                                DReportTime.deviceTimeZoneID
+                                event.isAllDay
+                                ? nil
+                                : timeZoneDraft
                         }
 
                         finish(

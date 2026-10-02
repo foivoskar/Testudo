@@ -13,6 +13,7 @@ enum SidebarSection:
     case todo
     case inProgress
     case completed
+    case archive
     case timeline
     case themes
     case organizations
@@ -37,6 +38,8 @@ enum SidebarSection:
             return "In Progress"
         case .completed:
             return "Completed"
+        case .archive:
+            return "Archive"
         case .timeline:
             return "Timeline"
         case .themes:
@@ -64,6 +67,8 @@ enum SidebarSection:
             return "clock"
         case .completed:
             return "checkmark.circle"
+        case .archive:
+            return "archivebox"
         case .timeline:
             return "list.bullet.rectangle"
         case .themes:
@@ -473,6 +478,10 @@ struct ContentView: View {
                         )
 
                         sidebarRow(
+                            .archive
+                        )
+
+                        sidebarRow(
                             .timeline
                         )
                     } header: {
@@ -703,6 +712,7 @@ struct ContentView: View {
             .todo,
             .inProgress,
             .completed,
+            .archive,
             .timeline
         ]
     }
@@ -1307,6 +1317,7 @@ struct ContentView: View {
              .todo,
              .inProgress,
              .completed,
+             .archive,
              .timeline:
             return true
 
@@ -1438,6 +1449,7 @@ private struct SectionContentView: View {
              .todo,
              .inProgress,
              .completed,
+             .archive,
              .timeline:
             return false
 
@@ -1491,6 +1503,12 @@ private struct SectionContentView: View {
                 selection:
                     $selectedWorkItemID
             )
+        case .archive:
+            ArchiveWorkListView(
+                selection:
+                    $selectedWorkItemID
+            )
+
         case .timeline:
             WorkListView(
                 mode: .timeline,
@@ -1705,6 +1723,10 @@ private struct SectionContentView: View {
             return
                 "Completed work"
 
+        case .archive:
+            return
+                "Closed work retained for history and reporting"
+
         case .timeline:
             return
                 "Chronological history of your work"
@@ -1806,6 +1828,17 @@ private struct ThemeNodeView: View {
     private var createKind:
         WorkItemKind?
 
+    private var isSelectedTheme:
+        Bool
+    {
+        selection
+            == theme.id
+        &&
+        selectedWorkItemID
+            == nil
+    }
+
+
     var body: some View {
         DisclosureGroup(
             isExpanded: $isExpanded
@@ -1873,6 +1906,13 @@ private struct ThemeNodeView: View {
             .frame(
                 height: 46,
                 alignment: .center
+            )
+            .middleColumnSelectionStyle(
+                isSelectedTheme,
+                leadingExtension:
+                    26,
+                trailingExtension:
+                    4
             )
             .contentShape(
                 Rectangle()
@@ -1994,28 +2034,31 @@ private struct WorkItemNodeView: View {
         }
     }
 
+    private var isSelectedWorkItem:
+        Bool
+    {
+        selectedWorkItemID
+            == item.id
+    }
+
+
     private var selectableLabel:
         some View
     {
         label
+            .middleColumnSelectionStyle(
+                isSelectedWorkItem,
+                leadingExtension:
+                    26,
+                trailingExtension:
+                    4
+            )
             .contentShape(
                 Rectangle()
             )
             .onTapGesture {
                 selectItem()
             }
-            .background(
-                selectedWorkItemID
-                    == item.id
-                ? Color.accentColor
-                    .opacity(0.12)
-                : Color.clear
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 5
-                )
-            )
     }
 
     private func selectItem() {
@@ -2033,9 +2076,13 @@ private struct WorkItemNodeView: View {
                 systemName: itemIcon
             )
             .foregroundStyle(
-                item.kind == .task
-                ? .primary
-                : .secondary
+                isSelectedWorkItem
+                ? Color.white
+                : (
+                    item.kind == .task
+                    ? Color.primary
+                    : Color.secondary
+                )
             )
 
             VStack(
@@ -2055,7 +2102,9 @@ private struct WorkItemNodeView: View {
                     )
                     .font(.caption2)
                     .foregroundStyle(
-                        .secondary
+                        isSelectedWorkItem
+                        ? Color.white.opacity(0.85)
+                        : Color.secondary
                     )
 
                     if let deadline =
@@ -2066,10 +2115,14 @@ private struct WorkItemNodeView: View {
                         )
                         .font(.caption2)
                         .foregroundStyle(
-                            deadline < Date()
-                            && status != .completed
-                            ? .red
-                            : .secondary
+                            isSelectedWorkItem
+                            ? Color.white.opacity(0.85)
+                            : (
+                                deadline < Date()
+                                && status != .completed
+                                ? Color.red
+                                : Color.secondary
+                            )
                         )
                     }
                 } else {
@@ -2078,7 +2131,9 @@ private struct WorkItemNodeView: View {
                     )
                     .font(.caption2)
                     .foregroundStyle(
-                        .secondary
+                        isSelectedWorkItem
+                        ? Color.white.opacity(0.85)
+                        : Color.secondary
                     )
                 }
             }
@@ -2371,7 +2426,10 @@ private struct StatusTaskListView: View {
             return "clock"
         case .completed:
             return "checkmark.circle"
-        }
+                case .closed:
+            return "archivebox"
+
+}
     }
 }
 
@@ -2517,6 +2575,9 @@ private struct WorkSummaryRow: View {
                 return "clock"
             case .completed:
                 return "checkmark.circle"
+            case .closed:
+                return "archivebox"
+
             case nil:
                 return "circle"
             }
@@ -3248,31 +3309,267 @@ struct SettingsView: View {
     @EnvironmentObject
     private var store: DReportStore
 
+    @State
+    private var showingProfileEditor =
+        false
+
+    @State
+    private var showingResetConfirmation =
+        false
+
+
     var body: some View {
         Form {
-            Section("DReport") {
+            Section(
+                "My Profile"
+            ) {
+                if
+                    let profile =
+                        store.localUserProfile
+                {
+                    LabeledContent(
+                        "Name"
+                    ) {
+                        Text(
+                            profile.displayName
+                        )
+                    }
+
+                    if
+                        !profile
+                            .professionalEmail
+                            .isEmpty
+                    {
+                        LabeledContent(
+                            "Email"
+                        ) {
+                            Text(
+                                profile
+                                    .professionalEmail
+                            )
+                        }
+                    }
+
+                    Button(
+                        "Edit My Profile…"
+                    ) {
+                        showingProfileEditor =
+                            true
+                    }
+
+                } else {
+                    Text(
+                        "No local application profile exists."
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+
+            Section(
+                "Application"
+            ) {
                 LabeledContent(
                     "Storage"
                 ) {
-                    Text("Local")
+                    Text(
+                        "Local"
+                    )
                 }
 
                 LabeledContent(
-                    "Accounts"
+                    "Known Work Environments"
                 ) {
-                    Text("None")
+                    Text(
+                        "\(store.workEnvironments.count)"
+                    )
                 }
             }
 
-            Section("Data") {
+
+            Section(
+                "Application Data"
+            ) {
+                LabeledContent(
+                    "Application database"
+                ) {
+                    Text(
+                        store
+                            .applicationFileURL
+                            .path
+                    )
+                    .font(
+                        .caption
+                    )
+                    .textSelection(
+                        .enabled
+                    )
+                    .multilineTextAlignment(
+                        .trailing
+                    )
+                }
+            }
+
+
+            Section(
+                "Reset This Installation"
+            ) {
                 Text(
-                    store.fileURL.path
+                    "Resetting removes this installation's profile, Environment registry and local mappings. Work Environment databases are not deleted."
                 )
-                .font(.caption)
-                .textSelection(.enabled)
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                Button(
+                    "Reset Application…",
+                    role:
+                        .destructive
+                ) {
+                    showingResetConfirmation =
+                        true
+                }
             }
         }
         .padding()
-        .frame(width: 540)
+        .frame(
+            width: 600
+        )
+        .sheet(
+            isPresented:
+                $showingProfileEditor
+        ) {
+            if
+                let profile =
+                    store.localUserProfile
+            {
+                LocalUserProfileEditorView(
+                    profile:
+                        profile
+                )
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingResetConfirmation
+        ) {
+            ResetLocalApplicationView {
+                store
+                    .resetApplication()
+
+                showingResetConfirmation =
+                    false
+            }
+        }
+    }
+}
+
+
+private struct ResetLocalApplicationView:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @State
+    private var confirmation =
+        ""
+
+    let onReset:
+        () -> Void
+
+
+    private var isConfirmed:
+        Bool
+    {
+        confirmation
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .uppercased()
+            == "RESET"
+    }
+
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 18
+        ) {
+            Label(
+                "Reset This Installation",
+                systemImage:
+                    "exclamationmark.triangle.fill"
+            )
+            .font(.title2)
+            .fontWeight(
+                .semibold
+            )
+
+            Text(
+                "This removes the local user profile, the list of known Work Environments and local Environment identity mappings from this installation."
+            )
+
+            Text(
+                "Work Environment databases and their Tasks, Notes, Events, Themes, Organizations, Groups and People are not deleted."
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                Text(
+                    "Type RESET to continue:"
+                )
+                .font(.callout)
+                .fontWeight(
+                    .medium
+                )
+
+                TextField(
+                    "RESET",
+                    text:
+                        $confirmation
+                )
+                .textFieldStyle(
+                    .roundedBorder
+                )
+            }
+
+            HStack {
+                Spacer()
+
+                Button(
+                    "Cancel"
+                ) {
+                    dismiss()
+                }
+
+                Button(
+                    "Reset Application",
+                    role:
+                        .destructive
+                ) {
+                    onReset()
+                    dismiss()
+                }
+                .disabled(
+                    !isConfirmed
+                )
+            }
+        }
+        .padding(24)
+        .frame(
+            width: 520
+        )
     }
 }

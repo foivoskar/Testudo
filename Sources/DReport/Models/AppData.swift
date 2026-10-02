@@ -1,7 +1,31 @@
 import Foundation
 
 struct DReportData: Codable {
-    var schemaVersion: Int = 5
+    var schemaVersion: Int = 7
+
+    // --------------------------------------------------------
+    // Application-level identity
+    // --------------------------------------------------------
+
+    var localUserProfile:
+        LocalUserProfile?
+
+
+    // --------------------------------------------------------
+    // Work Environments
+    // --------------------------------------------------------
+
+    var workEnvironments:
+        [WorkEnvironment] = []
+
+    var environmentMemberships:
+        [EnvironmentMembership] = []
+
+    // Local application state: which Environment is currently
+    // open on this installation.
+    var activeEnvironmentID:
+        UUID?
+
 
     var themes: [Theme] = []
     var workItems: [WorkItem] = []
@@ -13,6 +37,9 @@ struct DReportData: Codable {
 
     var workEntityRelationships:
         [WorkEntityRelationship] = []
+
+    var themeEntityRelationships:
+        [ThemeEntityRelationship] = []
 
     var historyEvents:
         [HistoryEvent] = []
@@ -42,12 +69,17 @@ struct DReportData: Codable {
         CodingKey
     {
         case schemaVersion
+        case localUserProfile
+        case workEnvironments
+        case environmentMemberships
+        case activeEnvironmentID
         case themes
         case workItems
         case entities
         case memberships
         case personProfiles
         case workEntityRelationships
+        case themeEntityRelationships
         case historyEvents
         case users
         case calendarAccounts
@@ -71,6 +103,34 @@ struct DReportData: Codable {
                 Int.self,
                 forKey: .schemaVersion
             ) ?? 1
+
+        localUserProfile =
+            try container.decodeIfPresent(
+                LocalUserProfile.self,
+                forKey:
+                    .localUserProfile
+            )
+
+        workEnvironments =
+            try container.decodeIfPresent(
+                [WorkEnvironment].self,
+                forKey:
+                    .workEnvironments
+            ) ?? []
+
+        environmentMemberships =
+            try container.decodeIfPresent(
+                [EnvironmentMembership].self,
+                forKey:
+                    .environmentMemberships
+            ) ?? []
+
+        activeEnvironmentID =
+            try container.decodeIfPresent(
+                UUID.self,
+                forKey:
+                    .activeEnvironmentID
+            )
 
         themes =
             try container.decodeIfPresent(
@@ -107,6 +167,13 @@ struct DReportData: Codable {
                 [WorkEntityRelationship].self,
                 forKey:
                     .workEntityRelationships
+            ) ?? []
+
+        themeEntityRelationships =
+            try container.decodeIfPresent(
+                [ThemeEntityRelationship].self,
+                forKey:
+                    .themeEntityRelationships
             ) ?? []
 
         historyEvents =

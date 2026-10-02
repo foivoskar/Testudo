@@ -217,6 +217,25 @@ struct PersonDetailView: View {
 
     let personID: UUID
 
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        personID: UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.personID =
+            personID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
+
     @State
     private var showingEditor = false
 
@@ -257,7 +276,17 @@ struct PersonDetailView: View {
                     personProfile(
                         person: person
                     )
-                }
+
+                    // DETAIL DELETE FOOTER
+                    HStack {
+                        Spacer()
+
+                        detailDeleteFooter
+
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+}
                 .padding(24)
                 .frame(
                     maxWidth: .infinity,
@@ -730,7 +759,8 @@ struct PersonDetailView: View {
                     personID
             )
             .filter {
-                $0.kind == kind
+                $0.kind
+                    == kind
             }
 
         let candidates =
@@ -739,31 +769,43 @@ struct PersonDetailView: View {
                     kind
             )
 
-        HierarchicalSelectionSummaryRow(
+        let tabs:
+            [EntitySelectionTab] =
+            kind == .organization
+            ? [
+                .organizations
+            ]
+            : [
+                .groups
+            ]
+
+        EntitySelectionSummaryRow(
             label:
                 title,
-            selectedTitles:
-                current.map(\.name),
+            selectedIDs:
+                Set(
+                    current.map(
+                        \.id
+                    )
+                ),
+            tabs:
+                tabs,
+            candidateIDs:
+                Set(
+                    candidates.map(
+                        \.id
+                    )
+                ),
             selectorTitle:
                 title,
             selectorMessage:
                 kind == .organization
-                ? "Organizations are shown as Organization → Sub-organization → deeper levels."
-                : "Groups are shown according to their structural hierarchy.",
-            nodes:
-                HierarchySelectionData
-                    .entityNodes(
-                        store:
-                            store,
-                        candidates:
-                            candidates
-                    ),
-            initialSelection:
-                Set(
-                    current.map(\.id)
-                ),
+                ? "Choose Organizations affiliated with this Person. Sub-organizations are shown hierarchically and existing affiliations remain visible in Selected."
+                : "Choose Groups affiliated with this Person. Subgroups are shown hierarchically and existing affiliations remain visible in Selected.",
+            emptyText:
+                "None",
             buttonSystemImage:
-                "plus.circle",
+                "pencil",
             onSave: {
                 selection in
 
@@ -895,7 +937,7 @@ struct PersonDetailView: View {
                             : "Disabled"
                     )
 
-                    if store.currentUserIsAdministrator {
+                    if store.currentEnvironmentUserIsAdministrator {
                         Button("Manage Account…") {
                             showingAccountManager = true
                         }
@@ -1143,6 +1185,9 @@ private struct RelatedWorkRow: View {
                 return "clock"
             case .completed:
                 return "checkmark.circle"
+            case .closed:
+                return "archivebox"
+
             case nil:
                 return "circle"
             }
@@ -1669,7 +1714,8 @@ private struct PersonEditView: View {
                     personID
             )
             .filter {
-                $0.kind == kind
+                $0.kind
+                    == kind
             }
 
         let candidates =
@@ -1678,31 +1724,43 @@ private struct PersonEditView: View {
                     kind
             )
 
-        HierarchicalSelectionSummaryRow(
+        let tabs:
+            [EntitySelectionTab] =
+            kind == .organization
+            ? [
+                .organizations
+            ]
+            : [
+                .groups
+            ]
+
+        EntitySelectionSummaryRow(
             label:
                 title,
-            selectedTitles:
-                current.map(\.name),
+            selectedIDs:
+                Set(
+                    current.map(
+                        \.id
+                    )
+                ),
+            tabs:
+                tabs,
+            candidateIDs:
+                Set(
+                    candidates.map(
+                        \.id
+                    )
+                ),
             selectorTitle:
                 title,
             selectorMessage:
                 kind == .organization
-                ? "Organizations are shown as Organization → Sub-organization → deeper levels."
-                : "Groups are shown according to their structural hierarchy.",
-            nodes:
-                HierarchySelectionData
-                    .entityNodes(
-                        store:
-                            store,
-                        candidates:
-                            candidates
-                    ),
-            initialSelection:
-                Set(
-                    current.map(\.id)
-                ),
+                ? "Choose Organizations affiliated with this Person. Sub-organizations are shown hierarchically and existing affiliations remain visible in Selected."
+                : "Choose Groups affiliated with this Person. Subgroups are shown hierarchically and existing affiliations remain visible in Selected.",
+            emptyText:
+                "None",
             buttonSystemImage:
-                "plus.circle",
+                "pencil",
             onSave: {
                 selection in
 

@@ -1,68 +1,122 @@
 import SwiftUI
 import AppKit
 
+
 struct SidebarUserFooter: View {
     @EnvironmentObject
     private var store: DReportStore
 
     @State
-    private var showingAccountPopover = false
+    private var showingPopover =
+        false
 
     @State
-    private var showingUsers = false
+    private var showingAdminTools =
+        false
 
-    @State
-    private var showingAdminTools = false
 
     var body: some View {
-        if let user = store.currentUser {
+        if
+            let profile =
+                store.localUserProfile
+        {
             Button {
-                showingAccountPopover.toggle()
+                showingPopover
+                    .toggle()
             } label: {
-                HStack(spacing: 8) {
-                    SidebarMiniAvatar(
-                        user: user
+                HStack(
+                    spacing: 8
+                ) {
+                    SidebarLocalUserAvatar(
+                        profile:
+                            profile
                     )
 
-                    Text(user.displayName)
+                    VStack(
+                        alignment: .leading,
+                        spacing: 1
+                    ) {
+                        Text(
+                            profile
+                                .displayName
+                        )
                         .font(
                             .system(
                                 size: 13,
-                                weight: .regular
+                                weight:
+                                    .regular
                             )
                         )
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(
+                            .primary
+                        )
                         .lineLimit(1)
 
-                    Spacer(minLength: 0)
+                        if
+                            let environment =
+                                store
+                                    .activeWorkEnvironment
+                        {
+                            Text(
+                                environment
+                                    .name
+                            )
+                            .font(
+                                .caption2
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .lineLimit(1)
+                        }
+                    }
+
+                    Spacer(
+                        minLength: 0
+                    )
                 }
-                .padding(.horizontal, 4)
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 34,
-                    maxHeight: 34,
-                    alignment: .leading
+                .padding(
+                    .horizontal,
+                    4
                 )
-                .contentShape(Rectangle())
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    minHeight:
+                        38,
+                    maxHeight:
+                        38,
+                    alignment:
+                        .leading
+                )
+                .contentShape(
+                    Rectangle()
+                )
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.top, 4)
-            .padding(.bottom, 8)
+            .buttonStyle(
+                .plain
+            )
+            .padding(
+                .horizontal,
+                12
+            )
+            .padding(
+                .top,
+                4
+            )
+            .padding(
+                .bottom,
+                8
+            )
             .popover(
                 isPresented:
-                    $showingAccountPopover,
-                arrowEdge: .bottom
+                    $showingPopover,
+                arrowEdge:
+                    .bottom
             ) {
-                accountPopover(
-                    user: user
+                popover(
+                    profile
                 )
-            }
-            .sheet(
-                isPresented:
-                    $showingUsers
-            ) {
-                UserManagementView()
             }
             .sheet(
                 isPresented:
@@ -73,121 +127,225 @@ struct SidebarUserFooter: View {
         }
     }
 
-    private func accountPopover(
-        user: DReportUser
+
+    private func popover(
+        _ profile:
+            LocalUserProfile
     ) -> some View {
         VStack(
             alignment: .leading,
             spacing: 10
         ) {
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(user.displayName)
-                    .fontWeight(.semibold)
+            Text(
+                profile.displayName
+            )
+            .fontWeight(
+                .semibold
+            )
 
-                Text("@\(user.username)")
-                    .font(.caption)
+
+            if
+                let environment =
+                    store
+                        .activeWorkEnvironment
+            {
+                Divider()
+
+                Text(
+                    environment.name
+                )
+                .fontWeight(
+                    .medium
+                )
+
+                if
+                    let role =
+                        store
+                            .currentEnvironmentRole
+                {
+                    Text(
+                        role.displayName
+                    )
+                    .font(
+                        .caption
+                    )
                     .foregroundStyle(
                         .secondary
                     )
-
-                if store.currentUserIsAdministrator {
-                    Text(
-                        user.role.displayName
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        .tertiary
-                    )
                 }
             }
 
-            if store.currentUserIsAdministrator {
-                Button("Users…") {
-                    showingAccountPopover = false
 
-                    DispatchQueue.main.async {
-                        showingUsers = true
-                    }
+            Divider()
+
+
+            if
+                store
+                    .currentEnvironmentUserIsAdministrator
+            {
+                Button(
+                    "Admin Tools…"
+                ) {
+                    showingPopover =
+                        false
+
+                    DispatchQueue
+                        .main
+                        .async {
+                            showingAdminTools =
+                                true
+                        }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(
+                    .plain
+                )
 
-                Button("Admin Tools…") {
-                    showingAccountPopover = false
-
-                    DispatchQueue.main.async {
-                        showingAdminTools = true
-                    }
-                }
-                .buttonStyle(.plain)
+                Divider()
             }
 
-            Button("Sign Out") {
-                showingAccountPopover = false
-                store.signOut()
+
+            Button(
+                "Switch Work Environment…"
+            ) {
+                showingPopover =
+                    false
+
+                store
+                    .closeWorkEnvironment()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(
+                .plain
+            )
         }
         .padding(12)
         .frame(
-            width: 200,
-            alignment: .leading
+            width: 230,
+            alignment:
+                .leading
         )
     }
 }
 
-private struct SidebarMiniAvatar: View {
-    let user: DReportUser
 
-    private let size: CGFloat = 24
+private struct SidebarLocalUserAvatar:
+    View
+{
+    let profile:
+        LocalUserProfile
+
+    private let size:
+        CGFloat = 24
+
+
+    private var initials:
+        String
+    {
+        let first =
+            profile.firstName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .first
+
+        let last =
+            profile.lastName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .first
+
+        let characters =
+            [
+                first,
+                last
+            ]
+            .compactMap {
+                $0
+            }
+
+        if characters.isEmpty {
+            return "?"
+        }
+
+        return
+            String(
+                characters
+            )
+            .uppercased()
+    }
+
 
     var body: some View {
         Group {
             if
-                let data = user.avatarData,
-                let image = NSImage(
-                    data: data
-                )
-            {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(
-                        width: size,
-                        height: size
+                let data =
+                    profile.avatarData,
+                let image =
+                    NSImage(
+                        data:
+                            data
                     )
-                    .clipShape(Circle())
+            {
+                Image(
+                    nsImage:
+                        image
+                )
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width:
+                        size,
+                    height:
+                        size
+                )
+                .clipShape(
+                    Circle()
+                )
+
             } else {
                 ZStack {
                     Circle()
                         .fill(
-                            Color.accentColor
-                                .opacity(0.15)
+                            Color
+                                .accentColor
+                                .opacity(
+                                    0.15
+                                )
                         )
 
-                    Text(user.initials)
-                        .font(
-                            .system(
-                                size: 10,
-                                weight: .semibold
-                            )
+                    Text(
+                        initials
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight:
+                                .semibold
                         )
-                        .foregroundStyle(
-                            Color.accentColor
-                        )
+                    )
+                    .foregroundStyle(
+                        Color
+                            .accentColor
+                    )
                 }
                 .frame(
-                    width: size,
-                    height: size
+                    width:
+                        size,
+                    height:
+                        size
                 )
             }
         }
         .frame(
-            width: size,
-            height: size
+            width:
+                size,
+            height:
+                size
         )
-        .clipShape(Circle())
+        .clipShape(
+            Circle()
+        )
     }
 }

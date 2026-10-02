@@ -546,102 +546,184 @@ struct TimeZoneIdentifierPicker:
 struct TimeZoneAwareDateEditor:
     View
 {
-    let label: String
+    let label:
+        String
 
     @Binding
-    var date: Date
+    var date:
+        Date
 
     @Binding
-    var timeZoneID: String
+    var timeZoneID:
+        String
 
-    private var selectedZone:
-        TimeZone
-    {
-        DReportTime.timeZone(
-            identifier:
-                timeZoneID
-        )
-    }
+    var includesTime:
+        Bool = true
+
+
+    @State
+    private var showingEditor =
+        false
+
+    @State
+    private var draftDate =
+        Date()
+
+    @State
+    private var draftTimeZoneID =
+        DReportTime.deviceTimeZoneID
+
 
     var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
-        ) {
-            if !label.isEmpty {
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
+        DetailSelectionRow(
+            label:
+                label,
+            valueText:
+                includesTime
+                ? DReportTime
+                    .displayDateTime(
+                        date,
+                        sourceTimeZoneID:
+                            timeZoneID
                     )
+                : date.formatted(
+                    date:
+                        .abbreviated,
+                    time:
+                        .omitted
+                ),
+            buttonSystemImage:
+                "pencil",
+            helpText:
+                "Edit \(label.lowercased())",
+            isPresented:
+                $showingEditor,
+            onEdit: {
+                draftDate =
+                    date
+
+                draftTimeZoneID =
+                    DReportTime
+                        .validTimeZoneIdentifier(
+                            timeZoneID
+                        )
+                    ?? DReportTime
+                        .deviceTimeZoneID
+
+                showingEditor =
+                    true
             }
-
-            DatePicker(
-                "",
-                selection:
-                    $date,
-                displayedComponents:
-                    [
-                        .date,
-                        .hourAndMinute
-                    ]
-            )
-            .labelsHidden()
-            .environment(
-                \.timeZone,
-                selectedZone
-            )
-
-            HStack(
-                spacing: 8
+        ) {
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    0
             ) {
-                Text("Time zone")
-                    .font(.caption)
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing: 5
+                ) {
+                    Text(label)
+                        .font(.headline)
+
+                    Text(
+                        includesTime
+                        ? "Choose the date, time and source time zone."
+                        : "Choose the date."
+                    )
+                    .font(.callout)
                     .foregroundStyle(
                         .secondary
                     )
+                }
+                .padding(
+                    .horizontal,
+                    20
+                )
+                .padding(
+                    .top,
+                    18
+                )
+                .padding(
+                    .bottom,
+                    14
+                )
 
-                TimeZoneIdentifierPicker(
-                    selection:
-                        $timeZoneID
+                Divider()
+
+                LargeDateTimeEditor(
+                    date:
+                        $draftDate,
+                    timeZoneID:
+                        $draftTimeZoneID,
+                    includesTime:
+                        includesTime,
+                    showsTimeZone:
+                        includesTime
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .padding(
+                    .vertical,
+                    8
+                )
+
+                Divider()
+
+                HStack {
+                    Spacer()
+
+                    Button(
+                        "Cancel"
+                    ) {
+                        showingEditor =
+                            false
+                    }
+                    .keyboardShortcut(
+                        .cancelAction
+                    )
+
+                    Button(
+                        "Save"
+                    ) {
+                        date =
+                            draftDate
+
+                        if includesTime {
+                            timeZoneID =
+                                draftTimeZoneID
+                        }
+
+                        showingEditor =
+                            false
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .keyboardShortcut(
+                        .defaultAction
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    18
+                )
+                .padding(
+                    .vertical,
+                    14
                 )
             }
-        }
-        .onAppear {
-            if
-                DReportTime
-                    .validTimeZoneIdentifier(
-                        timeZoneID
-                    ) == nil
-            {
-                timeZoneID =
-                    DReportTime
-                        .deviceTimeZoneID
-            }
-        }
-        .onChange(
-            of: timeZoneID
-        ) {
-            oldValue,
-            newValue in
-
-            guard
-                oldValue != newValue,
-                !oldValue.isEmpty,
-                !newValue.isEmpty
-            else {
-                return
-            }
-
-            date =
-                DReportTime
-                    .reinterpreting(
-                        date,
-                        fromTimeZoneID:
-                            oldValue,
-                        toTimeZoneID:
-                            newValue
-                    )
+            .frame(
+                width: 780
+            )
+            .background(
+                DReportStyle
+                    .contentBackground
+            )
         }
     }
 }

@@ -23,6 +23,7 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
     case todo
     case inProgress
     case completed
+    case closed
 
     var id: String { rawValue }
 
@@ -34,6 +35,9 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
             return "In Progress"
         case .completed:
             return "Completed"
+
+        case .closed:
+            return "Closed"
         }
     }
 }
@@ -132,6 +136,18 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
 
     var themeID: UUID?
+
+    // Multiple Theme membership.
+    //
+    // nil:
+    //   legacy WorkItem — use themeID as fallback.
+    //
+    // []:
+    //   explicitly assigned to no Themes.
+    //
+    // [UUID, ...]:
+    //   explicit multi-Theme membership.
+    var themeIDs: [UUID]? = nil
     var parentWorkItemID: UUID?
 
     var kind: WorkItemKind
@@ -272,6 +288,26 @@ struct WorkEntityRelationship: Identifiable, Codable, Hashable {
 
     var createdAt: Date = Date()
 }
+
+
+struct ThemeEntityRelationship:
+    Identifiable,
+    Codable,
+    Hashable
+{
+    var id:
+        UUID = UUID()
+
+    var themeID:
+        UUID
+
+    var entityID:
+        UUID
+
+    var createdAt:
+        Date = Date()
+}
+
 
 enum HistoryEventKind: String, Codable, CaseIterable {
     case created
