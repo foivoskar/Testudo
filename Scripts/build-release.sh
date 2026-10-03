@@ -4,8 +4,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-VERSION="${1:-0.1.1}"
-BUILD_NUMBER="${2:-2}"
+VERSION="${1:-0.1.2}"
+BUILD_NUMBER="${2:-3}"
 ARCH="$(uname -m)"
 
 APP_NAME="Testudo"

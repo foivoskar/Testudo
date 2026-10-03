@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 CONFIG="${1:-debug}"
-VERSION="${2:-0.1.1}"
-BUILD_NUMBER="${3:-2}"
+VERSION="${2:-0.1.2}"
+BUILD_NUMBER="${3:-3}"
 
 echo "Building Testudo ${VERSION} (${BUILD_NUMBER}) [$CONFIG]..."
 echo
