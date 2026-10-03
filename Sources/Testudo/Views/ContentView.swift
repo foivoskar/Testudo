@@ -2433,6 +2433,10 @@ private struct WorkItemNodeView: View {
                     }
                 }
             }
+            .padding(
+                .leading,
+                4
+            )
 
             Spacer()
 
