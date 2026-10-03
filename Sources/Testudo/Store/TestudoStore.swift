@@ -4076,10 +4076,7 @@ extension TestudoStore {
                     nil,
                 loggedAt:
                     kind == .activity
-                    ? (
-                        occurredAt
-                        ?? now
-                    )
+                    ? occurredAt
                     : nil,
                 createdByMembershipID:
                     currentEnvironmentMembership?.id,
@@ -4137,7 +4134,7 @@ extension TestudoStore {
                     now,
                 text:
                     kind == .activity
-                    ? "Logged event"
+                    ? "Logged activity"
                     : "Created \(kind.displayName.lowercased())",
                 actorMembershipID:
                     currentEnvironmentMembership?.id,

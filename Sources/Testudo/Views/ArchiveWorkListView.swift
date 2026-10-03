@@ -418,7 +418,7 @@ struct ArchiveWorkListView:
             return "Note"
 
         case .activity:
-            return "Event"
+            return "Activity"
         }
     }
 

@@ -1219,7 +1219,7 @@ struct WorkGuideRow: View {
         case .note:
             return "Note"
         case .activity:
-            return "Event"
+            return "Activity"
         }
     }
 
@@ -1386,6 +1386,10 @@ struct WorkItemDetailView: View {
         TestudoTime.deviceTimeZoneID
 
     @State
+    private var childHasOccurredAt =
+        false
+
+    @State
     private var childOccurredAtDraft =
         Date()
 
@@ -1411,7 +1415,7 @@ struct WorkItemDetailView: View {
         case status
         case deadline
         case reminder
-        case eventDate
+        case activityDate
         case relationship(UUID)
     }
 
@@ -2384,14 +2388,14 @@ struct WorkItemDetailView: View {
                         WorkItemKind.task
                     )
 
+                Text("Activity")
+                    .tag(
+                        WorkItemKind.activity
+                    )
+
                 Text("Note")
                     .tag(
                         WorkItemKind.note
-                    )
-
-                Text("Event")
-                    .tag(
-                        WorkItemKind.activity
                     )
             }
             .pickerStyle(
@@ -2434,7 +2438,7 @@ struct WorkItemDetailView: View {
                         childNoteOptions
 
                     case .activity:
-                        childEventOptions
+                        childActivityOptions
                     }
 
                     if let childErrorMessage {
@@ -2571,7 +2575,7 @@ struct WorkItemDetailView: View {
                 : (
                     childKindDraft
                         == .activity
-                    ? "Event title"
+                    ? "Activity title"
                     : "Sub-task title"
                 ),
                 text:
@@ -2745,48 +2749,69 @@ struct WorkItemDetailView: View {
     }
 
 
-    private var childEventOptions:
+    private var childActivityOptions:
         some View
     {
         VStack(
-            alignment: .leading,
-            spacing: 12
+            alignment:
+                .leading,
+            spacing:
+                12
         ) {
+
             childOptionHeader(
                 title:
-                    "Event details",
+                    "Activity options",
                 icon:
                     "clock.arrow.circlepath"
             )
 
-            TimeZoneAwareDateEditor(
-                label:
-                    "Occurred",
-                date:
-                    $childOccurredAtDraft,
-                timeZoneID:
-                    $childOccurredTimeZoneID
+
+            Toggle(
+                "Set date and time",
+                isOn:
+                    $childHasOccurredAt
             )
 
+
+            if childHasOccurredAt {
+
+                TimeZoneAwareDateEditor(
+                    label:
+                        "Occurred",
+                    date:
+                        $childOccurredAtDraft,
+                    timeZoneID:
+                        $childOccurredTimeZoneID
+                )
+            }
+
+
             HStack(
-                alignment: .top,
-                spacing: 7
+                alignment:
+                    .top,
+                spacing:
+                    7
             ) {
+
                 Image(
                     systemName:
                         "info.circle"
                 )
-            .testudoTaskStatusSymbolColor(
-                "info.circle"
-            )
+                .testudoTaskStatusSymbolColor(
+                    "info.circle"
+                )
                 .foregroundStyle(
                     .secondary
                 )
 
+
                 Text(
-                    "This Event records something that happened inside the task. It is not a Calendar Event."
+                    "An Activity records something that happened while working on the Task. The date and time are optional. Calendar Events are managed separately in Calendar."
                 )
-                .font(.caption)
+                .font(
+                    .caption
+                )
                 .foregroundStyle(
                     .secondary
                 )
@@ -2798,13 +2823,19 @@ struct WorkItemDetailView: View {
                 )
             }
         }
-        .padding(14)
+        .padding(
+            14
+        )
         .background(
-            Color.primary
-                .opacity(0.025),
+            Color
+                .primary
+                .opacity(
+                    0.025
+                ),
             in:
                 RoundedRectangle(
-                    cornerRadius: 10,
+                    cornerRadius:
+                        10,
                     style:
                         .continuous
                 )
@@ -2872,7 +2903,7 @@ struct WorkItemDetailView: View {
             return "Add Note"
 
         case .activity:
-            return "Add Event"
+            return "Add Activity"
         }
     }
 
@@ -2912,6 +2943,9 @@ struct WorkItemDetailView: View {
                 to: Date()
             )
             ?? Date()
+
+        childHasOccurredAt =
+            false
 
         childOccurredAtDraft =
             Date()
@@ -2974,6 +3008,7 @@ struct WorkItemDetailView: View {
                 occurredAt:
                     childKindDraft
                         == .activity
+                    && childHasOccurredAt
                     ? childOccurredAtDraft
                     : nil,
                 deadlineTimeZoneID:
@@ -2991,6 +3026,7 @@ struct WorkItemDetailView: View {
                 occurredTimeZoneID:
                     childKindDraft
                         == .activity
+                    && childHasOccurredAt
                     ? childOccurredTimeZoneID
                     : nil
             )
@@ -3015,7 +3051,7 @@ struct WorkItemDetailView: View {
             return "New Note"
 
         case .activity:
-            return "New Event"
+            return "New Activity"
         }
     }
 
@@ -3045,7 +3081,7 @@ struct WorkItemDetailView: View {
             return "Note"
 
         case .activity:
-            return "Event"
+            return "Activity"
         }
     }
 
@@ -4431,7 +4467,7 @@ struct WorkItemDetailView: View {
             return "Note"
 
         case .activity:
-            return "Event"
+            return "Activity"
         }
     }
 
@@ -4671,7 +4707,7 @@ struct WorkItemDetailView: View {
                 )
             )
 
-        case .eventDate:
+        case .activityDate:
             finish(
                 update(
                     item,
@@ -4920,7 +4956,7 @@ struct WorkItemDetailView: View {
             return "Note"
 
         case .activity:
-            return "Event"
+            return "Activity"
         }
     }
 

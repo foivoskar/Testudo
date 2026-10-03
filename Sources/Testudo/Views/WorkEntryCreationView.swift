@@ -554,7 +554,7 @@ struct WorkEntryCreationView: View {
         if kind == .activity {
             section(
                 title:
-                    "Event"
+                    "Activity"
             ) {
                 TimeZoneAwareDateEditor(
                     label:
