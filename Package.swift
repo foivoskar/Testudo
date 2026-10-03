@@ -16,7 +16,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Testudo",
-            path: "Sources/Testudo"
+            path: "Sources/Testudo",
+            exclude: ["Resources"]
         )
     ]
 )

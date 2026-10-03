@@ -32,6 +32,79 @@ mkdir -p \
 
 cp "$BIN" "$APP/Contents/MacOS/Testudo"
 
+# ------------------------------------------------------------
+# Testudo application icon
+# ------------------------------------------------------------
+
+TESTUDO_APP_ICON_SOURCE="$ROOT/Sources/Testudo/Resources/TestudoIcon.png"
+TESTUDO_APP_ICONSET="$ROOT/.build/TestudoIcon.iconset"
+TESTUDO_APP_ICNS="$APP/Contents/Resources/TestudoIcon.icns"
+
+if [ ! -f "$TESTUDO_APP_ICON_SOURCE" ]; then
+    echo "ERROR: Missing Testudo application icon:"
+    echo "$TESTUDO_APP_ICON_SOURCE"
+    exit 1
+fi
+
+rm -rf "$TESTUDO_APP_ICONSET"
+mkdir -p "$TESTUDO_APP_ICONSET"
+
+sips -z 16 16 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_16x16.png" \
+    >/dev/null
+
+sips -z 32 32 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_16x16@2x.png" \
+    >/dev/null
+
+sips -z 32 32 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_32x32.png" \
+    >/dev/null
+
+sips -z 64 64 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_32x32@2x.png" \
+    >/dev/null
+
+sips -z 128 128 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_128x128.png" \
+    >/dev/null
+
+sips -z 256 256 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_128x128@2x.png" \
+    >/dev/null
+
+sips -z 256 256 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_256x256.png" \
+    >/dev/null
+
+sips -z 512 512 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_256x256@2x.png" \
+    >/dev/null
+
+sips -z 512 512 \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    --out "$TESTUDO_APP_ICONSET/icon_512x512.png" \
+    >/dev/null
+
+cp \
+    "$TESTUDO_APP_ICON_SOURCE" \
+    "$TESTUDO_APP_ICONSET/icon_512x512@2x.png"
+
+iconutil \
+    -c icns \
+    "$TESTUDO_APP_ICONSET" \
+    -o "$TESTUDO_APP_ICNS"
+
+rm -rf "$TESTUDO_APP_ICONSET"
+
 TESTUDO_ICON="$ROOT/Sources/Testudo/Resources/testudo_icon_blue.png"
 
 if [ ! -f "$TESTUDO_ICON" ]; then
@@ -65,6 +138,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 
     <key>CFBundleDisplayName</key>
     <string>Testudo</string>
+
+    <key>CFBundleIconFile</key>
+    <string>TestudoIcon.icns</string>
 
     <key>CFBundlePackageType</key>
     <string>APPL</string>
