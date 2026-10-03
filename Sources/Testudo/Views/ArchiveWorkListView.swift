@@ -48,19 +48,28 @@ struct ArchiveWorkListView:
                 )
 
             } else {
-                List(
-                    selection:
-                        $selection
-                ) {
+                List {
                     ForEach(
                         visibleEntries
                     ) { entry in
                         archiveRow(
                             entry
                         )
-                        .tag(
-                            entry.item.id
+                        .middleColumnSelectionStyle(
+                            selection
+                                == entry.item.id,
+                            leadingExtension:
+                                4,
+                            trailingExtension:
+                                4
                         )
+                        .contentShape(
+                            Rectangle()
+                        )
+                        .onTapGesture {
+                            selection =
+                                entry.item.id
+                        }
                     }
                 }
                 .listStyle(

@@ -124,14 +124,29 @@ struct PeopleListView: View {
                 maxHeight: .infinity
             )
         } else {
-            List(
-                selection: $selection
-            ) {
-                ForEach(people) { person in
+            List {
+                ForEach(
+                    people
+                ) { person in
                     PersonListRow(
-                        person: person
+                        person:
+                            person
                     )
-                    .tag(person.id)
+                    .middleColumnSelectionStyle(
+                        selection
+                            == person.id,
+                        leadingExtension:
+                            4,
+                        trailingExtension:
+                            4
+                    )
+                    .contentShape(
+                        Rectangle()
+                    )
+                    .onTapGesture {
+                        selection =
+                            person.id
+                    }
                 }
             }
         }

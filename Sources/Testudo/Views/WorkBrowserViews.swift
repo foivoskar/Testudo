@@ -70,9 +70,7 @@ struct TodayDashboardView: View {
                     maxHeight: .infinity
                 )
             } else {
-                List(
-                    selection: $selection
-                ) {
+                List {
                     dashboardSection(
                         "Needs Attention",
                         items:
@@ -133,7 +131,20 @@ struct TodayDashboardView: View {
                                 section: title
                             )
                     )
-                    .tag(item.id)
+                    .middleColumnSelectionStyle(
+                        selection == item.id,
+                        leadingExtension:
+                            4,
+                        trailingExtension:
+                            4
+                    )
+                    .contentShape(
+                        Rectangle()
+                    )
+                    .onTapGesture {
+                        selection =
+                            item.id
+                    }
                 }
             } header: {
                 HStack {
@@ -615,9 +626,7 @@ struct WorkListView: View {
                     maxHeight: .infinity
                 )
             } else if showsTaskHierarchy {
-                List(
-                    selection: $selection
-                ) {
+                List {
                     ForEach(
                         visibleTaskEntries
                     ) { entry in
@@ -691,17 +700,27 @@ struct WorkListView: View {
                                     entry.depth
                             )
                         )
-                        .tag(
-                            entry.item.id
+                        .middleColumnSelectionStyle(
+                            selection
+                                == entry.item.id,
+                            leadingExtension:
+                                4,
+                            trailingExtension:
+                                4
                         )
+                        .contentShape(
+                            Rectangle()
+                        )
+                        .onTapGesture {
+                            selection =
+                                entry.item.id
+                        }
                     }
                 }
                 .listStyle(.inset)
 
             } else {
-                List(
-                    selection: $selection
-                ) {
+                List {
                     ForEach(items) { item in
                         WorkGuideRow(
                             item: item,
@@ -710,7 +729,20 @@ struct WorkListView: View {
                                     item
                                 )
                         )
-                        .tag(item.id)
+                        .middleColumnSelectionStyle(
+                            selection == item.id,
+                            leadingExtension:
+                                4,
+                            trailingExtension:
+                                4
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                        .onTapGesture {
+                            selection =
+                                item.id
+                        }
                     }
                 }
                 .listStyle(.inset)

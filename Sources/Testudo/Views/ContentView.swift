@@ -3282,11 +3282,10 @@ private struct EntityListView: View {
                 maxHeight: .infinity
             )
         } else {
-            List(
-                entities,
-                selection:
-                    $selection
-            ) { entity in
+            List {
+                ForEach(
+                    entities
+                ) { entity in
                 VStack(
                     alignment: .leading,
                     spacing: 4
@@ -3318,6 +3317,21 @@ private struct EntityListView: View {
                             )
                     }
                 }
+                .middleColumnSelectionStyle(
+                    selection == entity.id,
+                    leadingExtension:
+                        4,
+                    trailingExtension:
+                        4
+                )
+                .contentShape(
+                    Rectangle()
+                )
+                .onTapGesture {
+                    selection =
+                        entity.id
+                }
+            }
             }
         }
     }
