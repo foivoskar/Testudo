@@ -8854,3 +8854,364 @@ extension DReportStore {
         return nil
     }
 }
+
+
+// ============================================================
+// MARK: - Import local profile into current Environment Person
+// ============================================================
+
+extension DReportStore {
+
+    @discardableResult
+    func importLocalProfileIntoCurrentEnvironmentPerson(
+        fields:
+            Set<LocalProfileImportField>
+    ) -> String? {
+
+        guard
+            !fields.isEmpty
+        else {
+            return
+                "Choose at least one field to import."
+        }
+
+
+        guard
+            let source =
+                localUserProfile
+        else {
+            return
+                "No local Testudo profile is available."
+        }
+
+
+        guard
+            let membership =
+                currentEnvironmentMembership
+        else {
+            return
+                "No Environment membership is currently active."
+        }
+
+
+        guard
+            let personID =
+                membership.personEntityID
+        else {
+            return
+                "Your Environment membership is not linked to a Person."
+        }
+
+
+        guard
+            let person =
+                entity(
+                    id:
+                        personID
+                ),
+            person.kind
+                == .person
+        else {
+            return
+                "The Person linked to your Environment membership could not be found."
+        }
+
+
+        var target =
+            personProfile(
+                for:
+                    personID
+            )
+            ?? PersonProfile(
+                entityID:
+                    personID
+            )
+
+
+        // ----------------------------------------------------
+        // Identity
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .avatar
+        ) {
+            target.avatarData =
+                source.avatarData
+        }
+
+
+        if fields.contains(
+            .firstName
+        ) {
+            target.firstName =
+                source.firstName
+        }
+
+
+        if fields.contains(
+            .middleName
+        ) {
+            target.middleName =
+                source.middleName
+        }
+
+
+        if fields.contains(
+            .lastName
+        ) {
+            target.lastName =
+                source.lastName
+        }
+
+
+        if fields.contains(
+            .preferredName
+        ) {
+            target.preferredName =
+                source.preferredName
+        }
+
+
+        // ----------------------------------------------------
+        // Professional information
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .academicTitle
+        ) {
+            target.academicTitle =
+                source.academicTitle
+        }
+
+
+        if fields.contains(
+            .jobTitle
+        ) {
+            target.jobTitle =
+                source.jobTitle
+        }
+
+
+        if fields.contains(
+            .office
+        ) {
+            target.office =
+                source.office
+        }
+
+
+        if fields.contains(
+            .employeeID
+        ) {
+            target.employeeID =
+                source.employeeID
+        }
+
+
+        // ----------------------------------------------------
+        // Contact
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .professionalEmail
+        ) {
+            target.professionalEmail =
+                source.professionalEmail
+        }
+
+
+        if fields.contains(
+            .secondaryProfessionalEmail
+        ) {
+            target.secondaryProfessionalEmail =
+                source.secondaryProfessionalEmail
+        }
+
+
+        if fields.contains(
+            .professionalPhone
+        ) {
+            target.professionalPhone =
+                source.professionalPhone
+        }
+
+
+        if fields.contains(
+            .secondaryPhone
+        ) {
+            target.secondaryPhone =
+                source.secondaryPhone
+        }
+
+
+        if fields.contains(
+            .assistantContact
+        ) {
+            target.assistantContact =
+                source.assistantContact
+        }
+
+
+        // ----------------------------------------------------
+        // Online & research identity
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .website
+        ) {
+            target.website =
+                source.website
+        }
+
+
+        if fields.contains(
+            .orcid
+        ) {
+            target.orcid =
+                source.orcid
+        }
+
+
+        if fields.contains(
+            .linkedIn
+        ) {
+            target.linkedIn =
+                source.linkedIn
+        }
+
+
+        if fields.contains(
+            .github
+        ) {
+            target.github =
+                source.github
+        }
+
+
+        if fields.contains(
+            .researcherID
+        ) {
+            target.researcherID =
+                source.researcherID
+        }
+
+
+        if fields.contains(
+            .scopusAuthorID
+        ) {
+            target.scopusAuthorID =
+                source.scopusAuthorID
+        }
+
+
+        if fields.contains(
+            .googleScholarURL
+        ) {
+            target.googleScholarURL =
+                source.googleScholarURL
+        }
+
+
+        // ----------------------------------------------------
+        // Location
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .professionalAddress
+        ) {
+            target.professionalAddress =
+                source.professionalAddress
+        }
+
+
+        if fields.contains(
+            .city
+        ) {
+            target.city =
+                source.city
+        }
+
+
+        if fields.contains(
+            .postalCode
+        ) {
+            target.postalCode =
+                source.postalCode
+        }
+
+
+        if fields.contains(
+            .country
+        ) {
+            target.country =
+                source.country
+        }
+
+
+        // ----------------------------------------------------
+        // Additional information
+        // ----------------------------------------------------
+
+        if fields.contains(
+            .professionalFields
+        ) {
+            target.professionalFields =
+                source.professionalFields
+        }
+
+
+        if fields.contains(
+            .responsibilities
+        ) {
+            target.responsibilities =
+                source.responsibilities
+        }
+
+
+        if fields.contains(
+            .preferredLanguage
+        ) {
+            target.preferredLanguage =
+                source.preferredLanguage
+        }
+
+
+        if fields.contains(
+            .timeZone
+        ) {
+            target.timeZone =
+                source.timeZone
+        }
+
+
+        if fields.contains(
+            .tags
+        ) {
+            target.tags =
+                source.tags
+        }
+
+
+        if fields.contains(
+            .notes
+        ) {
+            target.notes =
+                source.notes
+        }
+
+
+        target.updatedAt =
+            Date()
+
+
+        // Use the canonical PersonProfile save path so Person
+        // naming / membership snapshot behavior remains identical
+        // to normal People-profile editing.
+        savePersonProfile(
+            target
+        )
+
+
+        return nil
+    }
+}

@@ -3333,6 +3333,12 @@ struct SettingsView: View {
                 }
 
                 settingsSection(
+                    "My Profile in Current Environment"
+                ) {
+                    CurrentEnvironmentProfileImportSummaryView()
+                }
+
+                settingsSection(
                     "Application"
                 ) {
                     settingsRow(
