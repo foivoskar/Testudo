@@ -7,12 +7,20 @@ import SwiftUI
 // Selection appearance is driven entirely by application state,
 // never by temporary macOS List focus.
 //
-// This prevents the inactive-grey -> active-blue transition and
-// gives browser rows one stable appearance whether selection
-// came from:
-//   • mouse click
-//   • Back / Forward
-//   • programmatic navigation
+// The selected background deliberately fills the complete
+// visual row:
+//
+//   • square edges
+//   • reaches the horizontal column edges
+//   • reaches the row boundaries / separators
+//
+// listRowBackground gives direct List rows their exact cell
+// background. The extended Rectangle also covers hierarchical
+// labels inside DisclosureGroup rows, where the selection
+// modifier lives inside the row label rather than directly on
+// the List row itself.
+//
+// Content positioning is not changed.
 // ============================================================
 
 struct MiddleColumnSelectionStyle:
@@ -26,6 +34,26 @@ struct MiddleColumnSelectionStyle:
 
     let trailingExtension:
         CGFloat
+
+
+    // Canonical Testudo selection blue:
+    // RGB(52, 120, 246) = #3478F6
+    private let selectionColor =
+        Color(
+            red:
+                52.0 / 255.0,
+            green:
+                120.0 / 255.0,
+            blue:
+                246.0 / 255.0
+        )
+
+
+    private let columnEdgeExtension:
+        CGFloat = 24
+
+    private let verticalRowExtension:
+        CGFloat = 9
 
 
     func body(
@@ -51,25 +79,35 @@ struct MiddleColumnSelectionStyle:
             )
             .background {
                 if isSelected {
-                    RoundedRectangle(
-                        cornerRadius:
-                            5,
-                        style:
-                            .continuous
-                    )
-                    .fill(
-                        Color.accentColor
-                    )
-                    .padding(
-                        .leading,
-                        -leadingExtension
-                    )
-                    .padding(
-                        .trailing,
-                        -trailingExtension
-                    )
+                    Rectangle()
+                        .fill(
+                            selectionColor
+                        )
+                        .padding(
+                            .leading,
+                            -(
+                                leadingExtension
+                                + columnEdgeExtension
+                            )
+                        )
+                        .padding(
+                            .trailing,
+                            -(
+                                trailingExtension
+                                + columnEdgeExtension
+                            )
+                        )
+                        .padding(
+                            .vertical,
+                            -verticalRowExtension
+                        )
                 }
             }
+            .listRowBackground(
+                isSelected
+                ? selectionColor
+                : Color.clear
+            )
     }
 }
 
