@@ -2166,10 +2166,7 @@ struct EntitySelectionPopover:
         [HierarchySelectionNode]
     {
         candidates
-            .sorted(
-                by:
-                    personSurnameSort
-            )
+            .sorted { personSurnameSort($0, $1) }
             .map {
                 person in
 

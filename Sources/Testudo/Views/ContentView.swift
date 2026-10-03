@@ -177,9 +177,14 @@ private struct DetailTrackpadNavigationCapture:
                         [weak self]
                         event in
 
-                        self?.handle(
-                            event
-                        )
+                        nonisolated(unsafe) let eventForMainActor = event
+                        nonisolated(unsafe) weak var handlerForMainActor = self
+
+                        MainActor.assumeIsolated {
+                            handlerForMainActor?.handle(
+                                eventForMainActor
+                            )
+                        }
 
                         // Never swallow the event.
                         // Vertical scrolling remains native.
@@ -199,6 +204,7 @@ private struct DetailTrackpadNavigationCapture:
             }
         }
 
+        @MainActor
         private func handle(
             _ event: NSEvent
         ) {

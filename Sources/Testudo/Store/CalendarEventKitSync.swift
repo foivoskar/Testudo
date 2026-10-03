@@ -434,9 +434,7 @@ final class AppleCalendarEventKitBridge
                             event.attendees
                             ?? []
                         )
-                        .compactMap(
-                            Self.emailAddress
-                        ),
+                        .compactMap { Self.emailAddress($0) },
                     createdAt:
                         event
                             .creationDate,

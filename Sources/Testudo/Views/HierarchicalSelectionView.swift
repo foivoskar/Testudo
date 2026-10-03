@@ -754,10 +754,7 @@ enum HierarchySelectionData {
                             parentID
                         )
                 }
-                .sorted(
-                    by:
-                        workSort
-                )
+                .sorted { workSort($0, $1) }
 
         var result:
             [HierarchySelectionNode] = []
@@ -809,10 +806,7 @@ enum HierarchySelectionData {
                         $0.parentWorkItemID
                             == item.id
                     }
-                    .sorted(
-                        by:
-                            workSort
-                    )
+                    .sorted { workSort($0, $1) }
 
             for child in children {
                 appendTree(
@@ -836,10 +830,7 @@ enum HierarchySelectionData {
 
         // Defensive handling for malformed cycles/orphans.
         for task in
-            tasks.sorted(
-                by:
-                    workSort
-            )
+            tasks.sorted { workSort($0, $1) }
         {
             if
                 !visited.contains(
@@ -1077,10 +1068,7 @@ enum HierarchySelectionData {
                         ?? nil
                         == nil
                 }
-                .sorted(
-                    by:
-                        entitySort
-                )
+                .sorted { entitySort($0, $1) }
 
         var result:
             [HierarchySelectionNode] = []
@@ -1138,10 +1126,7 @@ enum HierarchySelectionData {
                         )
                             == entity.id
                     }
-                    .sorted(
-                        by:
-                            entitySort
-                    )
+                    .sorted { entitySort($0, $1) }
 
             for child in children {
                 appendTree(
@@ -1164,10 +1149,7 @@ enum HierarchySelectionData {
         }
 
         for entity in
-            candidates.sorted(
-                by:
-                    entitySort
-            )
+            candidates.sorted { entitySort($0, $1) }
         {
             if
                 !visited.contains(
@@ -1540,10 +1522,7 @@ enum HierarchySelectionData {
         }
 
         for container in
-            containers.sorted(
-                by:
-                    entitySort
-            )
+            containers.sorted { entitySort($0, $1) }
         {
             if
                 !visitedContainers

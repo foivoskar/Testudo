@@ -179,9 +179,7 @@ struct TodayDashboardView: View {
 
                 return false
             }
-            .sorted(
-                by: priorityDateSort
-            )
+            .sorted { priorityDateSort($0, $1) }
     }
 
     private var todayItems:
@@ -232,9 +230,7 @@ struct TodayDashboardView: View {
 
                 return false
             }
-            .sorted(
-                by: priorityDateSort
-            )
+            .sorted { priorityDateSort($0, $1) }
     }
 
     private var inProgress:
@@ -329,9 +325,7 @@ struct TodayDashboardView: View {
 
                 return false
             }
-            .sorted(
-                by: priorityDateSort
-            )
+            .sorted { priorityDateSort($0, $1) }
     }
 
     private var doneToday:
