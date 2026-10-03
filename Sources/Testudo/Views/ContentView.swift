@@ -2212,6 +2212,9 @@ private struct ThemeNodeView: View {
                     theme.id
             }
         }
+        .middleColumnHierarchyRowSelectionStyle(
+            isSelectedTheme
+        )
         .sheet(
             item: $createKind
         ) { kind in
@@ -2327,6 +2330,9 @@ private struct WorkItemNodeView: View {
             } label: {
                 selectableLabel
             }
+            .middleColumnHierarchyRowSelectionStyle(
+                isSelectedWorkItem
+            )
             .sheet(
                 item: $createKind
             ) { kind in
