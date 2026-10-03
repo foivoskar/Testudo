@@ -5,6 +5,10 @@ import Foundation
 struct LargeDateTimeEditor:
     View
 {
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
     @Binding
     var date:
         Date
@@ -1742,11 +1746,35 @@ struct LargeDateTimeEditor:
                 )
                 .lowercased()
 
+
         if query.isEmpty {
-            return
+            let frequent =
+                store
+                    .mostUsedTimeZoneIdentifiers(
+                        limit:
+                            5
+                    )
+
+            let frequentSet =
+                Set(
+                    frequent
+                )
+
+            let remaining =
                 TestudoTime
                     .knownTimeZoneIdentifiers
+                    .filter {
+                        !frequentSet
+                            .contains(
+                                $0
+                            )
+                    }
+
+            return
+                frequent
+                + remaining
         }
+
 
         return
             TestudoTime

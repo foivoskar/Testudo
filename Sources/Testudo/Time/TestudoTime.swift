@@ -486,58 +486,507 @@ enum TestudoTime {
 struct TimeZoneIdentifierPicker:
     View
 {
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
     @Binding
-    var selection: String
+    var selection:
+        String
 
-    private var validSelection:
-        Binding<String>
+    @State
+    private var showingPicker =
+        false
+
+    @State
+    private var searchText =
+        ""
+
+
+    private var normalizedSelection:
+        String
     {
-        Binding(
-            get: {
-                if selection.isEmpty {
-                    return ""
-                }
+        if selection.isEmpty {
+            return ""
+        }
 
-                return
-                    TestudoTime
-                        .validTimeZoneIdentifier(
-                            selection
-                        )
-                    ?? ""
-            },
-            set: {
-                selection = $0
-            }
-        )
+        return
+            TestudoTime
+                .validTimeZoneIdentifier(
+                    selection
+                )
+            ?? ""
     }
 
-    var body: some View {
-        Picker(
-            "Time zone",
-            selection:
-                validSelection
-        ) {
-            Text("Not set")
-                .tag("")
 
-            ForEach(
-                TestudoTime
-                    .knownTimeZoneIdentifiers,
-                id: \.self
-            ) { identifier in
-                Text(
+    private var frequentTimeZones:
+        [String]
+    {
+        store
+            .mostUsedTimeZoneIdentifiers(
+                limit:
+                    5
+            )
+    }
+
+
+    private var remainingTimeZones:
+        [String]
+    {
+        let frequent =
+            Set(
+                frequentTimeZones
+            )
+
+        return
+            TestudoTime
+                .knownTimeZoneIdentifiers
+                .filter {
+                    !frequent
+                        .contains(
+                            $0
+                        )
+                }
+    }
+
+
+    private var searchResults:
+        [String]
+    {
+        let query =
+            searchText
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .lowercased()
+
+        guard
+            !query.isEmpty
+        else {
+            return []
+        }
+
+        return
+            TestudoTime
+                .knownTimeZoneIdentifiers
+                .filter {
+                    identifier in
+
+                    identifier
+                        .lowercased()
+                        .contains(
+                            query
+                        )
+                    ||
                     TestudoTime
                         .pickerTimeZoneLabel(
                             identifier:
                                 identifier
                         )
+                        .lowercased()
+                        .contains(
+                            query
+                        )
+                }
+    }
+
+
+    var body:
+        some View
+    {
+        LabeledContent(
+            "Time zone"
+        ) {
+            Button {
+                searchText =
+                    ""
+
+                showingPicker =
+                    true
+
+            } label: {
+                HStack(
+                    spacing:
+                        8
+                ) {
+                    Text(
+                        normalizedSelection
+                            .isEmpty
+                        ? "Not set"
+                        : TestudoTime
+                            .shortTimeZoneLabel(
+                                identifier:
+                                    normalizedSelection
+                            )
+                    )
+                    .lineLimit(1)
+
+                    Spacer(
+                        minLength:
+                            8
+                    )
+
+                    Image(
+                        systemName:
+                            "chevron.up.chevron.down"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                9,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .frame(
+                    minWidth:
+                        280,
+                    alignment:
+                        .leading
                 )
-                .tag(identifier)
+            }
+            .buttonStyle(
+                .bordered
+            )
+            .popover(
+                isPresented:
+                    $showingPicker,
+                arrowEdge:
+                    .bottom
+            ) {
+                pickerContent
             }
         }
-        .pickerStyle(.menu)
+    }
+
+
+    private var pickerContent:
+        some View
+    {
+        VStack(
+            spacing:
+                0
+        ) {
+            HStack(
+                spacing:
+                    8
+            ) {
+                Image(
+                    systemName:
+                        "magnifyingglass"
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                TextField(
+                    "Search time zones",
+                    text:
+                        $searchText
+                )
+                .textFieldStyle(
+                    .plain
+                )
+
+                if
+                    !searchText
+                        .isEmpty
+                {
+                    Button {
+                        searchText =
+                            ""
+
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                }
+            }
+            .padding(
+                .horizontal,
+                12
+            )
+            .frame(
+                height:
+                    40
+            )
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        2
+                ) {
+                    if
+                        searchText
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                    {
+                        if
+                            !frequentTimeZones
+                                .isEmpty
+                        {
+                            sectionHeader(
+                                "Frequently used"
+                            )
+
+                            ForEach(
+                                frequentTimeZones,
+                                id:
+                                    \.self
+                            ) {
+                                identifier in
+
+                                timeZoneRow(
+                                    identifier
+                                )
+                            }
+
+                            Divider()
+                                .padding(
+                                    .vertical,
+                                    5
+                                )
+                        }
+
+                        sectionHeader(
+                            "All time zones"
+                        )
+
+                        ForEach(
+                            remainingTimeZones,
+                            id:
+                                \.self
+                        ) {
+                            identifier in
+
+                            timeZoneRow(
+                                identifier
+                            )
+                        }
+
+                    } else if
+                        searchResults
+                            .isEmpty
+                    {
+                        Text(
+                            "No time zones found"
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            30
+                        )
+
+                    } else {
+                        sectionHeader(
+                            "Search results"
+                        )
+
+                        ForEach(
+                            searchResults,
+                            id:
+                                \.self
+                        ) {
+                            identifier in
+
+                            timeZoneRow(
+                                identifier
+                            )
+                        }
+                    }
+                }
+                .padding(
+                    8
+                )
+            }
+
+            Divider()
+
+            Button {
+                selection =
+                    ""
+
+                showingPicker =
+                    false
+
+            } label: {
+                HStack {
+                    Image(
+                        systemName:
+                            normalizedSelection
+                                .isEmpty
+                        ? "checkmark"
+                        : "circle"
+                    )
+                    .frame(
+                        width:
+                            18
+                    )
+
+                    Text(
+                        "Not set"
+                    )
+
+                    Spacer()
+                }
+                .contentShape(
+                    Rectangle()
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
+            .padding(
+                12
+            )
+        }
+        .frame(
+            width:
+                460,
+            height:
+                480
+        )
+        .background(
+            TestudoStyle
+                .contentBackground
+        )
+    }
+
+
+    private func timeZoneRow(
+        _ identifier:
+            String
+    ) -> some View
+    {
+        Button {
+            selection =
+                identifier
+
+            showingPicker =
+                false
+
+        } label: {
+            HStack(
+                spacing:
+                    10
+            ) {
+                Image(
+                    systemName:
+                        identifier
+                            == normalizedSelection
+                        ? "checkmark.circle.fill"
+                        : "circle"
+                )
+                .foregroundStyle(
+                    identifier
+                        == normalizedSelection
+                    ? Color.accentColor
+                    : Color.secondary
+                )
+
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        1
+                ) {
+                    Text(
+                        TestudoTime
+                            .shortTimeZoneLabel(
+                                identifier:
+                                    identifier
+                            )
+                    )
+
+                    Text(
+                        identifier
+                    )
+                    .font(
+                        .caption
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                Spacer()
+            }
+            .padding(
+                .horizontal,
+                8
+            )
+            .padding(
+                .vertical,
+                6
+            )
+            .contentShape(
+                Rectangle()
+            )
+        }
+        .buttonStyle(
+            .plain
+        )
+    }
+
+
+    private func sectionHeader(
+        _ title:
+            String
+    ) -> some View
+    {
+        Text(
+            title
+        )
+        .font(
+            .caption
+        )
+        .fontWeight(
+            .semibold
+        )
+        .foregroundStyle(
+            .secondary
+        )
+        .padding(
+            .horizontal,
+            8
+        )
+        .padding(
+            .top,
+            5
+        )
+        .padding(
+            .bottom,
+            3
+        )
     }
 }
+
 
 // ============================================================
 // Date + time + source-zone editor

@@ -2031,9 +2031,8 @@ private struct PersonEditView: View {
                         editSection(
                             "Preferences"
                         ) {
-                            ProfileTextField(
-                                "Preferred language",
-                                text:
+                            PreferredLanguagePicker(
+                                selection:
                                     optionalBinding(
                                         \.preferredLanguage
                                     )
