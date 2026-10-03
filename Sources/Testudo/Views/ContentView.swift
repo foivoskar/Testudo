@@ -422,11 +422,36 @@ struct ContentView: View {
                                     nil
                             )
                     } label: {
-                        Label(
-                            "New entry",
-                            systemImage:
-                                "square.and.pencil"
-                        )
+                        HStack(
+                            spacing:
+                                8
+                        ) {
+                            Image(
+                                systemName:
+                                    "square.and.pencil"
+                            )
+                            .frame(
+                                width:
+                                    18,
+                                alignment:
+                                    .center
+                            )
+
+                            Text(
+                                "New entry"
+                            )
+                            .lineLimit(
+                                1
+                            )
+                            .layoutPriority(
+                                1
+                            )
+
+                            Spacer(
+                                minLength:
+                                    0
+                            )
+                        }
                         .fontWeight(
                             .medium
                         )
@@ -742,12 +767,48 @@ struct ContentView: View {
     private func sidebarRow(
         _ item: SidebarSection
     ) -> some View {
-        Label(
-            item.title,
-            systemImage:
-                item.icon
+        HStack(
+            spacing:
+                8
+        ) {
+            Image(
+                systemName:
+                    item.icon
+            )
+            .frame(
+                width:
+                    18,
+                alignment:
+                    .center
+            )
+
+            Text(
+                item.title
+            )
+            .lineLimit(
+                1
+            )
+            .layoutPriority(
+                1
+            )
+
+            Spacer(
+                minLength:
+                    0
+            )
+        }
+        .frame(
+            maxWidth:
+                .infinity,
+            alignment:
+                .leading
         )
-        .tag(item)
+        .contentShape(
+            Rectangle()
+        )
+        .tag(
+            item
+        )
         .padding(
             .vertical,
             1
