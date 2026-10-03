@@ -193,85 +193,289 @@ struct ApplicationLoginView:
     private var showingSignOutConfirmation =
         false
 
+    @FocusState
+    private var passwordIsFocused:
+        Bool
+
 
     var body:
         some View
     {
-        VStack(
-            alignment:
-                .leading,
-            spacing:
-                22
-        ) {
+        ZStack {
 
-            Text(
-                "Log In to Testudo"
+            Color(
+                nsColor:
+                    .windowBackgroundColor
             )
-            .font(
-                .largeTitle
-            )
-            .fontWeight(
-                .semibold
-            )
+            .ignoresSafeArea()
 
 
-            if
-                let profile =
-                    store
-                        .localUserProfile
-            {
-                Text(
-                    profile.displayName
+            VStack(
+                spacing:
+                    28
+            ) {
+
+                Spacer()
+
+
+                if
+                    let profile =
+                        store
+                            .localUserProfile
+                {
+                    VStack(
+                        spacing:
+                            18
+                    ) {
+
+                        TestudoUserAvatarView(
+                            profile:
+                                profile,
+                            size:
+                                108
+                        )
+
+
+                        VStack(
+                            spacing:
+                                6
+                        ) {
+
+                            Text(
+                                "Welcome back"
+                            )
+                            .font(
+                                .system(
+                                    size:
+                                        30,
+                                    weight:
+                                        .semibold,
+                                    design:
+                                        .rounded
+                                )
+                            )
+
+
+                            Text(
+                                profile
+                                    .displayName
+                            )
+                            .font(
+                                .title3
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+                }
+
+
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        18
+                ) {
+
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            6
+                    ) {
+
+                        Text(
+                            "Log in to Testudo"
+                        )
+                        .font(
+                            .headline
+                        )
+
+
+                        Text(
+                            "Your profile and registered Work Environments are exactly as you left them."
+                        )
+                        .font(
+                            .callout
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            7
+                    ) {
+
+                        Text(
+                            "Password"
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+
+                        HStack(
+                            spacing:
+                                10
+                        ) {
+
+                            Image(
+                                systemName:
+                                    "lock.fill"
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+
+
+                            SecureField(
+                                "Enter your password",
+                                text:
+                                    $password
+                            )
+                            .textFieldStyle(
+                                .plain
+                            )
+                            .focused(
+                                $passwordIsFocused
+                            )
+                        }
+                        .padding(
+                            .horizontal,
+                            13
+                        )
+                        .frame(
+                            height:
+                                42
+                        )
+                        .background {
+
+                            RoundedRectangle(
+                                cornerRadius:
+                                    9,
+                                style:
+                                    .continuous
+                            )
+                            .fill(
+                                Color(
+                                    nsColor:
+                                        .textBackgroundColor
+                                )
+                            )
+                        }
+                        .overlay {
+
+                            RoundedRectangle(
+                                cornerRadius:
+                                    9,
+                                style:
+                                    .continuous
+                            )
+                            .stroke(
+                                passwordIsFocused
+                                ? Color
+                                    .accentColor
+                                    .opacity(
+                                        0.75
+                                    )
+                                : Color
+                                    .primary
+                                    .opacity(
+                                        0.10
+                                    ),
+                                lineWidth:
+                                    passwordIsFocused
+                                    ? 2
+                                    : 1
+                            )
+                        }
+                    }
+
+
+                    if
+                        let errorMessage
+                    {
+                        Label(
+                            errorMessage,
+                            systemImage:
+                                "exclamationmark.circle.fill"
+                        )
+                        .font(
+                            .callout
+                        )
+                        .foregroundStyle(
+                            .red
+                        )
+                    }
+
+
+                    Button(
+                        "Log In"
+                    ) {
+                        login()
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .controlSize(
+                        .large
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                    .disabled(
+                        password.isEmpty
+                    )
+                    .keyboardShortcut(
+                        .defaultAction
+                    )
+                }
+                .padding(
+                    24
                 )
-                .font(
-                    .title3
+                .frame(
+                    width:
+                        440
                 )
-                .fontWeight(
-                    .medium
+                .background(
+                    .regularMaterial,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius:
+                                18,
+                            style:
+                                .continuous
+                        )
                 )
-            }
+                .overlay {
 
+                    RoundedRectangle(
+                        cornerRadius:
+                            18,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        Color
+                            .primary
+                            .opacity(
+                                0.07
+                            ),
+                        lineWidth:
+                            1
+                    )
+                }
 
-            Text(
-                "Your local profile, Work Environment registry and remembered Environment sessions are still here exactly as you left them."
-            )
-            .foregroundStyle(
-                .secondary
-            )
-            .fixedSize(
-                horizontal:
-                    false,
-                vertical:
-                    true
-            )
-
-
-            SecureField(
-                "Password",
-                text:
-                    $password
-            )
-            .textFieldStyle(
-                .roundedBorder
-            )
-
-
-            if
-                let errorMessage
-            {
-                Text(
-                    errorMessage
-                )
-                .font(
-                    .callout
-                )
-                .foregroundStyle(
-                    .red
-                )
-            }
-
-
-            HStack {
 
                 Button(
                     "Sign Out from Testudo…",
@@ -281,39 +485,43 @@ struct ApplicationLoginView:
                     showingSignOutConfirmation =
                         true
                 }
+                .buttonStyle(
+                    .plain
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
 
 
                 Spacer()
-
-
-                Button(
-                    "Log In"
-                ) {
-                    login()
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .disabled(
-                    password.isEmpty
-                )
-                .keyboardShortcut(
-                    .defaultAction
-                )
+                Spacer()
             }
+            .padding(
+                44
+            )
         }
-        .padding(
-            32
-        )
-        .frame(
-            width:
-                560
-        )
+        .onAppear {
+
+            DispatchQueue
+                .main
+                .asyncAfter(
+                    deadline:
+                        .now()
+                        + 0.2
+                ) {
+                    passwordIsFocused =
+                        true
+                }
+        }
         .sheet(
             isPresented:
                 $showingSignOutConfirmation
         ) {
             ApplicationSignOutConfirmationView {
+
                 store
                     .signOutApplicationAndRemoveLocalData()
 

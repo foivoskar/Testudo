@@ -32,6 +32,16 @@ mkdir -p \
 
 cp "$BIN" "$APP/Contents/MacOS/DReport"
 
+TESTUDO_ICON="$ROOT/Sources/DReport/Resources/testudo_icon_blue.png"
+
+if [ ! -f "$TESTUDO_ICON" ]; then
+    echo "ERROR: Missing Testudo visual asset:"
+    echo "$TESTUDO_ICON"
+    exit 1
+fi
+
+cp     "$TESTUDO_ICON"     "$APP/Contents/Resources/testudo_icon_blue.png"
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"

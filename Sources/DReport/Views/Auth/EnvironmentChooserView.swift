@@ -3,9 +3,12 @@ import AppKit
 import UniformTypeIdentifiers
 
 
-struct EnvironmentChooserView: View {
+struct EnvironmentChooserView:
+    View
+{
     @EnvironmentObject
-    private var store: DReportStore
+    private var store:
+        DReportStore
 
     @State
     private var showingCreateEnvironment =
@@ -23,66 +26,76 @@ struct EnvironmentChooserView: View {
     private var errorMessage:
         String?
 
+    @State
+    private var hoveredEnvironmentID:
+        UUID?
 
-    var body: some View {
+
+    var body:
+        some View
+    {
         ZStack {
+
             Color(
                 nsColor:
                     .windowBackgroundColor
             )
             .ignoresSafeArea()
 
-            VStack(
-                alignment: .leading,
-                spacing: 26
-            ) {
-                header
 
-                environmentList
+            ScrollView {
 
-                Divider()
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        26
+                ) {
 
-                actions
+                    header
 
-                if let errorMessage {
-                    Label(
-                        errorMessage,
-                        systemImage:
-                            "exclamationmark.circle"
-                    )
-                    .font(
-                        .callout
-                    )
-                    .foregroundStyle(
-                        .red
-                    )
+                    environmentList
+
+                    actions
+
+
+                    if
+                        let errorMessage
+                    {
+                        Label(
+                            errorMessage,
+                            systemImage:
+                                "exclamationmark.circle.fill"
+                        )
+                        .font(
+                            .callout
+                        )
+                        .foregroundStyle(
+                            .red
+                        )
+                        .padding(
+                            .horizontal,
+                            4
+                        )
+                    }
                 }
-            }
-            .frame(
-                width: 650
-            )
-            .padding(36)
-            .background(
-                .regularMaterial,
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style:
-                            .continuous
-                    )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style:
-                        .continuous
+                .frame(
+                    maxWidth:
+                        780
                 )
-                .stroke(
-                    Color.primary
-                        .opacity(0.07)
+                .padding(
+                    .horizontal,
+                    44
+                )
+                .padding(
+                    .vertical,
+                    42
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
                 )
             }
-            .padding(48)
         }
         .sheet(
             isPresented:
@@ -94,6 +107,7 @@ struct EnvironmentChooserView: View {
             isPresented:
                 $showingEnvironmentEntry
         ) {
+
             if
                 let environmentID =
                     entryEnvironmentID
@@ -113,40 +127,112 @@ struct EnvironmentChooserView: View {
     private var header:
         some View
     {
-        VStack(
-            alignment: .leading,
-            spacing: 5
+        HStack(
+            alignment:
+                .center,
+            spacing:
+                18
         ) {
-            if
-                let profile =
-                    store.localUserProfile
-            {
-                Text(
-                    profile.displayName.isEmpty
-                    ? "Work Environments"
-                    : "Welcome, \(profile.displayName)"
-                )
-                .font(.largeTitle)
-                .fontWeight(
-                    .semibold
-                )
-            } else {
+
+            TestudoBrandIcon(
+                size:
+                    74,
+                showsBackground:
+                    true
+            )
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    5
+            ) {
+
                 Text(
                     "Work Environments"
                 )
-                .font(.largeTitle)
-                .fontWeight(
-                    .semibold
+                .font(
+                    .system(
+                        size:
+                            30,
+                        weight:
+                            .semibold,
+                        design:
+                            .rounded
+                    )
+                )
+
+
+                Text(
+                    "Choose where you want to work."
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
                 )
             }
 
-            Text(
-                "Choose a registered Work Environment, create a new one, or open an existing .testudoenv package."
-            )
-            .foregroundStyle(
-                .secondary
-            )
+
+            Spacer()
+
+
+            if
+                let profile =
+                    store
+                        .localUserProfile
+            {
+                HStack(
+                    spacing:
+                        10
+                ) {
+
+                    VStack(
+                        alignment:
+                            .trailing,
+                        spacing:
+                            2
+                    ) {
+
+                        Text(
+                            profile
+                                .displayName
+                        )
+                        .font(
+                            .callout
+                        )
+                        .fontWeight(
+                            .medium
+                        )
+
+
+                        Text(
+                            "Testudo user"
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+
+                    TestudoUserAvatarView(
+                        profile:
+                            profile,
+                        size:
+                            42
+                    )
+                }
+            }
         }
+        .padding(
+            .bottom,
+            4
+        )
     }
 
 
@@ -154,38 +240,85 @@ struct EnvironmentChooserView: View {
     private var environmentList:
         some View
     {
-        if store.workEnvironments.isEmpty {
-            ContentUnavailableView(
-                "No Work Environments",
-                systemImage:
-                    "square.stack.3d.up",
-                description:
-                    Text(
-                        "Create a new Environment or open an existing .testudoenv package."
-                    )
-            )
-            .frame(
-                minHeight: 180
-            )
-        } else {
-            ScrollView {
-                LazyVStack(
-                    spacing: 10
-                ) {
-                    ForEach(
-                        store.workEnvironments
-                    ) {
-                        environment in
+        if
+            store
+                .workEnvironments
+                .isEmpty
+        {
+            VStack(
+                spacing:
+                    16
+            ) {
 
-                        environmentRow(
-                            environment
-                        )
-                    }
-                }
+                TestudoBrandIcon(
+                    size:
+                        90,
+                    showsBackground:
+                        false
+                )
+                .opacity(
+                    0.75
+                )
+
+
+                Text(
+                    "No Work Environments yet"
+                )
+                .font(
+                    .title3
+                )
+                .fontWeight(
+                    .semibold
+                )
+
+
+                Text(
+                    "Create a new Environment or open an existing .testudoenv package."
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .multilineTextAlignment(
+                    .center
+                )
             }
             .frame(
-                maxHeight: 330
+                maxWidth:
+                    .infinity
             )
+            .padding(
+                .vertical,
+                54
+            )
+            .background(
+                .regularMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius:
+                            18,
+                        style:
+                            .continuous
+                    )
+            )
+
+        } else {
+
+            LazyVStack(
+                spacing:
+                    10
+            ) {
+
+                ForEach(
+                    store
+                        .workEnvironments
+                ) {
+                    environment in
+
+                    environmentRow(
+                        environment
+                    )
+                }
+            }
         }
     }
 
@@ -193,81 +326,208 @@ struct EnvironmentChooserView: View {
     private func environmentRow(
         _ environment:
             WorkEnvironment
-    ) -> some View {
-        HStack(
-            spacing: 14
-        ) {
-            Image(
-                systemName:
-                    "square.stack.3d.up.fill"
-            )
-            .font(
-                .system(
-                    size: 22
-                )
-            )
-            .foregroundStyle(
-                Color.accentColor
-            )
-            .frame(
-                width: 36
-            )
+    ) -> some View
+    {
+        let isHovered =
+            hoveredEnvironmentID
+                == environment.id
 
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(
-                    environment.name
-                )
-                .fontWeight(
-                    .medium
+
+        return
+            Button {
+                open(
+                    environment.id
                 )
 
-                if
-                    let path =
-                        environment
-                            .storage?
-                            .path
-                {
-                    Text(path)
+            } label: {
+
+                HStack(
+                    spacing:
+                        18
+                ) {
+
+                    TestudoBrandIcon(
+                        size:
+                            58,
+                        showsBackground:
+                            true
+                    )
+
+
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            5
+                    ) {
+
+                        Text(
+                            environment
+                                .name
+                        )
+                        .font(
+                            .system(
+                                size:
+                                    16,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .primary
+                        )
+
+
+                        if
+                            let path =
+                                environment
+                                    .storage?
+                                    .path
+                        {
+                            Text(
+                                path
+                            )
+                            .font(
+                                .caption
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .lineLimit(
+                                1
+                            )
+                            .truncationMode(
+                                .middle
+                            )
+                        }
+
+
+                        Text(
+                            "Open Work Environment"
+                        )
                         .font(
                             .caption
                         )
                         .foregroundStyle(
+                            Color
+                                .accentColor
+                        )
+                    }
+
+
+                    Spacer()
+
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                13,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        isHovered
+                        ? Color
+                            .accentColor
+                        : Color
                             .secondary
-                        )
-                        .lineLimit(1)
-                        .truncationMode(
-                            .middle
-                        )
+                    )
+                    .frame(
+                        width:
+                            30,
+                        height:
+                            30
+                    )
+                    .background {
+
+                        Circle()
+                            .fill(
+                                Color
+                                    .accentColor
+                                    .opacity(
+                                        isHovered
+                                        ? 0.12
+                                        : 0.05
+                                    )
+                            )
+                    }
                 }
-            }
-
-            Spacer()
-
-            Button(
-                "Open"
-            ) {
-                open(
-                    environment.id
+                .padding(
+                    16
+                )
+                .contentShape(
+                    Rectangle()
                 )
             }
             .buttonStyle(
-                .borderedProminent
+                .plain
             )
-        }
-        .padding(14)
-        .background(
-            Color.primary
-                .opacity(0.035),
-            in:
+            .background {
+
                 RoundedRectangle(
-                    cornerRadius: 10,
+                    cornerRadius:
+                        16,
                     style:
                         .continuous
                 )
-        )
+                .fill(
+                    isHovered
+                    ? Color
+                        .accentColor
+                        .opacity(
+                            0.055
+                        )
+                    : Color
+                        .primary
+                        .opacity(
+                            0.028
+                        )
+                )
+            }
+            .overlay {
+
+                RoundedRectangle(
+                    cornerRadius:
+                        16,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    isHovered
+                    ? Color
+                        .accentColor
+                        .opacity(
+                            0.25
+                        )
+                    : Color
+                        .primary
+                        .opacity(
+                            0.07
+                        ),
+                    lineWidth:
+                        1
+                )
+            }
+            .onHover {
+                hovering in
+
+                withAnimation(
+                    .easeOut(
+                        duration:
+                            0.12
+                    )
+                ) {
+                    hoveredEnvironmentID =
+                        hovering
+                        ? environment.id
+                        : nil
+                }
+            }
     }
 
 
@@ -275,12 +535,16 @@ struct EnvironmentChooserView: View {
         some View
     {
         HStack(
-            spacing: 12
+            spacing:
+                12
         ) {
+
             Button {
                 showingCreateEnvironment =
                     true
+
             } label: {
+
                 Label(
                     "Create New Environment",
                     systemImage:
@@ -288,12 +552,15 @@ struct EnvironmentChooserView: View {
                 )
             }
             .buttonStyle(
-                .bordered
+                .borderedProminent
             )
+
 
             Button {
                 loadEnvironment()
+
             } label: {
+
                 Label(
                     "Open Existing Environment…",
                     systemImage:
@@ -304,8 +571,13 @@ struct EnvironmentChooserView: View {
                 .bordered
             )
 
+
             Spacer()
         }
+        .padding(
+            .top,
+            2
+        )
     }
 
 
@@ -313,19 +585,23 @@ struct EnvironmentChooserView: View {
         _ environmentID:
             UUID
     ) {
+
         errorMessage =
             nil
 
+
         switch
-            store.openWorkEnvironment(
-                id:
-                    environmentID
-            )
+            store
+                .openWorkEnvironment(
+                    id:
+                        environmentID
+                )
         {
         case .opened:
             break
 
         case .identityRequired:
+
             entryEnvironmentID =
                 environmentID
 
@@ -335,6 +611,7 @@ struct EnvironmentChooserView: View {
         case .failed(
             let message
         ):
+
             errorMessage =
                 message
         }
@@ -385,10 +662,11 @@ struct EnvironmentChooserView: View {
 
 
         let result =
-            store.registerWorkEnvironment(
-                from:
-                    packageURL
-            )
+            store
+                .registerWorkEnvironment(
+                    from:
+                        packageURL
+                )
 
 
         if
@@ -417,8 +695,6 @@ struct EnvironmentChooserView: View {
             environmentID
         )
     }
-
-
 }
 
 
@@ -783,6 +1059,10 @@ private struct EnvironmentEntryView:
     private var errorMessage:
         String?
 
+    @FocusState
+    private var usernameIsFocused:
+        Bool
+
 
     private var environment:
         WorkEnvironment?
@@ -813,15 +1093,19 @@ private struct EnvironmentEntryView:
         some View
     {
         VStack(
-            alignment:
-                .leading,
             spacing:
-                20
+                22
         ) {
 
+            TestudoBrandIcon(
+                size:
+                    72,
+                showsBackground:
+                    true
+            )
+
+
             VStack(
-                alignment:
-                    .leading,
                 spacing:
                     5
             ) {
@@ -840,7 +1124,7 @@ private struct EnvironmentEntryView:
 
 
                 Text(
-                    "Sign in to this Work Environment."
+                    "Sign in to this Work Environment"
                 )
                 .foregroundStyle(
                     .secondary
@@ -863,6 +1147,9 @@ private struct EnvironmentEntryView:
                 .textFieldStyle(
                     .roundedBorder
                 )
+                .focused(
+                    $usernameIsFocused
+                )
 
 
                 SecureField(
@@ -883,7 +1170,7 @@ private struct EnvironmentEntryView:
 
 
                 Text(
-                    "If enabled, this installation can reopen the Environment without asking for your credentials again until you explicitly sign out."
+                    "When enabled, this Mac can reopen the Environment without asking for these credentials again until you explicitly sign out of the Environment."
                 )
                 .font(
                     .caption
@@ -898,13 +1185,32 @@ private struct EnvironmentEntryView:
                         true
                 )
             }
+            .padding(
+                18
+            )
+            .background(
+                Color
+                    .primary
+                    .opacity(
+                        0.025
+                    ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius:
+                            14,
+                        style:
+                            .continuous
+                    )
+            )
 
 
             if
                 let errorMessage
             {
-                Text(
-                    errorMessage
+                Label(
+                    errorMessage,
+                    systemImage:
+                        "exclamationmark.circle.fill"
                 )
                 .font(
                     .callout
@@ -912,37 +1218,57 @@ private struct EnvironmentEntryView:
                 .foregroundStyle(
                     .red
                 )
-            }
-
-
-            HStack {
-
-                Spacer()
-
-
-                Button(
-                    "Enter Environment"
-                ) {
-                    enter()
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .disabled(
-                    !canEnter
-                )
-                .keyboardShortcut(
-                    .defaultAction
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
                 )
             }
+
+
+            Button(
+                "Enter Environment"
+            ) {
+                enter()
+            }
+            .buttonStyle(
+                .borderedProminent
+            )
+            .controlSize(
+                .large
+            )
+            .frame(
+                maxWidth:
+                    .infinity
+            )
+            .disabled(
+                !canEnter
+            )
+            .keyboardShortcut(
+                .defaultAction
+            )
         }
         .padding(
-            26
+            28
         )
         .frame(
             width:
-                500
+                480
         )
+        .onAppear {
+
+            DispatchQueue
+                .main
+                .asyncAfter(
+                    deadline:
+                        .now()
+                        + 0.15
+                ) {
+                    usernameIsFocused =
+                        true
+                }
+        }
     }
 
 
