@@ -294,7 +294,7 @@ Build the default release with:
 
     ./Scripts/build-release.sh
 
-The default version is `0.1.2`.
+The default version is `0.1.3`.
 
 A specific version can be supplied as the first argument:
 
@@ -302,7 +302,7 @@ A specific version can be supplied as the first argument:
 
 The resulting disk image is written to `dist/`, for example:
 
-    dist/Testudo-0.1.2-macOS-arm64.dmg
+    dist/Testudo-0.1.3-macOS-arm64.dmg
 
 The DMG contains:
 
