@@ -1469,13 +1469,17 @@ struct WorkItemDetailView: View {
                 ScrollView {
                     VStack(
                         alignment: .leading,
-                        spacing: 28
+                        spacing: 22
                     ) {
                         header(item)
+
+                        taskDetailDivider
 
                         descriptionSection(
                             item
                         )
+
+                        taskDetailDivider
 
                         detailsSection(
                             item
@@ -1485,13 +1489,19 @@ struct WorkItemDetailView: View {
                             item
                         )
 
+                        taskDetailDivider
+
                         childrenSection(
                             item
                         )
 
+                        taskDetailDivider
+
                         relationshipsSection(
                             item
                         )
+
+                        taskDetailDivider
 
                         historySection(
                             item
@@ -1580,6 +1590,16 @@ struct WorkItemDetailView: View {
             )
         }
     }
+
+    private var taskDetailDivider:
+        some View
+    {
+        Divider()
+            .opacity(
+                0.55
+            )
+    }
+
 
     private func header(
         _ item: WorkItem
@@ -2345,8 +2365,10 @@ struct WorkItemDetailView: View {
 
                 if !children.isEmpty {
                     VStack(
-                        alignment: .leading,
-                        spacing: 4
+                        alignment:
+                            .leading,
+                        spacing:
+                            0
                     ) {
                         ForEach(
                             children
@@ -2358,7 +2380,10 @@ struct WorkItemDetailView: View {
                                     child.id
                             } label: {
                                 HStack(
-                                    spacing: 9
+                                    alignment:
+                                        .top,
+                                    spacing:
+                                        10
                                 ) {
                                     Image(
                                         systemName:
@@ -2366,25 +2391,90 @@ struct WorkItemDetailView: View {
                                                 child
                                             )
                                     )
-            .testudoTaskStatusSymbolColor(
-                childIcon(
-                                                child
-                                            )
-            )
-                                    .frame(
-                                        width: 18
+                                    .testudoTaskStatusSymbolColor(
+                                        childIcon(
+                                            child
+                                        )
                                     )
+                                    .frame(
+                                        width:
+                                            18
+                                    )
+                                    .padding(
+                                        .top,
+                                        2
+                                    )
+
 
                                     VStack(
                                         alignment:
                                             .leading,
-                                        spacing: 2
+                                        spacing:
+                                            3
                                     ) {
                                         Text(
                                             displayTitle(
                                                 child
                                             )
                                         )
+                                        .font(
+                                            .callout
+                                        )
+                                        .fontWeight(
+                                            .medium
+                                        )
+                                        .foregroundStyle(
+                                            .primary
+                                        )
+
+
+                                        let childBody =
+                                            child.body
+                                                .trimmingCharacters(
+                                                    in:
+                                                        .whitespacesAndNewlines
+                                                )
+
+                                        let childTitle =
+                                            child.title?
+                                                .trimmingCharacters(
+                                                    in:
+                                                        .whitespacesAndNewlines
+                                                )
+                                            ?? ""
+
+
+                                        // Show body text as a secondary preview
+                                        // for Sub-tasks, Notes and Activities.
+                                        //
+                                        // If there is no explicit title,
+                                        // displayTitle(child) already uses the
+                                        // body, so avoid repeating the same
+                                        // content a second time.
+                                        if
+                                            !childBody.isEmpty,
+                                            !childTitle.isEmpty
+                                        {
+                                            Text(
+                                                childBody
+                                            )
+                                            .font(
+                                                .caption
+                                            )
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                            .lineLimit(
+                                                2
+                                            )
+                                            .fixedSize(
+                                                horizontal:
+                                                    false,
+                                                vertical:
+                                                    true
+                                            )
+                                        }
+
 
                                         if
                                             child.kind
@@ -2404,21 +2494,32 @@ struct WorkItemDetailView: View {
                                         }
                                     }
 
-                                    Spacer()
+
+                                    Spacer(
+                                        minLength:
+                                            16
+                                    )
+
 
                                     Text(
                                         childTypeLabel(
                                             child
                                         )
                                     )
-                                    .font(.caption)
+                                    .font(
+                                        .caption2
+                                    )
                                     .foregroundStyle(
                                         .secondary
+                                    )
+                                    .padding(
+                                        .top,
+                                        2
                                     )
                                 }
                                 .padding(
                                     .vertical,
-                                    5
+                                    8
                                 )
                                 .contentShape(
                                     Rectangle()
@@ -2427,6 +2528,20 @@ struct WorkItemDetailView: View {
                             .buttonStyle(
                                 .plain
                             )
+
+
+                            if
+                                child.id
+                                    != children
+                                        .last?
+                                        .id
+                            {
+                                Divider()
+                                    .padding(
+                                        .leading,
+                                        28
+                                    )
+                            }
                         }
                     }
                 }
