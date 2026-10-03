@@ -411,7 +411,18 @@ struct PersonDetailView: View {
                     }
                     .padding(.top, 8)
 }
-                .padding(24)
+                .padding(
+                    .horizontal,
+                    24
+                )
+                .padding(
+                    .bottom,
+                    24
+                )
+                .padding(
+                    .top,
+                    4
+                )
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading

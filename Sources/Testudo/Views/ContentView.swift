@@ -644,7 +644,19 @@ struct ContentView: View {
                     maxHeight: .infinity
                 )
             }
-            .padding(.top, 12)
+            // Keep the detail pane at one permanent vertical
+            // position, independent of sidebar visibility.
+            //
+            // Effective detail-title top:
+            //   -12 + 30 navigation bar + 4 detail padding = 22 pt
+            //
+            // This matches the middle-column title when the
+            // sidebar is open:
+            //   20 middle-column padding + 2 header padding = 22 pt
+            .padding(
+                .top,
+                -12
+            )
             .background(
                 TestudoStyle.contentBackground
             )
