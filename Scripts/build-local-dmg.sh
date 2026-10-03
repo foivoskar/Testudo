@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+source "$ROOT/Scripts/version.sh"
+
 echo
 echo "============================================================"
 echo "  TESTUDO — BUILD LOCALLY"
@@ -37,12 +39,10 @@ echo "✓ Apple Silicon detected."
 # ------------------------------------------------------------
 
 REQUIRED_COMMANDS=(
-    git
     swift
     xcode-select
     codesign
     hdiutil
-    osascript
     iconutil
     sips
     shasum
@@ -72,32 +72,35 @@ fi
 echo "✓ Apple developer tools available."
 
 echo
-swift --version
+
+SWIFT_VERSION_OUTPUT="$(swift --version)"
+echo "$SWIFT_VERSION_OUTPUT"
 echo
 
-
-# ------------------------------------------------------------
-# Read current Testudo release defaults
-# ------------------------------------------------------------
-
-VERSION="$(
-    sed -n \
-        's/^VERSION="${1:-\([^}]*\)}"/\1/p' \
-        Scripts/build-release.sh \
+SWIFT_VERSION="$(
+    printf '%s\n' "$SWIFT_VERSION_OUTPUT" \
+    | sed -n 's/.*Swift version \([0-9][0-9.]*\).*/\1/p' \
     | head -n 1
 )"
 
-BUILD_NUMBER="$(
-    sed -n \
-        's/^BUILD_NUMBER="${2:-\([^}]*\)}"/\1/p' \
-        Scripts/build-release.sh \
-    | head -n 1
-)"
-
-if [ -z "$VERSION" ] || [ -z "$BUILD_NUMBER" ]; then
-    echo "ERROR: Could not determine the Testudo version/build."
+if [ -z "$SWIFT_VERSION" ]; then
+    echo "ERROR: Could not determine the installed Swift version."
     exit 1
 fi
+
+SWIFT_MAJOR="${SWIFT_VERSION%%.*}"
+
+if [ "$SWIFT_MAJOR" -lt 6 ]; then
+    echo "ERROR: Testudo requires Swift 6.0 or later."
+    echo "Detected Swift version: $SWIFT_VERSION"
+    exit 1
+fi
+
+echo "✓ Swift $SWIFT_VERSION satisfies the Testudo requirement."
+echo
+
+VERSION="$TESTUDO_VERSION"
+BUILD_NUMBER="$TESTUDO_BUILD_NUMBER"
 
 echo "Testudo version: $VERSION"
 echo "Build number:    $BUILD_NUMBER"
@@ -157,7 +160,49 @@ echo "$SHA256"
 echo
 echo "The application was compiled and signed locally on this Mac."
 echo
-echo "Opening the locally built DMG..."
+
+# ------------------------------------------------------------
+# Close older mounted Testudo installer images
+# ------------------------------------------------------------
+#
+# Repeated development builds can otherwise leave several older
+# Testudo DMGs mounted under /Volumes, which results in multiple
+# installer windows or volume names such as:
+#
+#   Testudo 0.1.4
+#   Testudo 0.1.4 1
+#   Testudo 0.1.4 2
+#
+# Before opening the newly built installer, detach only mounted
+# volumes matching the current Testudo installer name.
+
+echo "Checking for older mounted Testudo installer images..."
+
+FOUND_OLD_VOLUME=0
+
+while IFS= read -r mounted_volume; do
+
+    if [ -n "$mounted_volume" ]; then
+        FOUND_OLD_VOLUME=1
+
+        echo "Detaching old installer:"
+        echo "  $mounted_volume"
+
+        hdiutil detach "$mounted_volume" >/dev/null 2>&1 || true
+    fi
+
+done < <(
+    find /Volumes         -maxdepth 1         -type d         -name "Testudo ${VERSION}*"         -print         2>/dev/null     || true
+)
+
+if [ "$FOUND_OLD_VOLUME" -eq 0 ]; then
+    echo "✓ No older Testudo installer is mounted."
+else
+    echo "✓ Older Testudo installer volumes cleared."
+fi
+
+echo
+echo "Opening the finished Testudo installer..."
 echo
 
 open "$DMG"

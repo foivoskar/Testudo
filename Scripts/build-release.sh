@@ -1,10 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)" || exit 1
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-VERSION="${1:-0.1.4}"
-BUILD_NUMBER="${2:-5}"
+source "$ROOT/Scripts/version.sh"
+
+VERSION="${1:-$TESTUDO_VERSION}"
+BUILD_NUMBER="${2:-$TESTUDO_BUILD_NUMBER}"
 ARCH="$(uname -m)"
 
 APP_NAME="Testudo"
@@ -68,6 +71,42 @@ echo "✓ Info.plist valid."
 
 
 # ============================================================
+# DETERMINE INSTALLER IMAGE SIZE
+# ============================================================
+
+APP_SIZE_KIB="$(
+    du -sk "$APP_PATH"     | awk '{print $1}'
+)"
+
+if [ -z "$APP_SIZE_KIB" ]; then
+    echo "ERROR: Could not determine Testudo.app size."
+    exit 1
+fi
+
+APP_SIZE_MIB="$(
+    awk -v kib="$APP_SIZE_KIB"         'BEGIN { printf "%d", (kib + 1023) / 1024 }'
+)"
+
+# Give the writable installer image enough space for:
+# - Testudo.app
+# - filesystem metadata
+# - Finder metadata
+# - future application growth
+#
+# Never create an image smaller than 100 MiB.
+
+DMG_SIZE_MIB=$((APP_SIZE_MIB + 64))
+
+if [ "$DMG_SIZE_MIB" -lt 100 ]; then
+    DMG_SIZE_MIB=100
+fi
+
+echo
+echo "Application size: approximately ${APP_SIZE_MIB} MiB"
+echo "Writable DMG size: ${DMG_SIZE_MIB} MiB"
+
+
+# ============================================================
 # CLEAN PREVIOUS TEMP IMAGE
 # ============================================================
 
@@ -87,7 +126,7 @@ echo
 echo "Creating writable installer image..."
 
 hdiutil create \
-    -size 100m \
+    -size "${DMG_SIZE_MIB}m" \
     -fs HFS+ \
     -volname "$VOLNAME" \
     "$RW_DMG" \
@@ -106,6 +145,7 @@ ATTACH_INFO="$(
         -readwrite \
         -noverify \
         -noautoopen \
+        -nobrowse \
         -plist \
     | python3 -c '
 import plistlib
@@ -184,62 +224,16 @@ sync
 
 
 # ============================================================
-# FINDER WINDOW LAYOUT
+# INSTALLER CONTENT COMPLETE
 # ============================================================
 
-echo
-echo "Applying Finder layout..."
-
-FINDER_DISK_NAME="$(
-    basename "$MOUNT_DIR"
-)"
-
-osascript - "$FINDER_DISK_NAME" <<'APPLESCRIPT'
-on run argv
-
-    set volumeName to item 1 of argv
-
-    tell application "Finder"
-
-        tell disk volumeName
-
-            open
-
-            delay 1
-
-            set current view of container window to icon view
-
-            set toolbar visible of container window to false
-            set statusbar visible of container window to false
-
-            set bounds of container window to {300, 220, 980, 640}
-
-            set viewOptions to icon view options of container window
-
-            set arrangement of viewOptions to not arranged
-            set icon size of viewOptions to 112
-            set text size of viewOptions to 14
-
-            set position of item "Testudo.app" to {175, 190}
-            set position of item "Applications" to {505, 190}
-
-            update without registering applications
-
-            delay 2
-
-            close container window
-
-        end tell
-
-    end tell
-
-end run
-APPLESCRIPT
+# No Finder or AppleScript window is opened here.
+#
+# The writable installer image remains hidden while it is being
+# prepared. The user will see only the final DMG opened by
+# build-local-dmg.sh after the complete build has finished.
 
 sync
-sleep 2
-
-echo "✓ Finder layout saved."
 
 
 # ============================================================

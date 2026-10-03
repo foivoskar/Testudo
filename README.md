@@ -10,53 +10,103 @@ It is designed especially for researchers, research software engineers, technica
 
 ## Installation
 
-### Recommended: build Testudo locally
+### Build Testudo locally
 
-Current public Testudo binaries are not yet notarized with an Apple Developer ID. Because of this, macOS Gatekeeper may block a prebuilt application downloaded from the Internet.
+Testudo currently uses a **source-first installation model**.
 
-For the current releases, the recommended installation method is therefore to build Testudo locally from the public source code.
+The recommended installation method is to obtain the public source code and build the application directly on the Mac where it will be used.
 
-Requirements:
+Testudo does not require a paid Apple Developer account for this local installation method.
+
+The resulting application is compiled and ad-hoc signed locally on the user's own Mac. It is not a prebuilt executable distributed with Developer ID signing or Apple notarization.
+
+#### Requirements
 
 - macOS 14 or later
 - Apple Silicon Mac
-- Xcode or the Apple Command Line Tools with Swift available
-- Git
+- Swift 6.0 or later
+- Xcode or Apple Command Line Tools
+- Git for the recommended clone/update workflow
 
-Clone the repository:
+If Apple developer tools are not installed, request them with:
+
+    xcode-select --install
+
+#### Clone Testudo
+
+Open Terminal and run:
 
     git clone https://github.com/foivoskar/Testudo.git
     cd Testudo
 
-Then build the local DMG:
+#### Build the installer
+
+Run:
 
     ./Scripts/build-local-dmg.sh
 
-The script checks the required development tools, builds Testudo in release configuration, creates the application bundle, signs it locally, creates the installer DMG, verifies the disk image, and opens it.
+The script automatically:
 
-The resulting file is written to `dist/`, for example:
+- checks that macOS and the processor architecture are supported
+- checks the installed Swift toolchain
+- builds Testudo in release configuration
+- creates `Testudo.app`
+- ad-hoc signs the locally compiled application
+- creates a local installer DMG
+- verifies the completed disk image
+- calculates its SHA-256 checksum
+- opens the finished installer
+
+The resulting installer is written to `dist/`, for example:
 
     dist/Testudo-0.1.4-macOS-arm64.dmg
 
-When the DMG opens, drag `Testudo.app` from the left into `Applications` on the right.
+During packaging, temporary disk images remain hidden.
 
-Because the application is compiled locally on your own Mac rather than downloaded as a prebuilt executable, this method avoids the Gatekeeper problem affecting the current unnotarized GitHub binaries.
+When the build is complete, only the finished Testudo installer is opened.
 
-No paid Apple Developer account is required to build Testudo locally.
+Drag:
 
-### Updating an existing source checkout
+    Testudo.app
 
-If you already cloned Testudo previously:
+to:
 
-    cd Testudo
+    Applications
+
+using the two items shown in the installer.
+
+The executable installed this way was compiled locally on your own Mac rather than downloaded as a prebuilt Testudo executable.
+
+### Updating Testudo
+
+If Testudo was previously cloned from GitHub, open Terminal in the Testudo repository and run:
+
     git pull --ff-only
     ./Scripts/build-local-dmg.sh
 
-### Prebuilt GitHub DMG
+This downloads the current source code and creates a new local installer.
 
-A prebuilt DMG is also available from GitHub Releases.
+Drag the newly built `Testudo.app` into `Applications` to replace the previous version.
 
-Current prebuilt releases are ad-hoc signed and are not notarized by Apple. Depending on the macOS security policy, Gatekeeper may refuse to launch them. Until Testudo is distributed with Developer ID signing and Apple notarization, building locally is the recommended method.
+### Source archive alternative
+
+Git is not required by the build scripts themselves.
+
+A GitHub source archive can therefore also be downloaded and extracted manually. From the extracted Testudo directory, run:
+
+    ./Scripts/build-local-dmg.sh
+
+Using `git clone`, however, is recommended because subsequent updates can then be installed simply with:
+
+    git pull --ff-only
+
+### Distribution model
+
+Testudo currently does **not** use prebuilt application binaries as its recommended installation channel.
+
+GitHub tags and releases identify versions of the source code. The normal installation workflow is to build Testudo locally from that source.
+
+This keeps the current installation model independent of Developer ID distribution and Apple notarization of a prebuilt Testudo executable.
 
 ## Core idea
 
@@ -296,13 +346,14 @@ Environment registrations, Environment passwords and recovery credentials are in
 
 ## Building from source
 
-Requirements:
+Developer requirements:
 
-- macOS
-- Xcode / Swift toolchain
-- Apple command-line developer tools
+- macOS 14 or later
+- Apple Silicon
+- Swift 6.0 or later
+- Xcode or Apple Command Line Tools
 
-Build Testudo with:
+Build the application bundle directly with:
 
     ./Scripts/build-app.sh
 
@@ -310,17 +361,23 @@ The resulting application is created at:
 
     dist/Testudo.app
 
-## Building a release DMG
+The default Testudo version and build number are defined in:
 
-Build the default release with:
+    Scripts/version.sh
+
+This file is the single source of truth used by the build scripts.
+
+## Building a local installer DMG
+
+For development, testing, or release preparation, build the local installer DMG with:
 
     ./Scripts/build-release.sh
 
-The default version is `0.1.4`.
+The default version and build number are read from `Scripts/version.sh`.
 
-A specific version can be supplied as the first argument:
+A specific version and build number can still be supplied explicitly:
 
-    ./Scripts/build-release.sh 0.2.0
+    ./Scripts/build-release.sh 0.2.0 6
 
 The resulting disk image is written to `dist/`, for example:
 
@@ -331,7 +388,9 @@ The DMG contains:
 - `Testudo.app`
 - an `Applications` shortcut
 
-Installation therefore consists of dragging Testudo into the Applications folder.
+The build script sizes the writable installer image from the current application bundle instead of relying on a fixed application-size assumption.
+
+Installation consists of dragging Testudo into the Applications folder.
 
 ## Release status
 

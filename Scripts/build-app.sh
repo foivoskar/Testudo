@@ -4,14 +4,51 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+source "$ROOT/Scripts/version.sh"
+
 CONFIG="${1:-debug}"
-VERSION="${2:-0.1.4}"
-BUILD_NUMBER="${3:-5}"
+VERSION="${2:-$TESTUDO_VERSION}"
+BUILD_NUMBER="${3:-$TESTUDO_BUILD_NUMBER}"
 
 echo "Building Testudo ${VERSION} (${BUILD_NUMBER}) [$CONFIG]..."
 echo
 
-swift build -c "$CONFIG"
+# ------------------------------------------------------------
+# SwiftPM build backend
+# ------------------------------------------------------------
+#
+# Swift 6.4 made the new Swift Build backend the SwiftPM default.
+# Testudo does not require Swift Build-specific functionality.
+#
+# Where supported, explicitly use SwiftPM's established "native"
+# backend. This avoids Swift Build planning stalls seen on some
+# macOS/toolchain combinations.
+#
+# Older Swift toolchains that do not expose --build-system already
+# use the native backend, so they continue to build normally.
+
+SWIFT_BUILD_HELP="$(swift build --help 2>&1 || true)"
+
+BUILD_SYSTEM_ARGS=()
+
+if printf '%s\n' "$SWIFT_BUILD_HELP" | grep -q -- '--build-system'; then
+
+    BUILD_SYSTEM_ARGS=(
+        --build-system
+        native
+    )
+
+    echo "SwiftPM build system: native"
+
+else
+
+    echo "SwiftPM build system: default/native"
+
+fi
+
+echo
+
+swift build "${BUILD_SYSTEM_ARGS[@]}" -c "$CONFIG"
 
 BIN="$ROOT/.build/$CONFIG/Testudo"
 
