@@ -3337,9 +3337,9 @@ struct SettingsView: View {
                 ) {
                     settingsRow(
                         label:
-                            "Storage",
+                            "Environment registry",
                         value:
-                            "Local"
+                            "Local to this installation"
                     )
 
                     settingsRow(
@@ -3348,6 +3348,12 @@ struct SettingsView: View {
                         value:
                             "\(store.workEnvironments.count)"
                     )
+                }
+
+                settingsSection(
+                    "Work Environments"
+                ) {
+                    WorkEnvironmentSettingsManagementView()
                 }
 
                 settingsSection(
