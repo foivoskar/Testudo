@@ -745,6 +745,10 @@ struct ContentView: View {
             return 38
         }
 
+        if columnVisibility == .all {
+            return 20
+        }
+
         return 12
     }
 
