@@ -380,6 +380,11 @@ struct EntitySelectionSummaryRow:
     private var store:
         TestudoStore
 
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
     let label:
         String
 
@@ -420,63 +425,151 @@ struct EntitySelectionSummaryRow:
 
 
     var body: some View {
-        DetailSelectionRow(
-            label:
-                label,
-            valueText:
-                summaryText,
-            valueIsEmpty:
-                selectedIDs.isEmpty,
-            buttonSystemImage:
-                buttonSystemImage,
-            helpText:
-                "Edit \(label)",
-            isPresented:
-                $showingSelector,
-            onEdit: {
+        let entities =
+            selectedIDs
+                .compactMap {
+                    store.entity(
+                        id:
+                            $0
+                    )
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                14
+        ) {
+
+            Text(
+                label
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    120,
+                alignment:
+                    .leading
+            )
+
+
+            if entities.isEmpty {
+                Text(
+                    emptyText
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+
+            } else {
+                TestudoEntityLinks(
+                    entities:
+                        entities,
+                    font:
+                        .callout,
+                    color:
+                        .primary
+                )
+            }
+
+
+            Spacer(
+                minLength:
+                    8
+            )
+
+
+            Button {
                 showingSelector =
                     true
+            } label: {
+                Image(
+                    systemName:
+                        buttonSystemImage
+                )
+                .font(
+                    .system(
+                        size:
+                            10,
+                        weight:
+                            .medium
+                    )
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+                .frame(
+                    width:
+                        20,
+                    height:
+                        20
+                )
+                .contentShape(
+                    Rectangle()
+                )
             }
-        ) {
-            EntitySelectionPopover(
-                title:
-                    selectorTitle,
-                message:
-                    selectorMessage,
-                tabs:
-                    tabs,
-                candidateIDs:
-                    candidateIDs,
-                excludedIDs:
-                    excludedIDs,
-                initialSelection:
-                    selectedIDs,
-                maximumSelectionCount:
-                    maximumSelectionCount,
-                onCancel: {
-                    showingSelector =
-                        false
-                },
-                onSave: {
-                    selection in
-
-                    let error =
-                        onSave(
-                            selection
-                        )
-
-                    if error == nil {
+            .buttonStyle(
+                .plain
+            )
+            .help(
+                "Edit \(label)"
+            )
+            .popover(
+                isPresented:
+                    $showingSelector
+            ) {
+                EntitySelectionPopover(
+                    title:
+                        selectorTitle,
+                    message:
+                        selectorMessage,
+                    tabs:
+                        tabs,
+                    candidateIDs:
+                        candidateIDs,
+                    excludedIDs:
+                        excludedIDs,
+                    initialSelection:
+                        selectedIDs,
+                    maximumSelectionCount:
+                        maximumSelectionCount,
+                    onCancel: {
                         showingSelector =
                             false
-                    }
+                    },
+                    onSave: {
+                        selection in
 
-                    return error
-                }
-            )
-            .id(
-                selectionIdentity
-            )
+                        let error =
+                            onSave(
+                                selection
+                            )
+
+                        if error == nil {
+                            showingSelector =
+                                false
+                        }
+
+                        return error
+                    }
+                )
+                .id(
+                    selectionIdentity
+                )
+            }
         }
+        .font(
+            .callout
+        )
     }
 
 

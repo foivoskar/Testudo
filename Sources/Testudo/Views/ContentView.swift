@@ -588,6 +588,16 @@ struct ContentView: View {
                     workCreationRequest:
                         $workCreationRequest
                 )
+                .environment(
+                    \.testudoDetailNavigation,
+                    TestudoDetailNavigationAction {
+                        destination in
+
+                        navigateFromDetail(
+                            destination
+                        )
+                    }
+                )
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity
@@ -1195,6 +1205,74 @@ struct ContentView: View {
             destination
         )
     }
+
+    private func navigateFromDetail(
+        _ destination:
+            TestudoDetailDestination
+    ) {
+        let entry:
+            DetailNavigationEntry
+
+        switch destination {
+
+        case .work(
+            let id
+        ):
+            entry =
+                .work(
+                    section:
+                        .allTasks,
+                    id:
+                        id
+                )
+
+        case .theme(
+            let id
+        ):
+            entry =
+                .theme(
+                    id:
+                        id
+                )
+
+        case .organization(
+            let id
+        ):
+            entry =
+                .organization(
+                    id:
+                        id
+                )
+
+        case .group(
+            let id
+        ):
+            entry =
+                .group(
+                    id:
+                        id
+                )
+
+        case .person(
+            let id
+        ):
+            entry =
+                .person(
+                    id:
+                        id
+                )
+        }
+
+
+        registerDetailNavigation(
+            entry
+        )
+
+        applyDetailNavigation(
+            entry
+        )
+    }
+
 
     private func applyDetailNavigation(
         _ entry:

@@ -431,16 +431,13 @@ struct PersonDetailView: View {
                         )
 
                     if !affiliations.isEmpty {
-                        Text(
-                            affiliations
-                                .map(\.name)
-                                .joined(
-                                    separator: " · "
-                                )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
+                        TestudoEntityLinks(
+                            entities:
+                                affiliations,
+                            font:
+                                .caption,
+                            color:
+                                .secondary
                         )
                     }
                 }
@@ -1085,48 +1082,129 @@ private struct RelatedWorkRow: View {
     @EnvironmentObject
     private var store: TestudoStore
 
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
     let item: WorkItem
 
     var body: some View {
         HStack(
-            alignment: .top,
-            spacing: 10
+            alignment:
+                .top,
+            spacing:
+                10
         ) {
-            Image(
-                systemName: icon
+
+            Button {
+                detailNavigation(
+                    .work(
+                        item.id
+                    )
+                )
+            } label: {
+                Image(
+                    systemName:
+                        icon
+                )
+                .frame(
+                    width:
+                        20
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .testudoTaskStatusSymbolColor(
+                    icon
+                )
+            }
+            .buttonStyle(
+                .plain
             )
-            .frame(width: 20)
-            .foregroundStyle(
-                .secondary
+            .help(
+                "Open \(title)"
             )
+
 
             VStack(
-                alignment: .leading,
-                spacing: 4
+                alignment:
+                    .leading,
+                spacing:
+                    4
             ) {
-                Text(title)
-                    .fontWeight(.medium)
 
-                HStack(spacing: 7) {
-                    Text(typeName)
+                Button {
+                    detailNavigation(
+                        .work(
+                            item.id
+                        )
+                    )
+                } label: {
+                    Text(
+                        title
+                    )
+                    .fontWeight(
+                        .medium
+                    )
+                    .foregroundStyle(
+                        .primary
+                    )
+                }
+                .buttonStyle(
+                    .plain
+                )
+                .help(
+                    "Open \(title)"
+                )
+
+
+                HStack(
+                    spacing:
+                        7
+                ) {
+                    Text(
+                        typeName
+                    )
+
 
                     if
                         let status =
                             item.status
                     {
                         Text(
-                            status.displayName
+                            status
+                                .displayName
                         )
                     }
+
 
                     if
                         let theme =
                             store.theme(
-                                id: item.themeID
+                                id:
+                                    item.themeID
                             )
                     {
-                        Text(theme.name)
+                        Button {
+                            detailNavigation(
+                                .theme(
+                                    theme.id
+                                )
+                            )
+                        } label: {
+                            Text(
+                                theme.name
+                            )
+                        }
+                        .buttonStyle(
+                            .plain
+                        )
+                        .help(
+                            "Open \(theme.name)"
+                        )
                     }
+
 
                     if
                         let deadline =
@@ -1137,25 +1215,36 @@ private struct RelatedWorkRow: View {
                         )
                     }
                 }
-                .font(.caption)
+                .font(
+                    .caption
+                )
                 .foregroundStyle(
                     .secondary
                 )
+
 
                 if
                     item.title != nil,
                     !item.body.isEmpty
                 {
-                    Text(item.body)
-                        .font(.callout)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                        .lineLimit(3)
+                    Text(
+                        item.body
+                    )
+                    .font(
+                        .callout
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .lineLimit(
+                        3
+                    )
                 }
             }
 
+
             Spacer()
+
 
             Text(
                 relevantDate,
@@ -1165,12 +1254,17 @@ private struct RelatedWorkRow: View {
                     .month()
                     .year()
             )
-            .font(.caption)
+            .font(
+                .caption
+            )
             .foregroundStyle(
                 .tertiary
             )
         }
-        .padding(.vertical, 8)
+        .padding(
+            .vertical,
+            8
+        )
     }
 
     private var title: String {

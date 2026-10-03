@@ -99,48 +99,96 @@ private struct StructureEditActions:
 private struct StructureValueRow:
     View
 {
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
     let label: String
     let value: String
+
+    var navigationDestination:
+        TestudoDetailDestination? =
+            nil
+
     let onEdit: () -> Void
 
     var body: some View {
         HStack(
             alignment:
                 .firstTextBaseline,
-            spacing: 14
+            spacing:
+                14
         ) {
-            Text(label)
-                .foregroundStyle(
-                    .secondary
-                )
-                .frame(
-                    width: 120,
-                    alignment:
-                        .leading
-                )
 
             Text(
-                value.isEmpty
-                ? "None"
-                : value
+                label
             )
             .foregroundStyle(
-                value.isEmpty
-                ? .tertiary
-                : .primary
+                .secondary
             )
-            .textSelection(
-                .enabled
+            .frame(
+                width:
+                    120,
+                alignment:
+                    .leading
             )
 
+
+            if
+                let navigationDestination
+            {
+                Button {
+                    detailNavigation(
+                        navigationDestination
+                    )
+                } label: {
+                    Text(
+                        value.isEmpty
+                        ? "None"
+                        : value
+                    )
+                    .foregroundStyle(
+                        value.isEmpty
+                        ? .tertiary
+                        : .primary
+                    )
+                }
+                .buttonStyle(
+                    .plain
+                )
+                .help(
+                    "Open \(value)"
+                )
+
+            } else {
+                Text(
+                    value.isEmpty
+                    ? "None"
+                    : value
+                )
+                .foregroundStyle(
+                    value.isEmpty
+                    ? .tertiary
+                    : .primary
+                )
+                .textSelection(
+                    .enabled
+                )
+            }
+
+
             Spacer()
+
 
             StructureEditButton(
                 action:
                     onEdit
             )
         }
-        .font(.callout)
+        .font(
+            .callout
+        )
     }
 }
 
@@ -750,6 +798,13 @@ struct RichThemeDetailView: View {
                             theme.parentThemeID
                     )?.name
                     ?? "None",
+                navigationDestination:
+                    theme.parentThemeID
+                        .map {
+                            .theme(
+                                $0
+                            )
+                        },
                 onEdit: {
                     uuidDraft =
                         theme.parentThemeID
@@ -941,6 +996,13 @@ struct RichThemeDetailView: View {
                             )?.name
                         }
                     ?? "None",
+                navigationDestination:
+                    theme.ownerEntityID
+                        .map {
+                            .person(
+                                $0
+                            )
+                        },
                 onEdit: {
                     uuidDraft =
                         theme.ownerEntityID
@@ -1946,6 +2008,13 @@ struct RichStructureEntityDetailView:
                             )?.name
                         }
                     ?? "None",
+                navigationDestination:
+                    entity.ownerEntityID
+                        .map {
+                            .person(
+                                $0
+                            )
+                        },
                 onEdit: {
                     uuidDraft =
                         entity.ownerEntityID
