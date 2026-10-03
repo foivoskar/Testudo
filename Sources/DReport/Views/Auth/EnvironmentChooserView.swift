@@ -338,7 +338,13 @@ struct EnvironmentChooserView:
                         18
                 ) {
 
-                    TestudoBrandIcon(
+                    EnvironmentIconView(
+                        customImageData:
+                            store
+                                .environmentIconData(
+                                    for:
+                                        environment.id
+                                ),
                         size:
                             50,
                         showsBackground:
@@ -1089,11 +1095,17 @@ private struct EnvironmentEntryView:
                 22
         ) {
 
-            TestudoBrandIcon(
+            EnvironmentIconView(
+                customImageData:
+                    store
+                        .environmentIconData(
+                            for:
+                                environmentID
+                        ),
                 size:
                     72,
                 showsBackground:
-                    true
+                    false
             )
 
 

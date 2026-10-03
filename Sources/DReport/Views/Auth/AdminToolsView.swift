@@ -16,6 +16,10 @@ struct AdminToolsView:
     private var showingMembers =
         false
 
+    @State
+    private var environmentAppearanceError:
+        String?
+
 
     var body: some View {
         if
@@ -38,6 +42,10 @@ struct AdminToolsView:
                     Divider()
 
                     environmentSection(
+                        environment
+                    )
+
+                    appearanceSection(
                         environment
                     )
 
@@ -183,6 +191,209 @@ struct AdminToolsView:
                 )
             }
         }
+    }
+
+
+    private func appearanceSection(
+        _ environment:
+            WorkEnvironment
+    ) -> some View {
+
+        let customIconData =
+            store
+                .environmentIconData(
+                    for:
+                        environment.id
+                )
+
+        let hasCustomIcon =
+            customIconData
+                != nil
+
+
+        return
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    10
+            ) {
+
+                Text(
+                    "Environment Appearance"
+                )
+                .font(
+                    .headline
+                )
+
+
+                HStack(
+                    alignment:
+                        .center,
+                    spacing:
+                        18
+                ) {
+
+                    EnvironmentIconView(
+                        customImageData:
+                            customIconData,
+                        size:
+                            76,
+                        showsBackground:
+                            false
+                    )
+
+
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            4
+                    ) {
+
+                        Text(
+                            hasCustomIcon
+                            ? "Custom Environment icon"
+                            : "Default Testudo icon"
+                        )
+                        .fontWeight(
+                            .medium
+                        )
+
+
+                        Text(
+                            hasCustomIcon
+                            ? "Stored inside this .testudoenv package."
+                            : "This Environment currently uses Testudo's default blue icon."
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+
+                    Spacer()
+                }
+
+
+                HStack(
+                    spacing:
+                        10
+                ) {
+
+                    Button {
+
+                        chooseEnvironmentIcon()
+
+                    } label: {
+
+                        Label(
+                            hasCustomIcon
+                            ? "Change Icon…"
+                            : "Choose Custom Icon…",
+                            systemImage:
+                                "photo"
+                        )
+                    }
+                    .buttonStyle(
+                        .bordered
+                    )
+
+
+                    if hasCustomIcon {
+
+                        Button(
+                            "Restore Default"
+                        ) {
+
+                            environmentAppearanceError =
+                                store
+                                    .restoreActiveEnvironmentDefaultIcon()
+                        }
+                        .buttonStyle(
+                            .bordered
+                        )
+                    }
+                }
+
+
+                Text(
+                    "A custom icon is saved as EnvironmentIcon.png inside the portable .testudoenv package, so it travels with the Environment to other Testudo installations."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+
+                if
+                    let environmentAppearanceError
+                {
+                    Text(
+                        environmentAppearanceError
+                    )
+                    .font(
+                        .caption
+                    )
+                    .foregroundStyle(
+                        .red
+                    )
+                }
+            }
+    }
+
+
+    private func chooseEnvironmentIcon() {
+
+        environmentAppearanceError =
+            nil
+
+
+        let panel =
+            NSOpenPanel()
+
+        panel.title =
+            "Choose Work Environment Icon"
+
+        panel.prompt =
+            "Use Icon"
+
+        panel.canChooseFiles =
+            true
+
+        panel.canChooseDirectories =
+            false
+
+        panel.allowsMultipleSelection =
+            false
+
+        panel.allowedContentTypes =
+            [
+                .image
+            ]
+
+
+        guard
+            panel.runModal()
+                == .OK,
+            let sourceURL =
+                panel.url
+        else {
+            return
+        }
+
+
+        environmentAppearanceError =
+            store
+                .setActiveEnvironmentIcon(
+                    from:
+                        sourceURL
+                )
     }
 
 

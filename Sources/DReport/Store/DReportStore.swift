@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Combine
 
 @MainActor
@@ -9950,5 +9951,443 @@ extension DReportStore {
             return
                 "The .testudouser file could not be read."
         }
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Portable Work Environment appearance
+//
+// A custom Environment icon is an Environment-owned asset:
+//
+//     <Environment>.testudoenv/EnvironmentIcon.png
+//
+// It therefore travels with the package.
+//
+// Absence of EnvironmentIcon.png means the application should
+// render its bundled default Testudo Environment icon.
+// ============================================================
+
+extension DReportStore {
+
+    func environmentIconData(
+        for environmentID:
+            UUID
+    ) -> Data? {
+
+        guard
+            let environment =
+                applicationData
+                    .workEnvironments
+                    .first(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    ),
+            environment
+                .storage?
+                .kind
+                == .testudoPackage,
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
+                )
+        else {
+            return nil
+        }
+
+
+        let iconURL =
+            packageURL
+                .appendingPathComponent(
+                    TestudoEnvironmentPackage
+                        .customIconFileName
+                )
+
+
+        guard
+            FileManager
+                .default
+                .fileExists(
+                    atPath:
+                        iconURL.path
+                )
+        else {
+            return nil
+        }
+
+
+        return
+            try? Data(
+                contentsOf:
+                    iconURL
+            )
+    }
+
+
+    var activeEnvironmentIconData:
+        Data?
+    {
+        guard
+            let environmentID =
+                activeEnvironmentID
+        else {
+            return nil
+        }
+
+
+        return
+            environmentIconData(
+                for:
+                    environmentID
+            )
+    }
+
+
+    @discardableResult
+    func setActiveEnvironmentIcon(
+        from sourceURL:
+            URL
+    ) -> String? {
+
+        guard
+            currentEnvironmentUserIsAdministrator
+        else {
+            return
+                "Environment Administrator rights are required."
+        }
+
+
+        guard
+            let environmentID =
+                activeEnvironmentID,
+            let environmentIndex =
+                applicationData
+                    .workEnvironments
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "No Work Environment is active."
+        }
+
+
+        let environment =
+            applicationData
+                .workEnvironments[
+                    environmentIndex
+                ]
+
+
+        guard
+            environment
+                .storage?
+                .kind
+                == .testudoPackage
+        else {
+            return
+                "Save this Environment as a .testudoenv package before assigning a custom icon."
+        }
+
+
+        guard
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
+                )
+        else {
+            return
+                "The Work Environment package is unavailable."
+        }
+
+
+        guard
+            let pngData =
+                normalizedEnvironmentIconPNG(
+                    from:
+                        sourceURL
+                )
+        else {
+            return
+                "The selected image could not be converted to a PNG icon."
+        }
+
+
+        let iconURL =
+            packageURL
+                .appendingPathComponent(
+                    TestudoEnvironmentPackage
+                        .customIconFileName
+                )
+
+
+        do {
+
+            try pngData
+                .write(
+                    to:
+                        iconURL,
+                    options:
+                        .atomic
+                )
+
+        } catch {
+
+            return
+                "The Environment icon could not be saved: \(error.localizedDescription)"
+        }
+
+
+        let now =
+            Date()
+
+
+        applicationData
+            .workEnvironments[
+                environmentIndex
+            ]
+            .updatedAt =
+            now
+
+
+        saveApplicationData()
+
+
+        return nil
+    }
+
+
+    @discardableResult
+    func restoreActiveEnvironmentDefaultIcon()
+        -> String?
+    {
+        guard
+            currentEnvironmentUserIsAdministrator
+        else {
+            return
+                "Environment Administrator rights are required."
+        }
+
+
+        guard
+            let environmentID =
+                activeEnvironmentID,
+            let environmentIndex =
+                applicationData
+                    .workEnvironments
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    )
+        else {
+            return
+                "No Work Environment is active."
+        }
+
+
+        let environment =
+            applicationData
+                .workEnvironments[
+                    environmentIndex
+                ]
+
+
+        guard
+            environment
+                .storage?
+                .kind
+                == .testudoPackage,
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
+                )
+        else {
+            return
+                "The Work Environment package is unavailable."
+        }
+
+
+        let iconURL =
+            packageURL
+                .appendingPathComponent(
+                    TestudoEnvironmentPackage
+                        .customIconFileName
+                )
+
+
+        if
+            FileManager
+                .default
+                .fileExists(
+                    atPath:
+                        iconURL.path
+                )
+        {
+            do {
+
+                try FileManager
+                    .default
+                    .removeItem(
+                        at:
+                            iconURL
+                    )
+
+            } catch {
+
+                return
+                    "The custom Environment icon could not be removed: \(error.localizedDescription)"
+            }
+        }
+
+
+        applicationData
+            .workEnvironments[
+                environmentIndex
+            ]
+            .updatedAt =
+            Date()
+
+
+        saveApplicationData()
+
+
+        return nil
+    }
+
+
+    private func normalizedEnvironmentIconPNG(
+        from sourceURL:
+            URL
+    ) -> Data? {
+
+        guard
+            let sourceImage =
+                NSImage(
+                    contentsOf:
+                        sourceURL
+                )
+        else {
+            return nil
+        }
+
+
+        let sourceSize =
+            sourceImage.size
+
+
+        guard
+            sourceSize.width > 0,
+            sourceSize.height > 0
+        else {
+            return nil
+        }
+
+
+        let maximumDimension:
+            CGFloat =
+            1024
+
+
+        let scale =
+            min(
+                1,
+                maximumDimension
+                    / max(
+                        sourceSize.width,
+                        sourceSize.height
+                    )
+            )
+
+
+        let targetSize =
+            NSSize(
+                width:
+                    max(
+                        1,
+                        sourceSize.width
+                            * scale
+                    ),
+                height:
+                    max(
+                        1,
+                        sourceSize.height
+                            * scale
+                    )
+            )
+
+
+        let normalized =
+            NSImage(
+                size:
+                    targetSize
+            )
+
+
+        normalized.lockFocus()
+
+        NSGraphicsContext
+            .current?
+            .imageInterpolation =
+            .high
+
+
+        sourceImage.draw(
+            in:
+                NSRect(
+                    origin:
+                        .zero,
+                    size:
+                        targetSize
+                ),
+            from:
+                NSRect(
+                    origin:
+                        .zero,
+                    size:
+                        sourceSize
+                ),
+            operation:
+                .copy,
+            fraction:
+                1
+        )
+
+        normalized.unlockFocus()
+
+
+        guard
+            let tiff =
+                normalized
+                    .tiffRepresentation,
+            let bitmap =
+                NSBitmapImageRep(
+                    data:
+                        tiff
+                ),
+            let png =
+                bitmap
+                    .representation(
+                        using:
+                            .png,
+                        properties:
+                            [:]
+                    )
+        else {
+            return nil
+        }
+
+
+        return png
     }
 }

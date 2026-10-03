@@ -20,6 +20,13 @@ enum TestudoEnvironmentPackage {
     static let typeIdentifier =
         "com.testudo.environment"
 
+    // Optional Environment-owned appearance asset.
+    //
+    // Absence of this file means: use Testudo's bundled default
+    // blue Environment icon.
+    static let customIconFileName =
+        "EnvironmentIcon.png"
+
     static let contentType:
         UTType =
         UTType(

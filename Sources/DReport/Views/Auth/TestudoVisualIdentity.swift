@@ -95,6 +95,95 @@ struct TestudoBrandIcon:
 
 
 // ============================================================
+// MARK: - Work Environment icon
+//
+// customImageData == nil:
+//     bundled default Testudo icon
+//
+// customImageData != nil:
+//     EnvironmentIcon.png from the .testudoenv package
+// ============================================================
+
+struct EnvironmentIconView:
+    View
+{
+    let customImageData:
+        Data?
+
+    var size:
+        CGFloat
+
+    var showsBackground:
+        Bool = false
+
+
+    var body:
+        some View
+    {
+        Group {
+
+            if
+                let customImageData,
+                let customImage =
+                    NSImage(
+                        data:
+                            customImageData
+                    )
+            {
+                ZStack {
+
+                    if showsBackground {
+
+                        RoundedRectangle(
+                            cornerRadius:
+                                size * 0.26,
+                            style:
+                                .continuous
+                        )
+                        .fill(
+                            Color
+                                .accentColor
+                                .opacity(
+                                    0.08
+                                )
+                        )
+                    }
+
+
+                    Image(
+                        nsImage:
+                            customImage
+                    )
+                    .resizable()
+                    .scaledToFit()
+                    .padding(
+                        showsBackground
+                        ? size * 0.12
+                        : 0
+                    )
+                }
+                .frame(
+                    width:
+                        size,
+                    height:
+                        size
+                )
+
+            } else {
+
+                TestudoBrandIcon(
+                    size:
+                        size,
+                    showsBackground:
+                        showsBackground
+                )
+            }
+        }
+    }
+}
+
+
+// ============================================================
 // MARK: - Testudo local-user avatar
 // ============================================================
 
