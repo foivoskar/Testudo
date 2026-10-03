@@ -50,6 +50,15 @@ struct ApplicationCredential:
 
     var updatedAt:
         Date
+
+
+    // Three user-defined recovery questions.
+    //
+    // Answers are salted hashes only.
+    // nil means this older/local account has not configured
+    // password recovery yet.
+    var recoveryQuestions:
+        [SecurityQuestionCredential]? = nil
 }
 
 
@@ -57,7 +66,7 @@ struct ApplicationData:
     Codable
 {
     var schemaVersion:
-        Int = 4
+        Int = 5
 
     var localUserProfile:
         LocalUserProfile?

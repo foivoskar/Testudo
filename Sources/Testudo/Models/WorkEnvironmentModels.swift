@@ -732,6 +732,13 @@ struct EnvironmentCredential:
     {
         membershipID
     }
+
+
+    // Optional for backwards compatibility.
+    //
+    // Security answers are never stored in plaintext.
+    var recoveryQuestions:
+        [SecurityQuestionCredential]? = nil
 }
 
 
@@ -751,7 +758,7 @@ struct EnvironmentCredentialStore:
 
     init(
         schemaVersion:
-            Int = 1,
+            Int = 2,
         environmentID:
             UUID,
         credentials:

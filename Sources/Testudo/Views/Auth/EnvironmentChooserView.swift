@@ -1057,6 +1057,11 @@ private struct EnvironmentEntryView:
     private var errorMessage:
         String?
 
+
+    @State
+    private var showingPasswordRecovery =
+        false
+
     @FocusState
     private var usernameIsFocused:
         Bool
@@ -1166,6 +1171,32 @@ private struct EnvironmentEntryView:
                 )
 
 
+                Button(
+                    "Forgot Password?"
+                ) {
+                    showingPasswordRecovery =
+                        true
+                }
+                .buttonStyle(
+                    .plain
+                )
+                .foregroundStyle(
+                    Color
+                        .accentColor
+                )
+
+
+                Text(
+                    "If recovery is unavailable, contact an Environment Administrator, who can assign a new password to your account."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+
                 Toggle(
                     "Stay signed in",
                     isOn:
@@ -1260,6 +1291,20 @@ private struct EnvironmentEntryView:
             width:
                 480
         )
+        .sheet(
+            isPresented:
+                $showingPasswordRecovery
+        ) {
+            EnvironmentPasswordRecoveryView(
+                environmentID:
+                    environmentID,
+                initialUsername:
+                    username
+            )
+            .environmentObject(
+                store
+            )
+        }
         .onAppear {
 
             DispatchQueue

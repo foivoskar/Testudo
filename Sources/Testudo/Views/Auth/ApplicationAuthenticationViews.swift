@@ -21,6 +21,11 @@ struct ApplicationPasswordSetupView:
         ""
 
     @State
+    private var recoveryQuestions =
+        SecurityQuestionDraft
+            .emptySet
+
+    @State
     private var errorMessage:
         String?
 
@@ -28,119 +33,142 @@ struct ApplicationPasswordSetupView:
     var body:
         some View
     {
-        VStack(
-            alignment:
-                .leading,
-            spacing:
-                22
-        ) {
+        ScrollView {
 
-            Text(
-                "Protect Your Testudo Profile"
-            )
-            .font(
-                .largeTitle
-            )
-            .fontWeight(
-                .semibold
-            )
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    22
+            ) {
 
-
-            Text(
-                "Create a password for this Testudo installation. This password protects your local profile and your saved Work Environment registry. It is separate from every Work Environment password."
-            )
-            .foregroundStyle(
-                .secondary
-            )
-            .fixedSize(
-                horizontal:
-                    false,
-                vertical:
-                    true
-            )
-
-
-            if
-                let profile =
-                    store
-                        .localUserProfile
-            {
                 Text(
-                    profile.displayName
+                    "Protect Your Testudo Profile"
                 )
                 .font(
-                    .title3
+                    .largeTitle
                 )
                 .fontWeight(
-                    .medium
+                    .semibold
                 )
-            }
 
 
-            SecureField(
-                "Application password",
-                text:
-                    $password
-            )
-            .textFieldStyle(
-                .roundedBorder
-            )
-
-
-            SecureField(
-                "Confirm password",
-                text:
-                    $confirmation
-            )
-            .textFieldStyle(
-                .roundedBorder
-            )
-
-
-            if
-                let errorMessage
-            {
                 Text(
-                    errorMessage
-                )
-                .font(
-                    .callout
+                    "Create a password for this Testudo installation and define three security questions for password recovery. This password remains separate from every Work Environment password."
                 )
                 .foregroundStyle(
-                    .red
+                    .secondary
                 )
-            }
+                .fixedSize(
+                    horizontal:
+                        false,
+                    vertical:
+                        true
+                )
 
 
-            HStack {
-
-                Spacer()
-
-
-                Button(
-                    "Set Password"
-                ) {
-                    save()
+                if
+                    let profile =
+                        store
+                            .localUserProfile
+                {
+                    Text(
+                        profile.displayName
+                    )
+                    .font(
+                        .title3
+                    )
+                    .fontWeight(
+                        .medium
+                    )
                 }
-                .buttonStyle(
-                    .borderedProminent
+
+
+                SecureField(
+                    "Application password",
+                    text:
+                        $password
                 )
-                .disabled(
-                    password.isEmpty
-                    || confirmation.isEmpty
+                .textFieldStyle(
+                    .roundedBorder
                 )
-                .keyboardShortcut(
-                    .defaultAction
+
+
+                SecureField(
+                    "Confirm password",
+                    text:
+                        $confirmation
                 )
+                .textFieldStyle(
+                    .roundedBorder
+                )
+
+
+                Text(
+                    "Minimum 8 characters."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+
+                Divider()
+
+
+                SecurityQuestionDraftEditor(
+                    drafts:
+                        $recoveryQuestions
+                )
+
+
+                if
+                    let errorMessage
+                {
+                    Text(
+                        errorMessage
+                    )
+                    .font(
+                        .callout
+                    )
+                    .foregroundStyle(
+                        .red
+                    )
+                }
+
+
+                HStack {
+
+                    Spacer()
+
+
+                    Button(
+                        "Set Password and Recovery"
+                    ) {
+                        save()
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .keyboardShortcut(
+                        .defaultAction
+                    )
+                }
             }
+            .padding(
+                32
+            )
+            .frame(
+                maxWidth:
+                    620
+            )
+            .frame(
+                maxWidth:
+                    .infinity
+            )
         }
-        .padding(
-            32
-        )
-        .frame(
-            width:
-                540
-        )
     }
 
 
@@ -164,7 +192,9 @@ struct ApplicationPasswordSetupView:
         errorMessage =
             store
                 .configureApplicationPassword(
-                    password
+                    password,
+                    recoveryQuestions:
+                        recoveryQuestions
                 )
     }
 }
@@ -191,6 +221,11 @@ struct ApplicationLoginView:
 
     @State
     private var showingSignOutConfirmation =
+        false
+
+
+    @State
+    private var showingPasswordRecovery =
         false
 
     @FocusState
@@ -439,6 +474,21 @@ struct ApplicationLoginView:
                     .keyboardShortcut(
                         .defaultAction
                     )
+
+
+                    Button(
+                        "Forgot Password?"
+                    ) {
+                        showingPasswordRecovery =
+                            true
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                    .foregroundStyle(
+                        Color
+                            .accentColor
+                    )
                 }
                 .padding(
                     24
@@ -515,6 +565,15 @@ struct ApplicationLoginView:
                     passwordIsFocused =
                         true
                 }
+        }
+        .sheet(
+            isPresented:
+                $showingPasswordRecovery
+        ) {
+            ApplicationPasswordRecoveryView()
+                .environmentObject(
+                    store
+                )
         }
         .sheet(
             isPresented:
@@ -775,7 +834,33 @@ struct ApplicationSettingsGateView:
                 store
                     .applicationSessionIsOpen
             {
-                SettingsView()
+                TabView {
+
+                    SettingsView()
+                        .tabItem {
+                            Label(
+                                "General",
+                                systemImage:
+                                    "gearshape"
+                            )
+                        }
+
+
+                    SecuritySettingsView()
+                        .tabItem {
+                            Label(
+                                "Security",
+                                systemImage:
+                                    "lock.shield"
+                            )
+                        }
+                }
+                .frame(
+                    minWidth:
+                        720,
+                    minHeight:
+                        560
+                )
 
             } else {
 

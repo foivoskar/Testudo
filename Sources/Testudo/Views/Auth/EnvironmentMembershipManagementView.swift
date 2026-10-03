@@ -763,7 +763,7 @@ private struct EnvironmentMembershipEditorView:
 
                     Button(
                         hasPassword
-                        ? "Change Password…"
+                        ? "Set New Password…"
                         : "Set Password…"
                     ) {
                         showingPasswordEditor =
@@ -773,6 +773,17 @@ private struct EnvironmentMembershipEditorView:
 
                 Text(
                     "This credential belongs to this Work Environment and is separate from the local application profile."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+
+                Text(
+                    "As an Environment Administrator, you can assign a new password without knowing the member's current password. Security-question answers are never shown to Administrators."
                 )
                 .font(
                     .caption
@@ -1126,7 +1137,7 @@ private struct EnvironmentPasswordEditorView:
                     4
             ) {
                 Text(
-                    "Environment Password"
+                    "Set Environment Password"
                 )
                 .font(
                     .title2

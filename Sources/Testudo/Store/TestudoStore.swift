@@ -10395,3 +10395,944 @@ extension TestudoStore {
         return png
     }
 }
+
+
+// ============================================================
+// MARK: - Application password management and recovery
+// ============================================================
+
+extension TestudoStore {
+
+    var applicationRecoveryQuestionPrompts:
+        [SecurityQuestionPrompt]
+    {
+        SecurityRecovery
+            .prompts(
+                from:
+                    applicationData
+                        .applicationCredential?
+                        .recoveryQuestions
+            )
+    }
+
+
+    var applicationRecoveryQuestionsAreConfigured:
+        Bool
+    {
+        applicationRecoveryQuestionPrompts
+            .count
+            == 3
+    }
+
+
+    // --------------------------------------------------------
+    // Initial setup:
+    // create password + all three recovery questions.
+    // --------------------------------------------------------
+
+    @discardableResult
+    func configureApplicationPassword(
+        _ password:
+            String,
+        recoveryQuestions drafts:
+            [SecurityQuestionDraft]
+    ) -> String? {
+
+        guard
+            password.count
+                >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+
+        let recovery:
+            [SecurityQuestionCredential]
+
+
+        do {
+
+            recovery =
+                try SecurityRecovery
+                    .createCredentials(
+                        from:
+                            drafts
+                    )
+
+        } catch {
+
+            return
+                error.localizedDescription
+        }
+
+
+        if
+            let error =
+                configureApplicationPassword(
+                    password
+                )
+        {
+            return error
+        }
+
+
+        applicationData
+            .applicationCredential?
+            .recoveryQuestions =
+            recovery
+
+
+        applicationData
+            .applicationCredential?
+            .updatedAt =
+            Date()
+
+
+        applicationData
+            .schemaVersion =
+            max(
+                applicationData
+                    .schemaVersion,
+                5
+            )
+
+
+        saveApplicationData()
+
+
+        return nil
+    }
+
+
+    @discardableResult
+    func changeApplicationPassword(
+        currentPassword:
+            String,
+        newPassword:
+            String
+    ) -> String? {
+
+        guard
+            let credential =
+                applicationData
+                    .applicationCredential
+        else {
+            return
+                "No application password is configured."
+        }
+
+
+        guard
+            PasswordHasher
+                .verify(
+                    password:
+                        currentPassword,
+                    saltBase64:
+                        credential
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        credential
+                            .passwordHashBase64,
+                    iterations:
+                        credential
+                            .passwordIterations
+                )
+        else {
+            return
+                "The current password is incorrect."
+        }
+
+
+        guard
+            newPassword.count
+                >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+
+        do {
+
+            let hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            newPassword
+                    )
+
+
+            applicationData
+                .applicationCredential =
+                ApplicationCredential(
+                    passwordSaltBase64:
+                        hash.saltBase64,
+                    passwordHashBase64:
+                        hash.hashBase64,
+                    passwordIterations:
+                        hash.iterations,
+                    createdAt:
+                        credential.createdAt,
+                    updatedAt:
+                        Date(),
+                    recoveryQuestions:
+                        credential
+                            .recoveryQuestions
+                )
+
+
+            applicationData
+                .schemaVersion =
+                max(
+                    applicationData
+                        .schemaVersion,
+                    5
+                )
+
+
+            saveApplicationData()
+
+
+            return nil
+
+        } catch {
+
+            return
+                "The new application password could not be secured."
+        }
+    }
+
+
+    @discardableResult
+    func setApplicationRecoveryQuestions(
+        currentPassword:
+            String,
+        drafts:
+            [SecurityQuestionDraft]
+    ) -> String? {
+
+        guard
+            let credential =
+                applicationData
+                    .applicationCredential
+        else {
+            return
+                "No application password is configured."
+        }
+
+
+        guard
+            PasswordHasher
+                .verify(
+                    password:
+                        currentPassword,
+                    saltBase64:
+                        credential
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        credential
+                            .passwordHashBase64,
+                    iterations:
+                        credential
+                            .passwordIterations
+                )
+        else {
+            return
+                "The current password is incorrect."
+        }
+
+
+        do {
+
+            let recovery =
+                try SecurityRecovery
+                    .createCredentials(
+                        from:
+                            drafts
+                    )
+
+
+            applicationData
+                .applicationCredential?
+                .recoveryQuestions =
+                recovery
+
+
+            applicationData
+                .applicationCredential?
+                .updatedAt =
+                Date()
+
+
+            applicationData
+                .schemaVersion =
+                max(
+                    applicationData
+                        .schemaVersion,
+                    5
+                )
+
+
+            saveApplicationData()
+
+
+            return nil
+
+        } catch {
+
+            return
+                error.localizedDescription
+        }
+    }
+
+
+    @discardableResult
+    func resetApplicationPasswordUsingRecovery(
+        questionID:
+            UUID,
+        answer:
+            String,
+        newPassword:
+            String
+    ) -> String? {
+
+        guard
+            let credential =
+                applicationData
+                    .applicationCredential,
+            let recoveryQuestions =
+                credential
+                    .recoveryQuestions,
+            let question =
+                recoveryQuestions
+                    .first(
+                        where: {
+                            $0.id
+                                == questionID
+                        }
+                    )
+        else {
+            return
+                "Password recovery is not configured for this Testudo account."
+        }
+
+
+        guard
+            SecurityRecovery
+                .verify(
+                    answer:
+                        answer,
+                    against:
+                        question
+                )
+        else {
+            return
+                "The security answer is incorrect."
+        }
+
+
+        guard
+            newPassword.count
+                >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+
+        do {
+
+            let hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            newPassword
+                    )
+
+
+            applicationData
+                .applicationCredential =
+                ApplicationCredential(
+                    passwordSaltBase64:
+                        hash.saltBase64,
+                    passwordHashBase64:
+                        hash.hashBase64,
+                    passwordIterations:
+                        hash.iterations,
+                    createdAt:
+                        credential.createdAt,
+                    updatedAt:
+                        Date(),
+                    recoveryQuestions:
+                        recoveryQuestions
+                )
+
+
+            applicationData
+                .schemaVersion =
+                max(
+                    applicationData
+                        .schemaVersion,
+                    5
+                )
+
+
+            // Recovery does not silently create an authenticated
+            // application session. The user logs in explicitly
+            // with the newly chosen password.
+            applicationSessionIsOpen =
+                false
+
+            applicationData
+                .applicationIsLoggedOut =
+                true
+
+
+            saveApplicationData()
+
+
+            return nil
+
+        } catch {
+
+            return
+                "The new application password could not be secured."
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - Environment self-service password management
+// ============================================================
+
+extension TestudoStore {
+
+    var currentEnvironmentRecoveryQuestionPrompts:
+        [SecurityQuestionPrompt]
+    {
+        guard
+            let membershipID =
+                currentEnvironmentMembership?
+                    .id,
+            let credential =
+                environmentCredential(
+                    for:
+                        membershipID
+                )
+        else {
+            return []
+        }
+
+
+        return
+            SecurityRecovery
+                .prompts(
+                    from:
+                        credential
+                            .recoveryQuestions
+                )
+    }
+
+
+    var currentEnvironmentRecoveryQuestionsAreConfigured:
+        Bool
+    {
+        currentEnvironmentRecoveryQuestionPrompts
+            .count
+            == 3
+    }
+
+
+    func environmentRecoveryQuestionPrompts(
+        environmentID:
+            UUID,
+        username:
+            String
+    ) -> [SecurityQuestionPrompt] {
+
+        guard
+            activeEnvironmentID
+                == environmentID
+        else {
+            return []
+        }
+
+
+        let cleanedUsername =
+            username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        guard
+            !cleanedUsername.isEmpty,
+            let membership =
+                data
+                    .environmentMemberships
+                    .first(
+                        where: {
+                            guard
+                                $0.environmentID
+                                    == environmentID,
+                                $0.isActive,
+                                let identifier =
+                                    $0.directoryUserIdentifier?
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
+                                        )
+                            else {
+                                return false
+                            }
+
+
+                            return
+                                identifier
+                                    .caseInsensitiveCompare(
+                                        cleanedUsername
+                                    )
+                                    == .orderedSame
+                        }
+                    ),
+            let credential =
+                environmentCredential(
+                    for:
+                        membership.id
+                )
+        else {
+            return []
+        }
+
+
+        return
+            SecurityRecovery
+                .prompts(
+                    from:
+                        credential
+                            .recoveryQuestions
+                )
+    }
+
+
+    @discardableResult
+    func changeCurrentEnvironmentPassword(
+        currentPassword:
+            String,
+        newPassword:
+            String
+    ) -> String? {
+
+        guard
+            let membership =
+                currentEnvironmentMembership
+        else {
+            return
+                "No Environment membership is currently signed in."
+        }
+
+
+        guard
+            let credential =
+                environmentCredential(
+                    for:
+                        membership.id
+                )
+        else {
+            return
+                "This Environment account does not have a password."
+        }
+
+
+        guard
+            PasswordHasher
+                .verify(
+                    password:
+                        currentPassword,
+                    saltBase64:
+                        credential
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        credential
+                            .passwordHashBase64,
+                    iterations:
+                        credential
+                            .passwordIterations
+                )
+        else {
+            return
+                "The current Environment password is incorrect."
+        }
+
+
+        return
+            writeEnvironmentMembershipPassword(
+                membershipID:
+                    membership.id,
+                newPassword:
+                    newPassword
+            )
+    }
+
+
+    @discardableResult
+    func setCurrentEnvironmentRecoveryQuestions(
+        currentPassword:
+            String,
+        drafts:
+            [SecurityQuestionDraft]
+    ) -> String? {
+
+        guard
+            let membership =
+                currentEnvironmentMembership
+        else {
+            return
+                "No Environment membership is currently signed in."
+        }
+
+
+        guard
+            let credential =
+                environmentCredential(
+                    for:
+                        membership.id
+                )
+        else {
+            return
+                "This Environment account does not have a password."
+        }
+
+
+        guard
+            PasswordHasher
+                .verify(
+                    password:
+                        currentPassword,
+                    saltBase64:
+                        credential
+                            .passwordSaltBase64,
+                    expectedHashBase64:
+                        credential
+                            .passwordHashBase64,
+                    iterations:
+                        credential
+                            .passwordIterations
+                )
+        else {
+            return
+                "The current Environment password is incorrect."
+        }
+
+
+        let recovery:
+            [SecurityQuestionCredential]
+
+
+        do {
+
+            recovery =
+                try SecurityRecovery
+                    .createCredentials(
+                        from:
+                            drafts
+                    )
+
+        } catch {
+
+            return
+                error.localizedDescription
+        }
+
+
+        var credentialStore =
+            loadEnvironmentCredentialStore()
+
+
+        guard
+            let index =
+                credentialStore
+                    .credentials
+                    .firstIndex(
+                        where: {
+                            $0.membershipID
+                                == membership.id
+                        }
+                    )
+        else {
+            return
+                "The Environment credential could not be found."
+        }
+
+
+        credentialStore
+            .credentials[index]
+            .recoveryQuestions =
+            recovery
+
+
+        credentialStore
+            .credentials[index]
+            .updatedAt =
+            Date()
+
+
+        credentialStore
+            .schemaVersion =
+            max(
+                credentialStore
+                    .schemaVersion,
+                2
+            )
+
+
+        return
+            saveEnvironmentCredentialStore(
+                credentialStore
+            )
+    }
+
+
+    @discardableResult
+    func resetEnvironmentPasswordUsingRecovery(
+        environmentID:
+            UUID,
+        username:
+            String,
+        questionID:
+            UUID,
+        answer:
+            String,
+        newPassword:
+            String
+    ) -> String? {
+
+        guard
+            activeEnvironmentID
+                == environmentID
+        else {
+            return
+                "The selected Work Environment is not active."
+        }
+
+
+        let cleanedUsername =
+            username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        guard
+            let membership =
+                data
+                    .environmentMemberships
+                    .first(
+                        where: {
+                            guard
+                                $0.environmentID
+                                    == environmentID,
+                                $0.isActive,
+                                let identifier =
+                                    $0.directoryUserIdentifier?
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
+                                        )
+                            else {
+                                return false
+                            }
+
+
+                            return
+                                identifier
+                                    .caseInsensitiveCompare(
+                                        cleanedUsername
+                                    )
+                                    == .orderedSame
+                        }
+                    )
+        else {
+            return
+                "The Environment account could not be found."
+        }
+
+
+        guard
+            let credential =
+                environmentCredential(
+                    for:
+                        membership.id
+                ),
+            let recoveryQuestions =
+                credential
+                    .recoveryQuestions,
+            let question =
+                recoveryQuestions
+                    .first(
+                        where: {
+                            $0.id
+                                == questionID
+                        }
+                    )
+        else {
+            return
+                "Security-question recovery is not configured for this Environment account. Contact an Environment Administrator to set a new password."
+        }
+
+
+        guard
+            SecurityRecovery
+                .verify(
+                    answer:
+                        answer,
+                    against:
+                        question
+                )
+        else {
+            return
+                "The security answer is incorrect."
+        }
+
+
+        return
+            writeEnvironmentMembershipPassword(
+                membershipID:
+                    membership.id,
+                newPassword:
+                    newPassword
+            )
+    }
+
+
+    // --------------------------------------------------------
+    // Internal writer used by authenticated self-service and
+    // recovery. Administrator password reset remains a separate
+    // authorization path in setEnvironmentMembershipPassword().
+    // --------------------------------------------------------
+
+    private func writeEnvironmentMembershipPassword(
+        membershipID:
+            UUID,
+        newPassword:
+            String
+    ) -> String? {
+
+        guard
+            newPassword.count
+                >= 8
+        else {
+            return
+                "Password must contain at least 8 characters."
+        }
+
+
+        let hash:
+            (
+                saltBase64:
+                    String,
+                hashBase64:
+                    String,
+                iterations:
+                    Int
+            )
+
+
+        do {
+
+            hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            newPassword
+                    )
+
+        } catch {
+
+            return
+                "The password could not be secured."
+        }
+
+
+        var credentialStore =
+            loadEnvironmentCredentialStore()
+
+        let now =
+            Date()
+
+
+        if
+            let index =
+                credentialStore
+                    .credentials
+                    .firstIndex(
+                        where: {
+                            $0.membershipID
+                                == membershipID
+                        }
+                    )
+        {
+            credentialStore
+                .credentials[index]
+                .passwordSaltBase64 =
+                hash.saltBase64
+
+            credentialStore
+                .credentials[index]
+                .passwordHashBase64 =
+                hash.hashBase64
+
+            credentialStore
+                .credentials[index]
+                .passwordIterations =
+                hash.iterations
+
+            credentialStore
+                .credentials[index]
+                .updatedAt =
+                now
+
+        } else {
+
+            credentialStore
+                .credentials
+                .append(
+                    EnvironmentCredential(
+                        membershipID:
+                            membershipID,
+                        passwordSaltBase64:
+                            hash.saltBase64,
+                        passwordHashBase64:
+                            hash.hashBase64,
+                        passwordIterations:
+                            hash.iterations,
+                        createdAt:
+                            now,
+                        updatedAt:
+                            now,
+                        recoveryQuestions:
+                            nil
+                    )
+                )
+        }
+
+
+        credentialStore
+            .schemaVersion =
+            max(
+                credentialStore
+                    .schemaVersion,
+                2
+            )
+
+
+        return
+            saveEnvironmentCredentialStore(
+                credentialStore
+            )
+    }
+}
