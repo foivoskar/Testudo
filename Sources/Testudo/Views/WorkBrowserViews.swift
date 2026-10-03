@@ -1113,7 +1113,17 @@ struct WorkGuideRow: View {
                 height: 18
             )
             .foregroundStyle(
-                iconStyle
+                item.kind == .task
+                ? AnyShapeStyle(
+                    (
+                        item.status
+                        ?? .todo
+                    )
+                        .testudoStatusIconColor
+                )
+                : AnyShapeStyle(
+                    iconStyle
+                )
             )
 
             VStack(

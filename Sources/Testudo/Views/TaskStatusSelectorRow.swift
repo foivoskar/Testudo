@@ -104,6 +104,10 @@ struct TaskStatusSelectorRow:
                     statusIcon(
                         value
                     ),
+                systemImageColor:
+                    value
+                        .testudoStatusIconColor,
+
                 depth:
                     0,
                 searchText:

@@ -2076,11 +2076,15 @@ private struct WorkItemNodeView: View {
                 systemName: itemIcon
             )
             .foregroundStyle(
-                isSelectedWorkItem
-                ? Color.white
+                item.kind == .task
+                ? (
+                    item.status
+                    ?? .todo
+                )
+                    .testudoStatusIconColor
                 : (
-                    item.kind == .task
-                    ? Color.primary
+                    isSelectedWorkItem
+                    ? Color.white
                     : Color.secondary
                 )
             )

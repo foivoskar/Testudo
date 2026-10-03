@@ -31,6 +31,10 @@ struct HierarchySelectionNode:
     let systemImage:
         String?
 
+
+    var systemImageColor:
+        Color? = nil
+
     let depth:
         Int
 
@@ -457,8 +461,11 @@ private struct HierarchicalSelectionPanel:
                         systemImage
                 )
                 .foregroundStyle(
-                    .secondary
-                )
+                        node.systemImageColor
+                        ?? (
+                            .secondary
+                        )
+                    )
                 .frame(
                     width: 18
                 )
