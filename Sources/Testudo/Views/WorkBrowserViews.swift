@@ -6568,7 +6568,7 @@ struct WorkDetailRouterView: View {
                     section == .themes,
                     let selectedThemeID
                 {
-                    RichThemeDetailView(
+                    ThemeRelatedTasksDetailView(
                         themeID:
                             selectedThemeID
                     ) {
@@ -6582,8 +6582,8 @@ struct WorkDetailRouterView: View {
                         == .organizations,
                     let selectedOrganizationID
                 {
-                    RichStructureEntityDetailView(
-                        entityID:
+                    OrganizationDetailView(
+                        organizationID:
                             selectedOrganizationID
                     ) {
                         deleteFooter
@@ -6596,8 +6596,8 @@ struct WorkDetailRouterView: View {
                         == .groups,
                     let selectedGroupID
                 {
-                    RichStructureEntityDetailView(
-                        entityID:
+                    GroupDetailView(
+                        groupID:
                             selectedGroupID
                     ) {
                         deleteFooter

@@ -227,6 +227,75 @@ private struct StructureReadOnlyRow:
 }
 
 
+private struct OrganizationDetailCardModifier:
+    ViewModifier
+{
+    let enabled:
+        Bool
+
+    @ViewBuilder
+    func body(
+        content:
+            Content
+    ) -> some View {
+        if enabled {
+            content
+                .padding(
+                    16
+                )
+                .background(
+                    Color.primary
+                        .opacity(
+                            0.025
+                        ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius:
+                                12,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius:
+                            12,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        Color.primary
+                            .opacity(
+                                0.06
+                            ),
+                        lineWidth:
+                            1
+                    )
+                }
+
+        } else {
+            content
+        }
+    }
+}
+
+
+private extension View {
+
+    func organizationDetailCard(
+        _ enabled:
+            Bool
+    ) -> some View {
+        modifier(
+            OrganizationDetailCardModifier(
+                enabled:
+                    enabled
+            )
+        )
+    }
+}
+
+
 // ============================================================
 // MARK: - Rich Theme Inspector
 // ============================================================
@@ -1274,6 +1343,806 @@ struct RichThemeDetailView: View {
 // MARK: - Rich Organization / Group Inspector
 // ============================================================
 
+// ============================================================
+// MARK: - Organization Detail
+//
+// Same structural behaviour as PersonDetailView:
+//
+// No Related Tasks:
+//     full-height Organization details
+//
+// Related Tasks present:
+//     upper 50% = Related Tasks
+//     lower 50% = Organization details
+//     independent scrolling
+//
+// ============================================================
+
+// ============================================================
+// MARK: - Shared Related Tasks Split Pane
+//
+// Shared by Theme, Organization and Group.
+//
+// No related Tasks:
+//     full-height details.
+//
+// Related Tasks:
+//     upper 50% = independently scrollable Task list
+//     lower 50% = independently scrollable detail view
+//
+// This mirrors PersonDetailView structurally.
+// ============================================================
+
+private struct RelatedTasksSplitPane<
+    DetailContent:
+        View
+>: View {
+
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
+    let tasks:
+        [WorkItem]
+
+    private let detailContent:
+        () -> DetailContent
+
+
+    init(
+        tasks:
+            [WorkItem],
+        @ViewBuilder
+        detailContent:
+            @escaping () -> DetailContent
+    ) {
+        self.tasks =
+            tasks
+
+        self.detailContent =
+            detailContent
+    }
+
+
+    var body:
+        some View
+    {
+        Group {
+            if tasks.isEmpty {
+                detailContent()
+
+            } else {
+                splitDetailContent
+            }
+        }
+        .background(
+            TestudoStyle
+                .contentBackground
+        )
+    }
+
+
+    private var splitDetailContent:
+        some View
+    {
+        GeometryReader {
+            geometry in
+
+            let separatorHeight:
+                CGFloat = 1
+
+            let paneHeight =
+                max(
+                    0,
+                    (
+                        geometry
+                            .size
+                            .height
+                        - separatorHeight
+                    )
+                    / 2
+                )
+
+
+            VStack(
+                spacing:
+                    0
+            ) {
+                relatedTasksScroll
+                    .frame(
+                        height:
+                            paneHeight
+                    )
+
+                Divider()
+
+                detailContent()
+                    .frame(
+                        height:
+                            paneHeight
+                    )
+            }
+            .frame(
+                width:
+                    geometry
+                        .size
+                        .width,
+                height:
+                    geometry
+                        .size
+                        .height,
+                alignment:
+                    .top
+            )
+        }
+    }
+
+
+    private var relatedTasksScroll:
+        some View
+    {
+        ScrollView {
+            relatedTasksSection
+                .padding(
+                    .horizontal,
+                    24
+                )
+                .padding(
+                    .top,
+                    4
+                )
+                .padding(
+                    .bottom,
+                    20
+                )
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
+                )
+        }
+        .background(
+            TestudoStyle
+                .contentBackground
+        )
+    }
+
+
+    private var relatedTasksSection:
+        some View
+    {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                14
+        ) {
+            HStack {
+                Text(
+                    "Related Tasks"
+                )
+                .font(
+                    .title3
+                )
+                .fontWeight(
+                    .semibold
+                )
+
+                Spacer()
+
+                Text(
+                    "\(tasks.count)"
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            VStack(
+                spacing:
+                    0
+            ) {
+                ForEach(
+                    tasks
+                ) {
+                    task in
+
+                    Button {
+                        detailNavigation(
+                            .work(
+                                task.id
+                            )
+                        )
+
+                    } label: {
+                        taskRow(
+                            task
+                        )
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+
+
+                    if
+                        task.id
+                            != tasks
+                                .last?
+                                .id
+                    {
+                        Divider()
+                            .padding(
+                                .leading,
+                                30
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+
+    private func taskRow(
+        _ task:
+            WorkItem
+    ) -> some View
+    {
+        HStack(
+            alignment:
+                .top,
+            spacing:
+                10
+        ) {
+            Image(
+                systemName:
+                    taskIcon(
+                        task
+                    )
+            )
+            .testudoTaskStatusSymbolColor(
+                taskIcon(
+                    task
+                )
+            )
+            .frame(
+                width:
+                    20
+            )
+            .padding(
+                .top,
+                2
+            )
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    3
+            ) {
+                Text(
+                    taskTitle(
+                        task
+                    )
+                )
+                .font(
+                    .callout
+                )
+                .fontWeight(
+                    .medium
+                )
+                .foregroundStyle(
+                    .primary
+                )
+
+
+                HStack(
+                    spacing:
+                        6
+                ) {
+                    Text(
+                        "Task"
+                    )
+
+                    if
+                        let status =
+                            task.status
+                    {
+                        Text("·")
+
+                        Text(
+                            status
+                                .displayName
+                        )
+                    }
+
+
+                    if
+                        let theme =
+                            store.theme(
+                                id:
+                                    task.themeID
+                            )
+                    {
+                        Text("·")
+
+                        Text(
+                            theme.name
+                        )
+                    }
+
+
+                    if
+                        let deadline =
+                            task.deadlineAt
+                    {
+                        Text("·")
+
+                        Text(
+                            "Due \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: task.deadlineTimeZoneID))"
+                        )
+                    }
+                }
+                .font(
+                    .caption2
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+
+                let body =
+                    task.body
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                let explicitTitle =
+                    task.title?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                    ?? ""
+
+
+                if
+                    !body.isEmpty,
+                    !explicitTitle.isEmpty
+                {
+                    Text(
+                        body
+                    )
+                    .font(
+                        .caption
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .lineLimit(
+                        2
+                    )
+                    .fixedSize(
+                        horizontal:
+                            false,
+                        vertical:
+                            true
+                    )
+                }
+            }
+
+
+            Spacer(
+                minLength:
+                    0
+            )
+        }
+        .padding(
+            .vertical,
+            7
+        )
+        .contentShape(
+            Rectangle()
+        )
+    }
+
+
+    private func taskTitle(
+        _ task:
+            WorkItem
+    ) -> String {
+
+        if
+            let title =
+                task.title?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !title.isEmpty
+        {
+            return title
+        }
+
+
+        let body =
+            task.body
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !body.isEmpty {
+            return body
+        }
+
+
+        return "Task"
+    }
+
+
+    private func taskIcon(
+        _ task:
+            WorkItem
+    ) -> String {
+
+        switch task.status {
+        case .completed:
+            return
+                "checkmark.circle"
+
+        case .closed:
+            return
+                "archivebox"
+
+        case .inProgress:
+            return
+                "clock"
+
+        case .todo,
+             nil:
+            return
+                "circle"
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - Entity Related Tasks
+//
+// Organization and Group share the same Work relationship
+// semantics.
+// ============================================================
+
+private struct EntityRelatedTasksDetail<
+    DetailContent:
+        View
+>: View {
+
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    let entityID:
+        UUID
+
+    private let detailContent:
+        () -> DetailContent
+
+
+    init(
+        entityID:
+            UUID,
+        @ViewBuilder
+        detailContent:
+            @escaping () -> DetailContent
+    ) {
+        self.entityID =
+            entityID
+
+        self.detailContent =
+            detailContent
+    }
+
+
+    var body:
+        some View
+    {
+        RelatedTasksSplitPane(
+            tasks:
+                relatedTasks
+        ) {
+            detailContent()
+        }
+    }
+
+
+    private var relatedTasks:
+        [WorkItem]
+    {
+        store.data
+            .workItems
+            .filter {
+                item in
+
+                item.kind
+                    == .task
+                &&
+                workItemIsRelated(
+                    item
+                )
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+
+
+    private func workItemIsRelated(
+        _ item:
+            WorkItem
+    ) -> Bool {
+
+        if
+            store.data
+                .workEntityRelationships
+                .contains(
+                    where: {
+                        $0.workItemID
+                            == item.id
+                        &&
+                        $0.entityID
+                            == entityID
+                    }
+                )
+        {
+            return true
+        }
+
+
+        var currentParent =
+            item.parentWorkItemID
+
+        var visited =
+            Set<UUID>()
+
+
+        while
+            let parentID =
+                currentParent
+        {
+            guard
+                visited
+                    .insert(
+                        parentID
+                    )
+                    .inserted
+            else {
+                break
+            }
+
+
+            if
+                store.data
+                    .workEntityRelationships
+                    .contains(
+                        where: {
+                            $0.workItemID
+                                == parentID
+                            &&
+                            $0.entityID
+                                == entityID
+                            &&
+                            $0.inheritedByChildren
+                        }
+                    )
+            {
+                return true
+            }
+
+
+            currentParent =
+                store.workItem(
+                    id:
+                        parentID
+                )?
+                .parentWorkItemID
+        }
+
+
+        return false
+    }
+}
+
+
+// ============================================================
+// MARK: - Organization Detail
+// ============================================================
+
+struct OrganizationDetailView:
+    View
+{
+    let organizationID:
+        UUID
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        organizationID:
+            UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.organizationID =
+            organizationID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
+
+
+    var body:
+        some View
+    {
+        EntityRelatedTasksDetail(
+            entityID:
+                organizationID
+        ) {
+            RichStructureEntityDetailView(
+                entityID:
+                    organizationID
+            ) {
+                detailDeleteFooter
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - Group Detail
+// ============================================================
+
+struct GroupDetailView:
+    View
+{
+    let groupID:
+        UUID
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        groupID:
+            UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.groupID =
+            groupID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
+
+
+    var body:
+        some View
+    {
+        EntityRelatedTasksDetail(
+            entityID:
+                groupID
+        ) {
+            RichStructureEntityDetailView(
+                entityID:
+                    groupID
+            ) {
+                detailDeleteFooter
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - Theme Detail
+// ============================================================
+
+struct ThemeRelatedTasksDetailView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    let themeID:
+        UUID
+
+    private let detailDeleteFooter:
+        AnyView
+
+
+    init<DeleteFooter: View>(
+        themeID:
+            UUID,
+        @ViewBuilder
+        deleteFooter:
+            () -> DeleteFooter
+    ) {
+        self.themeID =
+            themeID
+
+        self.detailDeleteFooter =
+            AnyView(
+                deleteFooter()
+            )
+    }
+
+
+    var body:
+        some View
+    {
+        RelatedTasksSplitPane(
+            tasks:
+                relatedTasks
+        ) {
+            RichThemeDetailView(
+                themeID:
+                    themeID
+            ) {
+                detailDeleteFooter
+            }
+        }
+    }
+
+
+    // Tasks directly assigned to this Theme.
+    //
+    // Tasks belonging to descendant Themes remain associated
+    // with those descendant Themes rather than being duplicated
+    // in every ancestor's Related Tasks pane.
+    private var relatedTasks:
+        [WorkItem]
+    {
+        store.data
+            .workItems
+            .filter {
+                $0.kind
+                    == .task
+                &&
+                $0.themeID
+                    == themeID
+            }
+            .sorted {
+                $0.updatedAt
+                    > $1.updatedAt
+            }
+    }
+}
+
+
 struct RichStructureEntityDetailView:
     View
 {
@@ -1386,7 +2255,11 @@ struct RichStructureEntityDetailView:
                 ScrollView {
                     VStack(
                         alignment: .leading,
-                        spacing: 26
+                        spacing:
+                            entity.kind
+                                == .organization
+                            ? 18
+                            : 26
                     ) {
                         header(entity)
 
@@ -1430,9 +2303,17 @@ struct RichStructureEntityDetailView:
                                 ownerRow(entity)
                             }
                         }
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
+                        )
 
                         membershipsSection(
                             entity
+                        )
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
                         )
 
 
@@ -1442,6 +2323,10 @@ struct RichStructureEntityDetailView:
                         {
                             affiliatedPeopleSection(
                                 entity
+                            )
+                            .organizationDetailCard(
+                                entity.kind
+                                    == .organization
                             )
                         }
 
@@ -1473,6 +2358,10 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
+                        )
 
                         StructureInspectorSection(
                             title:
@@ -1552,6 +2441,10 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
+                        )
 
                         StructureInspectorSection(
                             title:
@@ -1593,6 +2486,10 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
+                        )
 
                         if let errorMessage {
                             Text(errorMessage)
@@ -1630,6 +2527,10 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
+                        .organizationDetailCard(
+                            entity.kind
+                                == .organization
+                        )
 
                         // DETAIL DELETE FOOTER
                         HStack {

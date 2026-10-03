@@ -3269,68 +3269,512 @@ private struct CreateWorkItemView: View {
 
 private struct EntityListView: View {
     @EnvironmentObject
-    private var store: TestudoStore
+    private var store:
+        TestudoStore
 
-    let kind: EntityKind
+    let kind:
+        EntityKind
 
     @Binding
-    var selection: UUID?
+    var selection:
+        UUID?
+
+
+    private struct OrganizationOutlineEntry:
+        Identifiable
+    {
+        let entity:
+            Entity
+
+        let depth:
+            Int
+
+        var id:
+            UUID
+        {
+            entity.id
+        }
+    }
+
 
     var body: some View {
         let entities =
-            store.entities(of: kind)
+            store.entities(
+                of:
+                    kind
+            )
 
         if entities.isEmpty {
             ContentUnavailableView {
                 Label(
                     emptyTitle,
-                    systemImage: icon
+                    systemImage:
+                        icon
                 )
             } description: {
-                Text(emptyDescription)
+                Text(
+                    emptyDescription
+                )
             }
             .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
+                maxWidth:
+                    .infinity,
+                maxHeight:
+                    .infinity
             )
+
+        } else if
+            kind == .organization
+        {
+            organizationList
+
         } else {
-            List {
-                ForEach(
-                    entities
-                ) { entity in
+            flatEntityList(
+                entities
+            )
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Organization hierarchy
+    // ========================================================
+
+    private var organizationList:
+        some View
+    {
+        List {
+            ForEach(
+                organizationEntries
+            ) {
+                entry in
+
+                organizationRow(
+                    entry
+                )
+                .padding(
+                    .leading,
+                    min(
+                        CGFloat(
+                            entry.depth
+                        ) * 18,
+                        90
+                    )
+                )
+                .middleColumnSelectionStyle(
+                    selection
+                        == entry.entity.id,
+                    leadingExtension:
+                        4,
+                    trailingExtension:
+                        4
+                )
+                .contentShape(
+                    Rectangle()
+                )
+                .onTapGesture {
+                    selection =
+                        entry.entity.id
+                }
+            }
+        }
+    }
+
+
+    private func organizationRow(
+        _ entry:
+            OrganizationOutlineEntry
+    ) -> some View
+    {
+        HStack(
+            alignment:
+                .top,
+            spacing:
+                9
+        ) {
+            Image(
+                systemName:
+                    "building.2"
+            )
+            .font(
+                .system(
+                    size:
+                        12,
+                    weight:
+                        .regular
+                )
+            )
+            .foregroundStyle(
+                selection
+                    == entry.entity.id
+                ? Color.white
+                : Color.primary
+            )
+            .frame(
+                width:
+                    17,
+                height:
+                    17
+            )
+            .padding(
+                .top,
+                1
+            )
+
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    2
+            ) {
+                Text(
+                    entry.entity.name
+                )
+                .fontWeight(
+                    .medium
+                )
+
+
+                if
+                    let secondary =
+                        organizationSecondaryText(
+                            entry.entity
+                        )
+                {
+                    Text(
+                        secondary
+                    )
+                    .font(
+                        .caption
+                    )
+                    .foregroundStyle(
+                        selection
+                            == entry.entity.id
+                        ? Color.white
+                            .opacity(
+                                0.82
+                            )
+                        : Color.secondary
+                    )
+                    .lineLimit(
+                        1
+                    )
+                }
+            }
+
+
+            Spacer(
+                minLength:
+                    0
+            )
+        }
+        .padding(
+            .vertical,
+            3
+        )
+    }
+
+
+    private var organizationEntries:
+        [OrganizationOutlineEntry]
+    {
+        let organizations =
+            store.entities(
+                of:
+                    .organization
+            )
+
+        let organizationIDs =
+            Set(
+                organizations.map(
+                    \.id
+                )
+            )
+
+
+        var parentIDs:
+            [UUID: UUID] = [:]
+
+
+        for organization in
+            organizations
+        {
+            if
+                let parent =
+                    store
+                        .containers(
+                            for:
+                                organization.id
+                        )
+                        .first(
+                            where: {
+                                $0.kind
+                                    == .organization
+                            }
+                        )
+            {
+                parentIDs[
+                    organization.id
+                ] =
+                    parent.id
+            }
+        }
+
+
+        let roots =
+            organizations
+                .filter {
+                    organization in
+
+                    guard
+                        let parentID =
+                            parentIDs[
+                                organization.id
+                            ]
+                    else {
+                        return true
+                    }
+
+                    return
+                        !organizationIDs
+                            .contains(
+                                parentID
+                            )
+                }
+                .sorted(
+                    by:
+                        organizationSort
+                )
+
+
+        var result:
+            [OrganizationOutlineEntry] =
+            []
+
+        var visited =
+            Set<UUID>()
+
+
+        func append(
+            _ organization:
+                Entity,
+            depth:
+                Int
+        ) {
+            guard
+                visited
+                    .insert(
+                        organization.id
+                    )
+                    .inserted
+            else {
+                return
+            }
+
+
+            result.append(
+                OrganizationOutlineEntry(
+                    entity:
+                        organization,
+                    depth:
+                        depth
+                )
+            )
+
+
+            let children =
+                organizations
+                    .filter {
+                        parentIDs[
+                            $0.id
+                        ]
+                        == organization.id
+                    }
+                    .sorted(
+                        by:
+                            organizationSort
+                    )
+
+
+            for child in
+                children
+            {
+                append(
+                    child,
+                    depth:
+                        depth + 1
+                )
+            }
+        }
+
+
+        for root in
+            roots
+        {
+            append(
+                root,
+                depth:
+                    0
+            )
+        }
+
+
+        // Defensive fallback for malformed/cyclic legacy data.
+        for organization in
+            organizations
+                .sorted(
+                    by:
+                        organizationSort
+                )
+        {
+            if
+                !visited
+                    .contains(
+                        organization.id
+                    )
+            {
+                append(
+                    organization,
+                    depth:
+                        0
+                )
+            }
+        }
+
+
+        return result
+    }
+
+
+    private func organizationSort(
+        _ lhs:
+            Entity,
+        _ rhs:
+            Entity
+    ) -> Bool {
+        lhs.name
+            .localizedCaseInsensitiveCompare(
+                rhs.name
+            )
+        == .orderedAscending
+    }
+
+
+    private func organizationSecondaryText(
+        _ organization:
+            Entity
+    ) -> String?
+    {
+        let shortName =
+            organization.shortName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        if !shortName.isEmpty {
+            return shortName
+        }
+
+
+        let code =
+            organization.code?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        if !code.isEmpty {
+            return code
+        }
+
+
+        return nil
+    }
+
+
+    // ========================================================
+    // MARK: Other entity lists
+    // ========================================================
+
+    private func flatEntityList(
+        _ entities:
+            [Entity]
+    ) -> some View
+    {
+        List {
+            ForEach(
+                entities
+            ) {
+                entity in
+
                 VStack(
-                    alignment: .leading,
-                    spacing: 4
+                    alignment:
+                        .leading,
+                    spacing:
+                        4
                 ) {
-                    Text(entity.name)
+                    Text(
+                        entity.name
+                    )
 
                     let containers =
                         store.containers(
-                            for: entity.id
+                            for:
+                                entity.id
                         )
 
                     if !containers.isEmpty {
                         Text(
                             containers
-                                .map(\.name)
+                                .map(
+                                    \.name
+                                )
                                 .joined(
-                                    separator: " · "
+                                    separator:
+                                        " · "
                                 )
                         )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
+                        .font(
+                            .caption
                         )
+                        .foregroundStyle(
+                            selection
+                                == entity.id
+                            ? Color.white
+                                .opacity(
+                                    0.82
+                                )
+                            : Color.secondary
+                        )
+
                     } else {
-                        Text("Independent")
-                            .font(.caption)
-                            .foregroundStyle(
-                                .tertiary
-                            )
+                        Text(
+                            "Independent"
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            selection
+                                == entity.id
+                            ? Color.white
+                                .opacity(
+                                    0.72
+                                )
+                            : Color.secondary
+                                .opacity(
+                                    0.65
+                                )
+                        )
                     }
                 }
                 .middleColumnSelectionStyle(
-                    selection == entity.id,
+                    selection
+                        == entity.id,
                     leadingExtension:
                         4,
                     trailingExtension:
@@ -3344,22 +3788,32 @@ private struct EntityListView: View {
                         entity.id
                 }
             }
-            }
         }
     }
 
-    private var emptyTitle: String {
+
+    private var emptyTitle:
+        String
+    {
         switch kind {
         case .organization:
-            return "No Organizations Yet"
+            return
+                "No Organizations Yet"
+
         case .group:
-            return "No Groups Yet"
+            return
+                "No Groups Yet"
+
         case .person:
-            return "No People Yet"
+            return
+                "No People Yet"
         }
     }
 
-    private var emptyDescription: String {
+
+    private var emptyDescription:
+        String
+    {
         switch kind {
         case .organization:
             return
@@ -3375,17 +3829,26 @@ private struct EntityListView: View {
         }
     }
 
-    private var icon: String {
+
+    private var icon:
+        String
+    {
         switch kind {
         case .organization:
-            return "building.2"
+            return
+                "building.2"
+
         case .group:
-            return "person.3"
+            return
+                "person.3"
+
         case .person:
-            return "person.2"
+            return
+                "person.2"
         }
     }
 }
+
 
 private struct CreateThemeView: View {
     @EnvironmentObject
