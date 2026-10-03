@@ -2355,73 +2355,82 @@ private struct WorkItemNodeView: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            Image(
-                systemName: itemIcon
-            )
-            .foregroundStyle(
-                item.kind == .task
-                ? (
-                    item.status
-                    ?? .todo
-                )
-                    .testudoStatusIconColor
-                : (
-                    isSelectedWorkItem
-                    ? Color.white
-                    : Color.secondary
-                )
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
+            HStack(
+                alignment: .top,
+                spacing: 8
             ) {
-                Text(displayTitle)
-                    .lineLimit(1)
-
-                if
-                    item.kind == .task,
-                    let status =
+                Image(
+                    systemName: itemIcon
+                )
+                .foregroundStyle(
+                    item.kind == .task
+                    ? (
                         item.status
-                {
-                    Text(
-                        status.displayName
+                        ?? .todo
                     )
-                    .font(.caption2)
-                    .foregroundStyle(
+                        .testudoStatusIconColor
+                    : (
                         isSelectedWorkItem
-                        ? Color.white.opacity(0.85)
+                        ? Color.white
                         : Color.secondary
                     )
+                )
+                .padding(
+                    .top,
+                    2
+                )
 
-                    if let deadline =
-                        item.deadlineAt
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(displayTitle)
+                        .lineLimit(1)
+
+                    if
+                        item.kind == .task,
+                        let status =
+                            item.status
                     {
                         Text(
-                            "Deadline: \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))"
+                            status.displayName
                         )
                         .font(.caption2)
                         .foregroundStyle(
                             isSelectedWorkItem
                             ? Color.white.opacity(0.85)
-                            : (
-                                deadline < Date()
-                                && status != .completed
-                                ? Color.red
-                                : Color.secondary
+                            : Color.secondary
+                        )
+
+                        if let deadline =
+                            item.deadlineAt
+                        {
+                            Text(
+                                "Deadline: \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))"
                             )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                isSelectedWorkItem
+                                ? Color.white.opacity(0.85)
+                                : (
+                                    deadline < Date()
+                                    && status != .completed
+                                    ? Color.red
+                                    : Color.secondary
+                                )
+                            )
+                        }
+                    } else {
+                        Text(
+                            item.kind.displayName
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            isSelectedWorkItem
+                            ? Color.white.opacity(0.85)
+                            : Color.secondary
                         )
                     }
-                } else {
-                    Text(
-                        item.kind.displayName
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        isSelectedWorkItem
-                        ? Color.white.opacity(0.85)
-                        : Color.secondary
-                    )
                 }
             }
 
@@ -2453,6 +2462,7 @@ private struct WorkItemNodeView: View {
             alignment: .center
         )
     }
+
 
     @ViewBuilder
     private var contextMenuContent:
