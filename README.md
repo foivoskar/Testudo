@@ -1,5 +1,9 @@
 # Testudo
 
+<p align="center">
+  <img src="Sources/Testudo/Resources/TestudoIcon.png" alt="Testudo application icon" width="180">
+</p>
+
 **Testudo** is a native macOS application for organizing complex professional and research work across tasks, notes, activities, calendar events, people, groups, organizations, themes, and independent Work Environments.
 
 It is designed especially for researchers, research software engineers, technical staff, academics, and people whose work involves multiple projects, institutions, collaborators, and scientific domains.
