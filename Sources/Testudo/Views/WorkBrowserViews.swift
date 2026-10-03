@@ -1528,6 +1528,11 @@ struct WorkItemDetailView: View {
                         item
                     )
             )
+            .testudoTaskStatusSymbolColor(
+                largeIcon(
+                        item
+                    )
+            )
             .font(.title2)
             .frame(width: 28)
 
@@ -2186,6 +2191,9 @@ struct WorkItemDetailView: View {
                             systemName:
                                 "plus.circle"
                         )
+            .testudoTaskStatusSymbolColor(
+                "plus.circle"
+            )
                         .font(
                             .system(
                                 size: 13,
@@ -2252,6 +2260,11 @@ struct WorkItemDetailView: View {
                                                 child
                                             )
                                     )
+            .testudoTaskStatusSymbolColor(
+                childIcon(
+                                                child
+                                            )
+            )
                                     .frame(
                                         width: 18
                                     )
@@ -2433,6 +2446,9 @@ struct WorkItemDetailView: View {
                                 systemName:
                                     "exclamationmark.circle.fill"
                             )
+            .testudoTaskStatusSymbolColor(
+                "exclamationmark.circle.fill"
+            )
                             .foregroundStyle(
                                 .red
                             )
@@ -2760,6 +2776,9 @@ struct WorkItemDetailView: View {
                     systemName:
                         "info.circle"
                 )
+            .testudoTaskStatusSymbolColor(
+                "info.circle"
+            )
                 .foregroundStyle(
                     .secondary
                 )
@@ -3128,6 +3147,9 @@ struct WorkItemDetailView: View {
                             systemName:
                                 "plus.circle"
                         )
+            .testudoTaskStatusSymbolColor(
+                "plus.circle"
+            )
                         .font(
                             .system(
                                 size: 12,
@@ -3225,6 +3247,9 @@ struct WorkItemDetailView: View {
                             systemName:
                                 "pencil"
                         )
+            .testudoTaskStatusSymbolColor(
+                "pencil"
+            )
                         .font(
                             .system(
                                 size: 10,
@@ -3906,6 +3931,9 @@ struct WorkItemDetailView: View {
                                     systemName:
                                         entry.icon
                                 )
+            .testudoTaskStatusSymbolColor(
+                entry.icon
+            )
                                 .font(
                                     .system(
                                         size: 11,
