@@ -2088,7 +2088,9 @@ private struct ThemeNodeView: View {
                     selectedWorkItemID:
                         $selectedWorkItemID,
                     workCreationRequest:
-                        $workCreationRequest
+                        $workCreationRequest,
+                    initiallyExpanded:
+                        false
                 )
             }
 
@@ -2234,7 +2236,9 @@ private struct WorkItemNodeView: View {
                 .constant(nil),
         workCreationRequest:
             Binding<WorkCreationRequest?> =
-                .constant(nil)
+                .constant(nil),
+        initiallyExpanded:
+            Bool = true
     ) {
         self.item =
             item
@@ -2244,10 +2248,17 @@ private struct WorkItemNodeView: View {
 
         self._workCreationRequest =
             workCreationRequest
+
+        self._isExpanded =
+            State(
+                initialValue:
+                    initiallyExpanded
+            )
     }
 
     @State
-    private var isExpanded = true
+    private var isExpanded:
+        Bool
 
     @State
     private var createKind:
