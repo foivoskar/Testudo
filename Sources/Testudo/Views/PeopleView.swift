@@ -13,6 +13,100 @@ struct PeopleListView: View {
             store.entities(
                 of: .person
             )
+            .sorted {
+                lhs,
+                rhs in
+
+                let lhsProfile =
+                    store.personProfile(
+                        for:
+                            lhs.id
+                    )
+
+                let rhsProfile =
+                    store.personProfile(
+                        for:
+                            rhs.id
+                    )
+
+                let lhsLastName =
+                    lhsProfile?
+                        .lastName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                    ?? ""
+
+                let rhsLastName =
+                    rhsProfile?
+                        .lastName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                    ?? ""
+
+                let lhsSurnameKey =
+                    lhsLastName.isEmpty
+                    ? lhs.name
+                    : lhsLastName
+
+                let rhsSurnameKey =
+                    rhsLastName.isEmpty
+                    ? rhs.name
+                    : rhsLastName
+
+                let surnameComparison =
+                    lhsSurnameKey
+                        .localizedCaseInsensitiveCompare(
+                            rhsSurnameKey
+                        )
+
+                if surnameComparison
+                    != .orderedSame
+                {
+                    return surnameComparison
+                        == .orderedAscending
+                }
+
+                let lhsFirstName =
+                    lhsProfile?
+                        .firstName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                    ?? ""
+
+                let rhsFirstName =
+                    rhsProfile?
+                        .firstName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                    ?? ""
+
+                let firstNameComparison =
+                    lhsFirstName
+                        .localizedCaseInsensitiveCompare(
+                            rhsFirstName
+                        )
+
+                if firstNameComparison
+                    != .orderedSame
+                {
+                    return firstNameComparison
+                        == .orderedAscending
+                }
+
+                return lhs.name
+                    .localizedCaseInsensitiveCompare(
+                        rhs.name
+                    )
+                    == .orderedAscending
+            }
 
         if people.isEmpty {
             ContentUnavailableView {
