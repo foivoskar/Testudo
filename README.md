@@ -8,6 +8,56 @@
 
 It is designed especially for researchers, research software engineers, technical staff, academics, and people whose work involves multiple projects, institutions, collaborators, and scientific domains.
 
+## Installation
+
+### Recommended: build Testudo locally
+
+Current public Testudo binaries are not yet notarized with an Apple Developer ID. Because of this, macOS Gatekeeper may block a prebuilt application downloaded from the Internet.
+
+For the current releases, the recommended installation method is therefore to build Testudo locally from the public source code.
+
+Requirements:
+
+- macOS 14 or later
+- Apple Silicon Mac
+- Xcode or the Apple Command Line Tools with Swift available
+- Git
+
+Clone the repository:
+
+    git clone https://github.com/foivoskar/Testudo.git
+    cd Testudo
+
+Then build the local DMG:
+
+    ./Scripts/build-local-dmg.sh
+
+The script checks the required development tools, builds Testudo in release configuration, creates the application bundle, signs it locally, creates the installer DMG, verifies the disk image, and opens it.
+
+The resulting file is written to `dist/`, for example:
+
+    dist/Testudo-0.1.4-macOS-arm64.dmg
+
+When the DMG opens, drag `Testudo.app` from the left into `Applications` on the right.
+
+Because the application is compiled locally on your own Mac rather than downloaded as a prebuilt executable, this method avoids the Gatekeeper problem affecting the current unnotarized GitHub binaries.
+
+No paid Apple Developer account is required to build Testudo locally.
+
+### Updating an existing source checkout
+
+If you already cloned Testudo previously:
+
+    cd Testudo
+    git pull --ff-only
+    ./Scripts/build-local-dmg.sh
+
+### Prebuilt GitHub DMG
+
+A prebuilt DMG is also available from GitHub Releases.
+
+Current prebuilt releases are ad-hoc signed and are not notarized by Apple. Depending on the macOS security policy, Gatekeeper may refuse to launch them. Until Testudo is distributed with Developer ID signing and Apple notarization, building locally is the recommended method.
+
 ## Core idea
 
 Testudo combines three things that are often separated in conventional task managers:
@@ -243,34 +293,6 @@ The local Testudo user profile can be exported as a `.testudouser` file.
 This provides a convenient way to restore profile information after a complete local Sign Out.
 
 Environment registrations, Environment passwords and recovery credentials are intentionally not stored in `.testudouser`.
-
-## Installation
-
-Testudo currently targets macOS on Apple Silicon.
-
-Download the latest DMG from the GitHub Releases page.
-
-Open the disk image and drag:
-
-    Testudo.app
-
-into:
-
-    Applications
-
-Then launch Testudo from Applications.
-
-### macOS security warning
-
-Current Testudo builds are not notarized with an Apple Developer ID.
-
-Depending on the macOS security configuration, macOS may block the application the first time it is launched.
-
-If necessary, use:
-
-**System Settings → Privacy & Security → Open Anyway**
-
-or right-click `Testudo.app` and choose **Open**.
 
 ## Building from source
 
