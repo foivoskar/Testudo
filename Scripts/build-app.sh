@@ -5,8 +5,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 CONFIG="${1:-debug}"
+VERSION="${2:-0.1.1}"
+BUILD_NUMBER="${3:-2}"
 
-echo "Building Testudo ($CONFIG)..."
+echo "Building Testudo ${VERSION} (${BUILD_NUMBER}) [$CONFIG]..."
 echo
 
 swift build -c "$CONFIG"
@@ -115,7 +117,7 @@ fi
 
 cp     "$TESTUDO_ICON"     "$APP/Contents/Resources/testudo_icon_blue.png"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -146,10 +148,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>APPL</string>
 
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>${VERSION}</string>
 
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD_NUMBER}</string>
 
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>

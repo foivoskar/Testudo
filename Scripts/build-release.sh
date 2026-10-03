@@ -4,7 +4,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-VERSION="${1:-0.1.0}"
+VERSION="${1:-0.1.1}"
+BUILD_NUMBER="${2:-2}"
 ARCH="$(uname -m)"
 
 APP_NAME="Testudo"
@@ -22,6 +23,7 @@ echo "  TESTUDO — RELEASE BUILD"
 echo "============================================================"
 echo
 echo "Version:      ${VERSION}"
+echo "Build:        ${BUILD_NUMBER}"
 echo "Architecture: ${ARCH}"
 echo
 
@@ -34,7 +36,7 @@ mkdir -p \
 echo "Building Testudo.app..."
 echo
 
-./Scripts/build-app.sh release
+./Scripts/build-app.sh release "$VERSION" "$BUILD_NUMBER"
 
 if [ ! -d "${APP_PATH}" ]; then
     echo
