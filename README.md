@@ -132,6 +132,18 @@ Git tags identify source versions of Testudo. Installation is performed by compi
 
 This keeps the current installation model independent of Developer ID distribution and Apple notarization of a prebuilt Testudo executable.
 
+## Documentation
+
+A complete English user manual is available directly from this repository:
+
+- [Testudo User Manual — PDF](Testudo_manual.pdf)
+- [LaTeX source](Documentation/TestudoManual/Testudo_manual.tex)
+- [LaTeX document class](Documentation/TestudoManual/testudomanual.cls)
+
+The manual covers installation, Work Environments, authentication, navigation, Tasks, Notes, Activities, Calendar Events, Themes, People, Groups, Organizations, external calendars, time zones, data portability, administration, security, troubleshooting, recommended workflows and technical reference material.
+
+The PDF is generated from the LaTeX sources stored under `Documentation/TestudoManual/`.
+
 ## Core idea
 
 Testudo combines three things that are often separated in conventional task managers:

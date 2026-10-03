@@ -1,0 +1,2115 @@
+\documentclass{testudomanual}
+
+\newcommand{\ManualVersion}{1.0}
+\newcommand{\DocumentedTestudoVersion}{0.1.4}
+\newcommand{\ManualDate}{October 2026}
+
+\newcommand{\TestudoIconPath}{
+    ../../Sources/Testudo/Resources/testudo_icon_blue.png
+}
+
+\title{Testudo User Manual}
+\author{Foivos Karakostas}
+\date{\ManualDate}
+
+\begin{document}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+
+\begin{titlepage}
+
+    \centering
+
+    \vspace*{18mm}
+
+    \includegraphics[
+        width=0.24\textwidth
+    ]{\TestudoIconPath}
+
+    \vspace{16mm}
+
+    {\Huge\bfseries\color{TestudoDarkBlue}
+        Testudo
+        \par
+    }
+
+    \vspace{5mm}
+
+    {\LARGE
+        User Manual
+        \par
+    }
+
+    \vspace{8mm}
+
+    {\large
+        A native local-first macOS environment for
+        structured professional and research work
+        \par
+    }
+
+    \vfill
+
+    \begin{tabular}{rl}
+        Manual version: &
+        \ManualVersion
+        \\[3pt]
+
+        Application version documented: &
+        \DocumentedTestudoVersion
+        \\[3pt]
+
+        Platform: &
+        macOS, Apple Silicon
+        \\[3pt]
+
+        Date: &
+        \ManualDate
+    \end{tabular}
+
+    \vfill
+
+    {\small
+        Foivos Karakostas
+        \par
+    }
+
+    \vspace{8mm}
+
+\end{titlepage}
+
+
+% ============================================================
+% FRONT MATTER
+% ============================================================
+
+\pagenumbering{roman}
+
+\chapter*{About this manual}
+
+\addcontentsline{
+    toc
+}{
+    chapter
+}{
+    About this manual
+}
+
+This manual documents the current implemented form of \Testudo,
+a native macOS application for organising complex professional,
+technical, academic and research work.
+
+The manual focuses on the user-facing concepts and workflows of the
+application. It also explains the local-first storage model,
+authentication architecture, calendar integration, portability and
+installation process.
+
+\Testudo\ is under active development. Screens, labels and individual
+workflows may evolve between versions. Where the data model provides
+a stable conceptual distinction, this manual explains that distinction
+explicitly.
+
+\manualnote{Terminology}{
+In the current implementation, a chronological work-log entry inside
+the Work hierarchy is called an \term{Activity}. A scheduled
+\term{Calendar Event} is a separate object. The two concepts should
+not be confused.
+}
+
+\manualnote{Image used in this manual}{
+The visual mark used on the cover is
+\filepath{Sources/Testudo/Resources/testudo\_icon\_blue.png}.
+This is also the default visual used for newly created Work
+Environments.
+}
+
+\clearpage
+
+\tableofcontents
+
+\clearpage
+
+\pagenumbering{arabic}
+
+
+% ============================================================
+% CHAPTER 1
+% ============================================================
+
+\chapter{Introduction}
+
+\section{What Testudo is}
+
+\Testudo\ is a native macOS application designed to bring several
+normally separate aspects of professional work into one structured
+environment.
+
+Its core model combines:
+
+\begin{itemize}
+    \item hierarchical Tasks and sub-tasks;
+    \item Notes and chronological Activities;
+    \item scheduled Calendar Events;
+    \item People;
+    \item Groups;
+    \item Organizations;
+    \item thematic classification through Themes;
+    \item relationships between work and real-world entities;
+    \item chronological history and audit information;
+    \item portable, independent Work Environments.
+\end{itemize}
+
+The application is particularly suitable for situations in which work
+cannot be represented adequately by a flat task list.
+
+Examples include:
+
+\begin{itemize}
+    \item scientific research;
+    \item research software engineering;
+    \item laboratory and technical operations;
+    \item academic collaborations;
+    \item multi-institution projects;
+    \item infrastructure administration;
+    \item project coordination;
+    \item seminar or working-group organisation;
+    \item long-running professional activities with extensive history.
+\end{itemize}
+
+
+\section{Local-first design}
+
+\Testudo\ is designed as a local-first application.
+
+There is no mandatory Testudo cloud service. The primary data of a
+Work Environment is stored in a portable
+\fileext{.testudoenv} package chosen by the user.
+
+The package may be placed:
+
+\begin{itemize}
+    \item on local storage;
+    \item in iCloud Drive;
+    \item in Dropbox;
+    \item in OneDrive;
+    \item or in another filesystem location available to macOS.
+\end{itemize}
+
+\Testudo\ works with the selected package instead of importing its
+contents into a proprietary remote service.
+
+\manualwarning{Synchronised folders}{
+A cloud-synchronised filesystem can transport a Work Environment
+between computers, but it is still a filesystem synchronisation
+mechanism. Avoid simultaneous conflicting edits from multiple
+computers unless you are certain the synchronisation system has
+completed.
+}
+
+
+\section{The principal data domains}
+
+The application can be understood as several connected domains.
+
+\begin{longtable}{L{0.23\textwidth} L{0.69\textwidth}}
+\toprule
+\textbf{Domain} &
+\textbf{Purpose}
+\\
+\midrule
+\endhead
+
+Work &
+Tasks, sub-tasks, Notes and Activities.
+\\
+
+Calendar &
+Scheduled Calendar Events from Testudo or connected external
+calendars.
+\\
+
+Themes &
+Hierarchical semantic classification of work and entities.
+\\
+
+People &
+Individuals, profiles and professional affiliations.
+\\
+
+Groups &
+Teams, laboratories, committees and other group structures.
+\\
+
+Organizations &
+Institutions and organizational hierarchies.
+\\
+
+History &
+Chronological record of important work-related changes.
+\\
+
+Work Environments &
+Independent portable collections of data, membership and
+configuration.
+\\
+
+\bottomrule
+\end{longtable}
+
+
+% ============================================================
+% CHAPTER 2
+% ============================================================
+
+\chapter{Installation}
+
+\section{System requirements}
+
+The current public version of Testudo requires:
+
+\begin{itemize}
+    \item macOS 14 or later;
+    \item an Apple Silicon Mac;
+    \item Swift 6.0 or later;
+    \item Xcode or Apple Command Line Tools;
+    \item Git for the normal source-based installation workflow.
+\end{itemize}
+
+The current distribution model intentionally builds the application
+locally from source.
+
+A paid Apple Developer Program membership is not required for this
+local-build installation workflow.
+
+
+\section{Quick local installation}
+
+The simplest installation workflow is:
+
+\begin{lstlisting}
+curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh | bash
+\end{lstlisting}
+
+The installer:
+
+\begin{enumerate}
+    \item verifies that the computer is running macOS;
+    \item verifies that it is an Apple Silicon Mac;
+    \item checks the Apple developer tools;
+    \item checks the Swift version;
+    \item obtains the public Testudo source code;
+    \item builds the application locally;
+    \item ad-hoc signs the locally compiled application;
+    \item creates a local DMG installer;
+    \item verifies the DMG;
+    \item opens the finished installer.
+\end{enumerate}
+
+The Testudo executable itself is therefore compiled on the user's Mac
+rather than downloaded as a prebuilt application binary.
+
+
+\section{Inspecting the installer first}
+
+Users who do not wish to pipe a remote script directly to a shell can
+download and inspect it first:
+
+\begin{lstlisting}
+curl -fsSL \
+  https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
+  -o testudo-install.sh
+\end{lstlisting}
+
+Inspect the file and then run:
+
+\begin{lstlisting}
+bash testudo-install.sh
+\end{lstlisting}
+
+
+\section{Manual local build}
+
+The equivalent manual procedure is:
+
+\begin{lstlisting}
+git clone https://github.com/foivoskar/Testudo.git
+cd Testudo
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+After a successful build, the installer is written to the
+\filepath{dist} directory.
+
+For example:
+
+\begin{lstlisting}
+dist/Testudo-0.1.4-macOS-arm64.dmg
+\end{lstlisting}
+
+Open the resulting DMG and drag \filepath{Testudo.app} into
+\filepath{Applications}.
+
+
+\section{Installing Apple developer tools}
+
+If the Command Line Tools are missing, macOS can request their
+installation with:
+
+\begin{lstlisting}
+xcode-select --install
+\end{lstlisting}
+
+After the installation completes, repeat the Testudo installation
+command.
+
+
+\section{Updating Testudo}
+
+If the one-line installer was used, it can be run again.
+
+For a manual Git checkout:
+
+\begin{lstlisting}
+cd ~/Testudo
+git pull --ff-only
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+A new locally built DMG is produced.
+
+Replace the older copy of \filepath{Testudo.app} in
+\filepath{/Applications} with the newly built application.
+
+
+\section{Why Testudo currently uses local compilation}
+
+Current Testudo distribution is source-first.
+
+The project does not depend on distribution of a prebuilt,
+Developer-ID-signed application. This allows users to obtain the
+public source and compile the executable directly on their own Mac.
+
+Git tags may be used to identify historical source versions without
+requiring downloadable application binaries.
+
+
+% ============================================================
+% CHAPTER 3
+% ============================================================
+
+\chapter{First Launch and the Local User}
+
+\section{The local Testudo profile}
+
+A Testudo installation has a local application user profile.
+
+The local profile describes the person using this installation and
+may include professional information such as:
+
+\begin{itemize}
+    \item first, middle and last name;
+    \item preferred name;
+    \item academic title;
+    \item job title;
+    \item professional e-mail addresses;
+    \item telephone numbers;
+    \item office;
+    \item employee identifier;
+    \item professional address;
+    \item website;
+    \item ORCID;
+    \item GitHub;
+    \item LinkedIn;
+    \item ResearcherID;
+    \item Scopus Author ID;
+    \item Google Scholar URL;
+    \item professional fields;
+    \item responsibilities;
+    \item preferred language;
+    \item preferred time zone;
+    \item tags and notes;
+    \item profile image.
+\end{itemize}
+
+This profile belongs to the application installation.
+
+It is conceptually separate from a Person object inside a particular
+Work Environment.
+
+
+\section{Local user versus Environment member}
+
+This distinction is important.
+
+The local application user represents the person operating this
+installation of Testudo.
+
+An Environment membership represents an identity \emph{inside a
+specific Work Environment}.
+
+The same local user may therefore have different roles in different
+Environments.
+
+For example:
+
+\begin{itemize}
+    \item Environment A: Administrator;
+    \item Environment B: User;
+    \item Environment C: no membership yet.
+\end{itemize}
+
+
+\section{Portable user profile}
+
+Testudo supports portable profile files with the extension:
+
+\begin{center}
+\fileext{.testudouser}
+\end{center}
+
+A Testudo user profile can be exported and later imported.
+
+This is intended to make restoration of personal profile information
+easier after a complete local sign-out or when configuring another
+installation.
+
+\manualnote{What a portable profile does not contain}{
+Environment registrations, Environment passwords and local
+authentication credentials are intentionally separate from the
+portable user profile.
+}
+
+
+% ============================================================
+% CHAPTER 4
+% ============================================================
+
+\chapter{Work Environments}
+
+\section{Concept}
+
+A \term{Work Environment} is an independent Testudo workspace.
+
+It contains the work, people, themes, structures, calendar
+relationships, membership information and history belonging to one
+logical environment.
+
+Different Environments are isolated from one another.
+
+
+\section{The \texorpdfstring{\fileext{.testudoenv}}{.testudoenv} package}
+
+A Work Environment is stored as a portable package whose filename
+ends in:
+
+\begin{center}
+\fileext{.testudoenv}
+\end{center}
+
+A typical package contains files such as:
+
+\begin{lstlisting}
+Example.testudoenv/
+|-- EnvironmentManifest.json
+|-- EnvironmentData.json
+|-- EnvironmentCredentials.json
+`-- EnvironmentIcon.png
+\end{lstlisting}
+
+The Environment icon is optional.
+
+
+\section{Environment manifest}
+
+The manifest makes a Work Environment self-identifying.
+
+It contains information such as:
+
+\begin{itemize}
+    \item the Environment identifier;
+    \item the Environment name;
+    \item schema information;
+    \item identity-provider information;
+    \item creation and update timestamps.
+\end{itemize}
+
+
+\section{Environment storage location}
+
+The application stores local knowledge of where each registered
+Environment package can be found.
+
+macOS persistent file-access bookmarks are used so that Testudo can
+continue to access a user-selected package where permitted by the
+operating system.
+
+This local registration is different from the portable Environment
+data itself.
+
+
+\section{Creating or registering an Environment}
+
+A user may create a new Work Environment or register an existing
+\fileext{.testudoenv} package.
+
+When moving an Environment between folders or computers, the new
+Testudo installation may need to be shown the new package location.
+
+
+\section{Environment icon}
+
+Each Work Environment may have its own icon.
+
+If no custom Environment icon exists, Testudo uses its standard
+default Environment visual.
+
+Environment Administrators can change or restore the Environment icon
+through the Environment administration tools.
+
+
+\section{Backing up an Environment}
+
+Backing up a Work Environment normally means backing up its complete
+\fileext{.testudoenv} package.
+
+Do not back up only one JSON file unless you understand exactly which
+parts of the Environment you intend to preserve.
+
+\manualtip{Recommended backup practice}{
+Keep independent backups of important Work Environment packages,
+especially while using early Testudo releases. A synchronised cloud
+folder is useful for replication, but it should not be your only
+backup.
+}
+
+
+% ============================================================
+% CHAPTER 5
+% ============================================================
+
+\chapter{Authentication and Roles}
+
+\section{Two authentication layers}
+
+Testudo distinguishes between:
+
+\begin{enumerate}
+    \item application-level identity and authentication;
+    \item Work Environment identity and authentication.
+\end{enumerate}
+
+These layers serve different purposes.
+
+
+\section{Environment roles}
+
+The current Environment role model contains two principal roles:
+
+\begin{description}
+    \item[Administrator]
+    Can perform Environment administration operations.
+
+    \item[User]
+    Standard Environment member.
+\end{description}
+
+A person's role belongs to the Environment, not to the application as
+a whole.
+
+
+\section{Environment passwords}
+
+Environment users can authenticate using Environment-local accounts.
+
+Users can change their own Environment password.
+
+Environment Administrators can assign a new password to another
+Environment member without knowing that person's existing password.
+
+
+\section{Security questions and password recovery}
+
+Testudo supports recovery through security questions.
+
+The current design uses three security questions for account recovery.
+
+Users should choose answers that they can reproduce reliably.
+
+
+\section{Stay signed in}
+
+A local installation may remember that a user wishes to stay signed
+in to an Environment.
+
+This remembered local state belongs to the application installation
+and is not stored as the user's plaintext password inside the portable
+Environment.
+
+
+\section{Log Out and Sign Out}
+
+The application distinguishes between leaving an authenticated
+session and removing broader local application state.
+
+A normal logout should not be confused with complete local sign-out
+or removal of local profile information.
+
+Before performing a complete sign-out, consider exporting the
+\fileext{.testudouser} profile if you want an easy way to restore
+profile information later.
+
+
+% ============================================================
+% CHAPTER 6
+% ============================================================
+
+\chapter{The Testudo Interface}
+
+\section{Three-column navigation}
+
+Testudo uses a native macOS multi-column interface.
+
+The three conceptual regions are:
+
+\begin{enumerate}
+    \item \textbf{main navigation} on the left;
+    \item \textbf{lists, trees or collections} in the middle;
+    \item \textbf{detail view} on the right.
+\end{enumerate}
+
+The exact content depends on the currently selected area.
+
+
+\section{Main navigation}
+
+The primary navigation provides access to the major functional areas,
+including:
+
+\begin{itemize}
+    \item Work;
+    \item Calendar;
+    \item Themes;
+    \item People;
+    \item Groups;
+    \item Organizations;
+    \item Environment administration where permitted.
+\end{itemize}
+
+
+\section{Detail navigation}
+
+Objects displayed inside detail views can contain references to other
+Testudo objects.
+
+When a related Task, Theme, Person, Group or Organization is
+selectable, Testudo can navigate directly to that object.
+
+The detail area maintains Back and Forward navigation history so that
+users can follow relationships without losing their previous context.
+
+
+\section{Hierarchical presentation}
+
+Hierarchical data is used extensively.
+
+Examples include:
+
+\begin{itemize}
+    \item Tasks and sub-tasks;
+    \item Themes and sub-themes;
+    \item Organizations;
+    \item relationships between Groups and Organizations.
+\end{itemize}
+
+Disclosure controls can be used to expand or collapse nested content.
+
+
+% ============================================================
+% CHAPTER 7
+% ============================================================
+
+\chapter{Work}
+
+\section{Work item types}
+
+The current Work model has three principal item types:
+
+\begin{description}
+
+    \item[Task]
+    An actionable work item with state and optional planning
+    information.
+
+    \item[Note]
+    Information attached to the Work hierarchy.
+
+    \item[Activity]
+    A chronological record of something that happened while working.
+
+\end{description}
+
+
+\section{Tasks}
+
+Tasks can be top-level items or sub-tasks.
+
+A Task may contain other Work items and can participate in
+relationships with Themes and entities.
+
+
+\section{Task states}
+
+The implemented Task states are:
+
+\begin{longtable}{L{0.24\textwidth} L{0.68\textwidth}}
+\toprule
+\textbf{State} &
+\textbf{Meaning}
+\\
+\midrule
+\endhead
+
+To Do &
+Work exists but is not currently marked as in progress.
+\\
+
+In Progress &
+Work is actively underway.
+\\
+
+Completed &
+The work has been completed.
+\\
+
+Closed &
+The item has been formally closed.
+\\
+
+\bottomrule
+\end{longtable}
+
+The interface uses a consistent visual status language for the main
+active states. In particular, To Do, In Progress and Completed have
+distinct visual treatments.
+
+
+\section{Task dates}
+
+Depending on the item and workflow, Testudo can maintain timestamps
+such as:
+
+\begin{itemize}
+    \item creation time;
+    \item update time;
+    \item scheduled time;
+    \item deadline;
+    \item reminder time;
+    \item start time;
+    \item completion time;
+    \item logged time.
+\end{itemize}
+
+These timestamps are stored as absolute instants while preserving
+relevant source time-zone information.
+
+
+\section{Sub-tasks}
+
+Tasks can be nested.
+
+This allows larger work items to be decomposed into increasingly
+specific actions while retaining their relationship to the parent
+Task.
+
+A sub-task remains a full Task and may have its own:
+
+\begin{itemize}
+    \item state;
+    \item dates;
+    \item content;
+    \item relationships;
+    \item history;
+    \item nested children.
+\end{itemize}
+
+
+\section{Notes}
+
+Notes are informational Work items.
+
+They can be placed inside the Work hierarchy and used to preserve
+context that is not itself an actionable Task.
+
+Notes may also participate in date/reminder workflows where supported
+by the interface.
+
+
+\section{Activities}
+
+An Activity records something that happened during work.
+
+Examples include:
+
+\begin{itemize}
+    \item a discussion took place;
+    \item a server was upgraded;
+    \item a manuscript section was reviewed;
+    \item a measurement was completed;
+    \item a decision was made;
+    \item an external dependency was resolved.
+\end{itemize}
+
+An Activity is a work-log object, not a scheduled Calendar Event.
+
+This distinction is fundamental:
+
+\begin{center}
+\textbf{Activity = something recorded as having happened}
+\end{center}
+
+\begin{center}
+\textbf{Calendar Event = a calendar-based event with a time interval}
+\end{center}
+
+
+% ============================================================
+% CHAPTER 8
+% ============================================================
+
+\chapter{Relationships}
+
+\section{Why relationships matter}
+
+Testudo is not limited to placing Tasks in folders.
+
+Work can be connected semantically to People, Groups and
+Organizations.
+
+This makes it possible to represent \emph{why} an entity is connected
+to work.
+
+
+\section{Work relationship roles}
+
+The current relationship roles are:
+
+\begin{longtable}{L{0.25\textwidth} L{0.67\textwidth}}
+\toprule
+\textbf{Relationship} &
+\textbf{Typical interpretation}
+\\
+\midrule
+\endhead
+
+For &
+The work is being performed for the related entity.
+\\
+
+Requested by &
+The related entity requested the work.
+\\
+
+With &
+The work is being performed with the related entity.
+\\
+
+Assigned to &
+Responsibility for the work is assigned to the related entity.
+\\
+
+Related to &
+A general semantic relationship.
+\\
+
+\bottomrule
+\end{longtable}
+
+
+\section{Relationship inheritance}
+
+Work relationships can be inherited by child Work items.
+
+This allows a relationship established at a higher level of the Work
+hierarchy to remain relevant to nested work without repeatedly
+entering the same relationship.
+
+Where precision is required, relationships can also be managed at the
+specific Work-item level.
+
+
+% ============================================================
+% CHAPTER 9
+% ============================================================
+
+\chapter{Themes}
+
+\section{Purpose}
+
+Themes provide a semantic classification system that is independent
+of the Work hierarchy and independent of the organizational
+hierarchy.
+
+A Theme can represent, for example:
+
+\begin{itemize}
+    \item a scientific subject;
+    \item a research programme;
+    \item an infrastructure topic;
+    \item a long-running initiative;
+    \item an administrative domain;
+    \item a technical area.
+\end{itemize}
+
+
+\section{Theme hierarchy}
+
+Themes can contain sub-themes.
+
+This makes it possible to model broad and narrow areas without forcing
+the Work hierarchy itself to reproduce the same structure.
+
+
+\section{Theme information}
+
+A Theme may contain information such as:
+
+\begin{itemize}
+    \item name;
+    \item summary;
+    \item notes;
+    \item code;
+    \item status;
+    \item priority;
+    \item owner;
+    \item start date;
+    \item target date;
+    \item tags;
+    \item URL;
+    \item visual symbol.
+\end{itemize}
+
+
+\section{Themes and Work}
+
+Work items can be associated with Themes.
+
+The current data model supports explicit multi-Theme membership,
+allowing one Work item to belong to more than one semantic domain
+where appropriate.
+
+
+\section{Themes and entities}
+
+Themes can also be related directly to People, Groups and
+Organizations.
+
+This lets Testudo represent knowledge such as:
+
+\begin{itemize}
+    \item which laboratory works on a Theme;
+    \item which person is associated with a research subject;
+    \item which Organization participates in a programme.
+\end{itemize}
+
+
+% ============================================================
+% CHAPTER 10
+% ============================================================
+
+\chapter{People}
+
+\section{People directory}
+
+The People area maintains Person entities inside a Work Environment.
+
+A Person may contain professional information and can participate in
+work relationships, affiliations, groups and organizational
+structures.
+
+
+\section{Names and ordering}
+
+The People list is ordered primarily by surname, with first name used
+as a secondary key where appropriate.
+
+Older records that do not contain a separately stored surname can
+fall back to their available display name.
+
+
+\section{Affiliations}
+
+A Person can have multiple affiliations.
+
+This is important for academic and technical work where one
+individual may simultaneously belong to:
+
+\begin{itemize}
+    \item a university;
+    \item a laboratory;
+    \item a department;
+    \item a collaboration;
+    \item a working group;
+    \item another institution.
+\end{itemize}
+
+
+\section{Primary affiliation}
+
+One affiliation may be explicitly marked as the primary affiliation.
+
+When no explicit Primary affiliation is selected, Testudo can use an
+appropriate directly affiliated Organization as the display
+affiliation.
+
+When available, an Organization's Short Name can be used in compact
+presentation.
+
+
+\section{Person versus local profile}
+
+A Person inside an Environment is not automatically identical to the
+application's Local User Profile.
+
+A user's compatible local profile information may be used to create
+or populate a corresponding Person when appropriate, but the two
+objects belong to different layers of the application.
+
+
+% ============================================================
+% CHAPTER 11
+% ============================================================
+
+\chapter{Groups and Organizations}
+
+\section{Organizations}
+
+Organizations represent institutional structures.
+
+Examples include:
+
+\begin{itemize}
+    \item universities;
+    \item institutes;
+    \item departments;
+    \item companies;
+    \item observatories;
+    \item research centres.
+\end{itemize}
+
+Organizations can contain other Organizations, allowing institutional
+hierarchies to be represented.
+
+
+\section{Organization metadata}
+
+Organizational entities may include information such as:
+
+\begin{itemize}
+    \item full name;
+    \item short name;
+    \item code;
+    \item status;
+    \item priority;
+    \item owner;
+    \item website;
+    \item e-mail;
+    \item phone;
+    \item address;
+    \item city;
+    \item postal code;
+    \item country;
+    \item tags;
+    \item notes.
+\end{itemize}
+
+
+\section{Groups}
+
+Groups represent teams or other collective structures.
+
+Examples include:
+
+\begin{itemize}
+    \item laboratories;
+    \item project teams;
+    \item committees;
+    \item working groups;
+    \item technical teams;
+    \item collaborations.
+\end{itemize}
+
+A Group may exist inside an Organization or independently where the
+data model permits it.
+
+
+\section{Membership}
+
+Entity memberships connect People, Groups and Organizations.
+
+These memberships are separate from Work relationships.
+
+For example, ``Person A belongs to Laboratory B'' is structurally
+different from ``Task C is assigned to Person A''.
+
+
+% ============================================================
+% CHAPTER 12
+% ============================================================
+
+\chapter{Calendar}
+
+\section{Calendar Events}
+
+Calendar Events represent scheduled events.
+
+A Calendar Event can contain information such as:
+
+\begin{itemize}
+    \item title;
+    \item notes;
+    \item location;
+    \item start time;
+    \item end time;
+    \item all-day state;
+    \item time zones;
+    \item confirmation status;
+    \item recurrence information;
+    \item organizer;
+    \item attendees;
+    \item conference URL;
+    \item external calendar identifiers.
+\end{itemize}
+
+
+\section{Calendar Event status}
+
+Calendar Events can represent states including:
+
+\begin{itemize}
+    \item Confirmed;
+    \item Tentative;
+    \item Cancelled.
+\end{itemize}
+
+
+\section{Testudo calendars}
+
+Testudo supports its own local calendar source.
+
+Calendar Events created as local Testudo events can participate
+directly in Testudo relationships.
+
+
+\section{Apple Calendar and iCloud}
+
+A Work Environment can connect supported Apple Calendar calendars
+through macOS EventKit.
+
+Apple Calendar integration requires macOS Calendar permission.
+
+External source data imported from Apple Calendar is treated as
+read-only source information inside Testudo.
+
+Testudo does not need to modify the original external Apple Calendar
+event in order to create Testudo-specific relationships.
+
+
+\section{iCal subscriptions}
+
+Testudo also supports iCal subscription sources.
+
+A subscription can import calendar information from an iCalendar
+feed.
+
+
+\section{Secret iCal addresses}
+
+The actual secret iCal subscription URL is not intended to be stored
+as ordinary portable Environment data.
+
+Testudo stores the sensitive address using the macOS Keychain
+mechanism and keeps a lookup reference in its calendar configuration.
+
+
+\section{External calendars and Environment administration}
+
+Connected calendar sources can be managed from the Work Environment
+administration tools.
+
+Depending on the source, administrators can:
+
+\begin{itemize}
+    \item connect calendars;
+    \item synchronise them;
+    \item review synchronisation status;
+    \item remove an external calendar connection.
+\end{itemize}
+
+Removing a connected external calendar removes its imported Testudo
+representation and Testudo-specific relationships as appropriate.
+
+It does not imply deletion of the source calendar from the external
+calendar service.
+
+
+\section{Linking Calendar Events to Work}
+
+Calendar Events can be linked to Testudo Work items.
+
+This lets a scheduled meeting or appointment be connected to the Task,
+Note or Activity context to which it relates.
+
+Calendar Events can also be linked to Themes.
+
+
+% ============================================================
+% CHAPTER 13
+% ============================================================
+
+\chapter{Time Zones and Date Handling}
+
+\section{Device time zone}
+
+Testudo uses the Mac's automatically updating current time zone as the
+default display context.
+
+The device zone is obtained from macOS rather than being permanently
+hard-coded into an Environment.
+
+
+\section{IANA time zones}
+
+Where a date and time is entered with a source time zone, Testudo uses
+real IANA time-zone identifiers.
+
+Examples include:
+
+\begin{lstlisting}
+Europe/Paris
+America/Argentina/Buenos_Aires
+America/New_York
+Asia/Tokyo
+\end{lstlisting}
+
+
+\section{Absolute timestamps}
+
+Dates represent absolute instants.
+
+Where relevant, Testudo additionally records the IANA time zone in
+which that time was originally entered or generated.
+
+
+\section{Displaying source and local time}
+
+When a timestamp's source zone differs from the current device zone,
+Testudo can display both contexts.
+
+Conceptually, a time may be shown as:
+
+\begin{center}
+current-device-time
+\quad $\cdot$ \quad
+source-time and source-zone
+\end{center}
+
+This is useful when work crosses geographical time zones.
+
+
+\section{Changing the selected source zone}
+
+When editing a date and changing its source zone, Testudo treats the
+change as a reinterpretation of the entered wall-clock time.
+
+For example, changing an entry from ``10:00 Paris'' to
+``10:00 New York'' is treated as a request for 10:00 in the new zone,
+rather than silently converting the original instant to 04:00 New
+York.
+
+This makes the time-zone selector behave like an input-zone selector
+rather than an accidental conversion command.
+
+
+% ============================================================
+% CHAPTER 14
+% ============================================================
+
+\chapter{History and Audit Information}
+
+\section{Work history}
+
+Testudo maintains chronological history for important Work changes.
+
+History can include events such as:
+
+\begin{itemize}
+    \item creation;
+    \item editing;
+    \item status changes;
+    \item scheduling;
+    \item starting work;
+    \item completion;
+    \item Activity logging;
+    \item relationship creation;
+    \item relationship removal;
+    \item movement within the Work hierarchy.
+\end{itemize}
+
+
+\section{Actor information}
+
+Where an authenticated Environment membership is available, history
+can identify the Environment member responsible for the action.
+
+
+\section{History time zones}
+
+History timestamps can preserve the zone in which an action occurred.
+
+Where the history describes another date value, Testudo can also
+retain that value's source zone separately.
+
+
+% ============================================================
+% CHAPTER 15
+% ============================================================
+
+\chapter{Demo Environment}
+
+\section{Purpose}
+
+The Work Environments screen provides a way to create a demonstration
+Environment.
+
+The Demo Environment is intended for learning and exploration without
+requiring the user to enter a large amount of data manually.
+
+
+\section{Demo subject matter}
+
+The generated demonstration data represents a fictional academic and
+scientific working environment.
+
+It can include areas such as:
+
+\begin{itemize}
+    \item Research Software Engineering;
+    \item Scientific Computing and HPC;
+    \item Data Infrastructure;
+    \item AI and Data Science;
+    \item Earth and Environmental Sciences;
+    \item Physics and Astronomy;
+    \item Computational Biology;
+    \item Chemistry and Materials Science;
+    \item Instrumentation and Sensors;
+    \item Open Science and FAIR Data;
+    \item International Collaborations;
+    \item Seminars and Training;
+    \item Research Administration.
+\end{itemize}
+
+
+\section{Generated objects}
+
+A Demo Environment contains interconnected examples of:
+
+\begin{itemize}
+    \item People;
+    \item Organizations;
+    \item Groups;
+    \item Themes;
+    \item Tasks;
+    \item sub-tasks;
+    \item Notes;
+    \item Activities;
+    \item Calendar Events;
+    \item affiliations;
+    \item Work relationships;
+    \item history.
+\end{itemize}
+
+
+\section{Demo dates}
+
+Demo dates are generated relative to the date on which the Demo
+Environment is created.
+
+The generated timeline covers approximately one month before creation
+and two months after creation.
+
+Operational dates are generally placed on working days and during
+normal working hours.
+
+
+\section{Demo naming}
+
+Repeated Demo creation uses the lowest available name.
+
+For example:
+
+\begin{lstlisting}
+Demo
+Demo-2
+Demo-3
+\end{lstlisting}
+
+If a numbered Demo is removed, its number may later become available
+again.
+
+
+% ============================================================
+% CHAPTER 16
+% ============================================================
+
+\chapter{Data Portability and Storage}
+
+\section{What is portable}
+
+The principal portable object is the
+\fileext{.testudoenv} Work Environment package.
+
+It contains the Environment data needed to identify and operate that
+Environment.
+
+
+\section{What is local to one installation}
+
+Some information intentionally remains local to the Testudo
+installation.
+
+Examples include:
+
+\begin{itemize}
+    \item local Environment registration;
+    \item filesystem bookmark information;
+    \item local mapping between the application's user and an
+          Environment membership;
+    \item remembered local authentication state;
+    \item some sensitive Keychain-managed credentials.
+\end{itemize}
+
+
+\section{Moving a Work Environment}
+
+To move an Environment:
+
+\begin{enumerate}
+    \item make sure Testudo has finished writing changes;
+    \item copy or move the complete
+          \fileext{.testudoenv} package;
+    \item allow filesystem or cloud synchronisation to finish;
+    \item register or reopen the package from the new location.
+\end{enumerate}
+
+
+\section{Using cloud-synchronised storage}
+
+A Work Environment package can live in a directory managed by a
+synchronisation provider.
+
+This can make the same Environment package available on more than one
+computer.
+
+However, users should avoid generating simultaneous divergent edits
+to the same package.
+
+\manualwarning{Backups are still required}{
+File synchronisation is not equivalent to historical backup.
+Accidental deletion or corruption may itself be synchronised.
+Maintain independent backups for important Environments.
+}
+
+
+% ============================================================
+% CHAPTER 17
+% ============================================================
+
+\chapter{Administration}
+
+\section{Environment Administrator}
+
+The Administrator role applies to a particular Work Environment.
+
+Administrative capabilities include Environment-level configuration
+that ordinary members should not necessarily be able to perform.
+
+
+\section{Membership administration}
+
+Administrators can manage Environment membership and authentication
+information according to the current local-account model.
+
+
+\section{Password administration}
+
+An Administrator can assign a new password to another Environment
+member without needing to know the old password.
+
+
+\section{Environment appearance}
+
+Administrators can manage the Work Environment icon, including
+restoring the default appearance.
+
+
+\section{Connected calendars}
+
+Environment administration includes management of connected external
+calendar sources.
+
+This includes supported Apple Calendar and iCal connections.
+
+
+% ============================================================
+% CHAPTER 18
+% ============================================================
+
+\chapter{Security and Privacy}
+
+\section{Local-first privacy model}
+
+Testudo does not require a central Testudo cloud service for normal
+operation.
+
+Environment information remains in the chosen
+\fileext{.testudoenv} package.
+
+
+\section{Passwords}
+
+Passwords are not intended to be stored as readable plaintext.
+
+The authentication layer uses password hashing and separate recovery
+mechanisms.
+
+
+\section{Sensitive external calendar information}
+
+Secret iCal subscription addresses are treated as sensitive
+information and are stored using macOS Keychain integration rather
+than being exposed as ordinary Environment data.
+
+
+\section{Calendar permission}
+
+Apple Calendar integration requires the user to grant the application
+appropriate macOS Calendar access.
+
+The external Apple Calendar event source remains read-only from
+Testudo's integration perspective.
+
+
+\section{Portable files}
+
+A portable Work Environment may contain significant professional or
+organizational information.
+
+Treat \fileext{.testudoenv} packages as potentially sensitive files
+when copying, sharing or backing them up.
+
+
+% ============================================================
+% CHAPTER 19
+% ============================================================
+
+\chapter{Troubleshooting}
+
+\section{The build stops at Planning deferred tasks}
+
+Newer Swift toolchains may use a newer Swift build backend by default.
+
+Testudo's build script explicitly prefers the established native
+SwiftPM build backend where that option is supported.
+
+Make sure the repository is current:
+
+\begin{lstlisting}
+git pull --ff-only
+\end{lstlisting}
+
+Then rebuild:
+
+\begin{lstlisting}
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+
+\section{Swift is too old}
+
+Check the version:
+
+\begin{lstlisting}
+swift --version
+\end{lstlisting}
+
+Testudo currently requires Swift 6.0 or later.
+
+
+\section{Apple developer tools are missing}
+
+Run:
+
+\begin{lstlisting}
+xcode-select --install
+\end{lstlisting}
+
+After installation, retry the build.
+
+
+\section{The automatic installer refuses to update}
+
+The automatic installer intentionally avoids overwriting a source
+checkout containing local changes.
+
+Inspect the repository:
+
+\begin{lstlisting}
+cd ~/Testudo
+git status
+\end{lstlisting}
+
+Resolve, commit, stash or deliberately discard your own changes before
+using automatic update behaviour.
+
+
+\section{The Work Environment cannot be found}
+
+If a \fileext{.testudoenv} package was moved, renamed or relocated by
+a synchronisation provider, Testudo's stored local path or filesystem
+bookmark may no longer point to the correct location.
+
+Locate the package and register or reopen it from its current
+location.
+
+
+\section{Apple Calendar does not appear}
+
+Check:
+
+\begin{enumerate}
+    \item that Calendar permission has been granted in macOS;
+    \item that the relevant external calendar has been connected;
+    \item that the calendar is enabled;
+    \item that synchronisation has been run successfully.
+\end{enumerate}
+
+
+\section{iCal synchronisation fails}
+
+Possible causes include:
+
+\begin{itemize}
+    \item an invalid or expired subscription address;
+    \item loss of network connectivity;
+    \item a remote server error;
+    \item authentication or access changes at the provider.
+\end{itemize}
+
+Review the calendar's synchronisation status and reconnect the source
+if necessary.
+
+
+\section{Several old Testudo installer volumes appear}
+
+Current local-build scripts attempt to detach older mounted Testudo
+installer images before opening the newly built DMG.
+
+If an old volume remains mounted, eject it manually in Finder or
+Disk Utility and run the build again.
+
+
+% ============================================================
+% CHAPTER 20
+% ============================================================
+
+\chapter{Recommended Working Practices}
+
+\section{Use Tasks for actionable work}
+
+Create a Task when an item represents work that can meaningfully
+progress through a state.
+
+Use sub-tasks when decomposition adds useful structure.
+
+
+\section{Use Notes for context}
+
+Use Notes for durable contextual information that should live beside
+the work but does not itself require Task state.
+
+
+\section{Use Activities for the work log}
+
+Use Activities to record what actually happened.
+
+A useful Activity should usually answer at least one of these
+questions:
+
+\begin{itemize}
+    \item What happened?
+    \item When did it happen?
+    \item What changed?
+    \item What decision was made?
+    \item What result was obtained?
+\end{itemize}
+
+
+\section{Use Calendar Events for scheduled time}
+
+Use Calendar Events when the object belongs on a calendar and has a
+scheduled time interval.
+
+Do not use Calendar Events merely as a substitute for Activity
+history.
+
+
+\section{Use Themes for semantic classification}
+
+Themes are most useful for concepts that cut across the Work,
+People and Organization hierarchies.
+
+
+\section{Model People and Organizations explicitly}
+
+When a person, laboratory or institution repeatedly appears in your
+work, represent it as an entity rather than repeatedly typing its name
+into free text.
+
+This makes Testudo relationships navigable and reusable.
+
+
+\section{Preserve history}
+
+For long-running work, recording Activities and maintaining Task
+state provides a much more useful record than continually rewriting
+a single Note.
+
+
+% ============================================================
+% CHAPTER 21
+% ============================================================
+
+\chapter{Technical Reference}
+
+\section{Important file extensions}
+
+\begin{longtable}{L{0.28\textwidth} L{0.62\textwidth}}
+\toprule
+\textbf{Extension} &
+\textbf{Purpose}
+\\
+\midrule
+\endhead
+
+\fileext{.testudoenv} &
+Portable Testudo Work Environment package.
+\\
+
+\fileext{.testudouser} &
+Portable local Testudo profile information.
+\\
+
+\fileext{.dmg} &
+Locally generated macOS installer disk image.
+\\
+
+\bottomrule
+\end{longtable}
+
+
+\section{Source tree}
+
+Important project locations include:
+
+\begin{lstlisting}
+Sources/Testudo/
+|-- Auth/
+|-- Demo/
+|-- Models/
+|-- Resources/
+|-- Store/
+|-- Time/
+|-- Views/
+`-- TestudoApp.swift
+\end{lstlisting}
+
+
+\section{Build scripts}
+
+The principal build scripts are:
+
+\begin{lstlisting}
+Scripts/build-app.sh
+Scripts/build-release.sh
+Scripts/build-local-dmg.sh
+Scripts/version.sh
+\end{lstlisting}
+
+The standard local user-facing build is:
+
+\begin{lstlisting}
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+
+\section{Version information}
+
+The default application version and build number are maintained in:
+
+\begin{lstlisting}
+Scripts/version.sh
+\end{lstlisting}
+
+This file acts as the build scripts' central version source.
+
+
+\section{Application build}
+
+To create the application bundle directly:
+
+\begin{lstlisting}
+./Scripts/build-app.sh
+\end{lstlisting}
+
+The resulting bundle is created under:
+
+\begin{lstlisting}
+dist/Testudo.app
+\end{lstlisting}
+
+
+\section{Local DMG build}
+
+To create the installer disk image:
+
+\begin{lstlisting}
+./Scripts/build-release.sh
+\end{lstlisting}
+
+or use the complete user-facing workflow:
+
+\begin{lstlisting}
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+
+% ============================================================
+% CHAPTER 22
+% ============================================================
+
+\chapter{Glossary}
+
+\begin{description}
+
+\item[Activity]
+A chronological Work item recording something that happened.
+
+\item[Calendar Event]
+A scheduled event represented in the Calendar domain.
+
+\item[Entity]
+A Person, Group or Organization.
+
+\item[Environment Administrator]
+A member with administrative privileges inside one Work Environment.
+
+\item[Environment member]
+An identity belonging to a specific Work Environment.
+
+\item[Group]
+A team, laboratory, committee, collaboration or similar collective
+entity.
+
+\item[Local User Profile]
+The professional profile belonging to the user of one Testudo
+installation.
+
+\item[Note]
+An informational Work item.
+
+\item[Organization]
+An institutional entity that may contain other Organizations or
+Groups.
+
+\item[Person]
+An individual represented within a Work Environment.
+
+\item[Task]
+An actionable Work item with Task status.
+
+\item[Theme]
+A hierarchical semantic classification independent of the Work and
+organizational hierarchies.
+
+\item[Work Environment]
+An independent portable Testudo workspace represented by a
+\fileext{.testudoenv} package.
+
+\item[Work relationship]
+A semantic connection between a Work item and a Person, Group or
+Organization.
+
+\end{description}
+
+
+% ============================================================
+% APPENDICES
+% ============================================================
+
+\appendix
+
+\chapter{Command Reference}
+
+\section{Install Testudo}
+
+\begin{lstlisting}
+curl -fsSL \
+  https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
+  | bash
+\end{lstlisting}
+
+
+\section{Clone manually}
+
+\begin{lstlisting}
+git clone https://github.com/foivoskar/Testudo.git
+cd Testudo
+\end{lstlisting}
+
+
+\section{Update source}
+
+\begin{lstlisting}
+git pull --ff-only
+\end{lstlisting}
+
+
+\section{Build local installer}
+
+\begin{lstlisting}
+./Scripts/build-local-dmg.sh
+\end{lstlisting}
+
+
+\section{Build application only}
+
+\begin{lstlisting}
+./Scripts/build-app.sh
+\end{lstlisting}
+
+
+\section{Check Swift}
+
+\begin{lstlisting}
+swift --version
+\end{lstlisting}
+
+
+\section{Request Apple Command Line Tools}
+
+\begin{lstlisting}
+xcode-select --install
+\end{lstlisting}
+
+
+\chapter{Manual Source and Compilation}
+
+The source files for this manual are stored under:
+
+\begin{lstlisting}
+Documentation/TestudoManual/
+\end{lstlisting}
+
+The two maintained manual source files are:
+
+\begin{lstlisting}
+Testudo_manual.tex
+testudomanual.cls
+\end{lstlisting}
+
+The cover uses:
+
+\begin{lstlisting}
+Sources/Testudo/Resources/testudo_icon_blue.png
+\end{lstlisting}
+
+When compiled from the manual directory, the expected PDF is:
+
+\begin{lstlisting}
+Testudo_manual.pdf
+\end{lstlisting}
+
+The project-level build procedure places the final copy at the root of
+the Testudo repository:
+
+\begin{lstlisting}
+Testudo_manual.pdf
+\end{lstlisting}
+
+
+\chapter{Early Release Notice}
+
+Testudo is currently an early public release.
+
+The application, user interface and data model may continue to evolve.
+
+Before upgrading between early versions:
+
+\begin{enumerate}
+    \item ensure important Work Environments are backed up;
+    \item allow cloud-synchronised copies to finish synchronising;
+    \item keep an independent copy of critical
+          \fileext{.testudoenv} packages;
+    \item review version-specific changes where relevant.
+\end{enumerate}
+
+
+\chapter*{License}
+
+\addcontentsline{
+    toc
+}{
+    chapter
+}{
+    License
+}
+
+Testudo is distributed under the MIT License.
+
+See the repository's \filepath{LICENSE} file for the complete license
+text.
+
+
+\chapter*{Author}
+
+\addcontentsline{
+    toc
+}{
+    chapter
+}{
+    Author
+}
+
+\textbf{Foivos Karakostas}
+
+\vfill
+
+\begin{center}
+    \includegraphics[
+        width=0.10\textwidth
+    ]{\TestudoIconPath}
+
+    \vspace{4mm}
+
+    {\small
+        Testudo User Manual
+        \\
+        Manual version \ManualVersion
+        \\
+        \ManualDate
+    }
+\end{center}
+
+\end{document}
