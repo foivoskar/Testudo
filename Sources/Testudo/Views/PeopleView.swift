@@ -386,50 +386,23 @@ struct PersonDetailView: View {
                     id: personID
                 )
         {
-            ScrollView {
-                VStack(
-                    alignment: .leading,
-                    spacing: 26
-                ) {
-                    if !relatedWorkItems.isEmpty {
-                        relatedWorkSection
-
-                        Divider()
-                    }
-
-                    personProfile(
-                        person: person
+            Group {
+                if relatedWorkItems.isEmpty {
+                    personDetailsScroll(
+                        person:
+                            person
                     )
 
-                    // DETAIL DELETE FOOTER
-                    HStack {
-                        Spacer()
-
-                        detailDeleteFooter
-
-                        Spacer()
-                    }
-                    .padding(.top, 8)
-}
-                .padding(
-                    .horizontal,
-                    24
-                )
-                .padding(
-                    .bottom,
-                    24
-                )
-                .padding(
-                    .top,
-                    4
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
+                } else {
+                    splitDetailContent(
+                        person:
+                            person
+                    )
+                }
             }
             .background(
-                TestudoStyle.contentBackground
+                TestudoStyle
+                    .contentBackground
             )
             .sheet(
                 isPresented:
@@ -446,6 +419,7 @@ struct PersonDetailView: View {
             ) {
                 EnvironmentMembershipManagementView()
             }
+
         } else {
             ContentUnavailableView(
                 "Person Not Found",
@@ -454,6 +428,158 @@ struct PersonDetailView: View {
             )
         }
     }
+
+
+    // ========================================================
+    // MARK: - Split detail layout
+    // ========================================================
+
+    private func splitDetailContent(
+        person:
+            Entity
+    ) -> some View {
+        GeometryReader {
+            geometry in
+
+            let separatorHeight:
+                CGFloat = 1
+
+            let paneHeight =
+                max(
+                    0,
+                    (
+                        geometry
+                            .size
+                            .height
+                        - separatorHeight
+                    )
+                    / 2
+                )
+
+
+            VStack(
+                spacing:
+                    0
+            ) {
+                relatedWorkScroll
+                    .frame(
+                        height:
+                            paneHeight
+                    )
+
+                Divider()
+
+                personDetailsScroll(
+                    person:
+                        person
+                )
+                .frame(
+                    height:
+                        paneHeight
+                )
+            }
+            .frame(
+                width:
+                    geometry
+                        .size
+                        .width,
+                height:
+                    geometry
+                        .size
+                        .height,
+                alignment:
+                    .top
+            )
+        }
+    }
+
+
+    private var relatedWorkScroll:
+        some View
+    {
+        ScrollView {
+            relatedWorkSection
+                .padding(
+                    .horizontal,
+                    24
+                )
+                .padding(
+                    .top,
+                    4
+                )
+                .padding(
+                    .bottom,
+                    20
+                )
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
+                )
+        }
+        .background(
+            TestudoStyle
+                .contentBackground
+        )
+    }
+
+
+    private func personDetailsScroll(
+        person:
+            Entity
+    ) -> some View {
+        ScrollView {
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    26
+            ) {
+                personProfile(
+                    person:
+                        person
+                )
+
+
+                // DETAIL DELETE FOOTER
+                HStack {
+                    Spacer()
+
+                    detailDeleteFooter
+
+                    Spacer()
+                }
+                .padding(
+                    .top,
+                    8
+                )
+            }
+            .padding(
+                .horizontal,
+                24
+            )
+            .padding(
+                .bottom,
+                24
+            )
+            .padding(
+                .top,
+                12
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+                alignment:
+                    .leading
+            )
+        }
+        .background(
+            TestudoStyle
+                .contentBackground
+        )
+    }
+
 
     private var relatedWorkSection:
         some View
@@ -859,6 +985,7 @@ struct PersonDetailView: View {
                     )
             }
         }
+        .personDetailCard()
     }
 
 
@@ -1286,6 +1413,7 @@ struct PersonDetailView: View {
                 )
             }
         }
+        .personDetailCard()
     }
 
 
@@ -1712,6 +1840,48 @@ private struct PersonLargeAvatar: View {
     }
 }
 
+private extension View {
+
+    func personDetailCard()
+        -> some View
+    {
+        self
+            .padding(
+                14
+            )
+            .background(
+                Color.primary
+                    .opacity(
+                        0.025
+                    ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius:
+                            11,
+                        style:
+                            .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        11,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.primary
+                        .opacity(
+                            0.06
+                        ),
+                    lineWidth:
+                        1
+                )
+            }
+    }
+}
+
+
 private struct ReadOnlyProfileSection: View {
     let title: String
     let rows: [(String, String)]
@@ -1719,25 +1889,44 @@ private struct ReadOnlyProfileSection: View {
     var body: some View {
         VStack(
             alignment: .leading,
-            spacing: 10
+            spacing: 12
         ) {
             Text(title)
                 .font(.headline)
 
-            VStack(spacing: 7) {
+            VStack(
+                spacing:
+                    8
+            ) {
                 ForEach(
                     Array(
                         rows.enumerated()
                     ),
                     id: \.offset
-                ) { _, row in
+                ) {
+                    index,
+                    row in
+
                     ReadOnlyValueRow(
-                        label: row.0,
-                        value: row.1
+                        label:
+                            row.0,
+                        value:
+                            row.1
                     )
+
+                    if
+                        index
+                            < rows.count - 1
+                    {
+                        Divider()
+                            .opacity(
+                                0.55
+                            )
+                    }
                 }
             }
         }
+        .personDetailCard()
     }
 }
 
