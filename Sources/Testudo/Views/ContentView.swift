@@ -3188,7 +3188,8 @@ private struct CreateWorkItemView: View {
                 }
 
                 Button("Create") {
-                    store.createWorkItem(
+                    let newID =
+                        store.createWorkItem(
                         themeID: themeID,
                         parentWorkItemID:
                             parentWorkItemID,
@@ -3206,6 +3207,25 @@ private struct CreateWorkItemView: View {
                             ? deadlineTimeZoneID
                             : nil
                     )
+
+
+                    if
+                        kind == .task,
+                        let newID,
+                        let parentWorkItemID
+                    {
+                        _ =
+                            store
+                                .copyInheritedWorkRelationships(
+                                    fromParentTaskID:
+                                        parentWorkItemID,
+                                    toWorkItemID:
+                                        newID,
+                                    replacingExisting:
+                                        false
+                                )
+                    }
+
 
                     isPresented = false
                 }

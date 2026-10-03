@@ -1037,6 +1037,36 @@ struct WorkEntryCreationView: View {
             }
         }
 
+        // If this is a newly created Sub-task, merge any
+        // inheritable relationships from its immediate Parent.
+        //
+        // Explicit relationships entered in this form already
+        // exist, so they take precedence over identical inherited
+        // relationships.
+        if
+            kind == .task,
+            let parentWorkItemID
+        {
+            if
+                let inheritanceError =
+                    store
+                        .copyInheritedWorkRelationships(
+                            fromParentTaskID:
+                                parentWorkItemID,
+                            toWorkItemID:
+                                newID,
+                            replacingExisting:
+                                false
+                        )
+            {
+                errorMessage =
+                    inheritanceError
+
+                return
+            }
+        }
+
+
         selectedWorkItemID =
             newID
 

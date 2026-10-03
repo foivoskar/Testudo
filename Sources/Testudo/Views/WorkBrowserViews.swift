@@ -1399,6 +1399,15 @@ struct WorkItemDetailView: View {
     private var errorMessage:
         String?
 
+
+    @State
+    private var showingParentRelationshipChoice =
+        false
+
+    @State
+    private var pendingParentRelationshipSourceID:
+        UUID?
+
     private enum EditableField:
         Hashable
     {
@@ -1511,6 +1520,33 @@ struct WorkItemDetailView: View {
             TestudoStyle
                 .contentBackground
         )
+        .confirmationDialog(
+            "Use Parent Relationships?",
+            isPresented:
+                $showingParentRelationshipChoice,
+            titleVisibility:
+                .visible
+        ) {
+            Button(
+                "Copy Parent Relationships"
+            ) {
+                copyPendingParentRelationships()
+            }
+
+            Button(
+                "Keep Current Relationships",
+                role:
+                    .cancel
+            ) {
+                pendingParentRelationshipSourceID =
+                    nil
+            }
+
+        } message: {
+            Text(
+                "The Parent Task has been saved. Copying will replace this Task's current Related People, Groups & Organizations with the Parent's relationships marked “Inherited by child items”. The copied relationships can be edited normally afterward."
+            )
+        }
     }
 
     private func header(
@@ -1916,13 +1952,53 @@ struct WorkItemDetailView: View {
             onSave: {
                 selection in
 
-                update(
-                    item,
-                    parentID:
-                        selection.first,
-                    parentWasEdited:
+                let newParentID =
+                    selection.first
+
+                let previousParentID =
+                    item.parentWorkItemID
+
+
+                let error =
+                    update(
+                        item,
+                        parentID:
+                            newParentID,
+                        parentWasEdited:
+                            true
+                    )
+
+
+                if let error {
+                    errorMessage =
+                        error
+
+                    return error
+                }
+
+
+                errorMessage =
+                    nil
+
+
+                // Only an existing Task that has just been
+                // attached/re-attached to a Parent needs the
+                // user's post-save relationship decision.
+                if
+                    item.kind == .task,
+                    let newParentID,
+                    newParentID
+                        != previousParentID
+                {
+                    pendingParentRelationshipSourceID =
+                        newParentID
+
+                    showingParentRelationshipChoice =
                         true
-                )
+                }
+
+
+                return nil
             }
         )
     }
@@ -4843,6 +4919,38 @@ struct WorkItemDetailView: View {
                 : item.loggedTimeZoneID
         )
     }
+
+    private func copyPendingParentRelationships() {
+        guard
+            let parentID =
+                pendingParentRelationshipSourceID
+        else {
+            return
+        }
+
+
+        let error =
+            store
+                .copyInheritedWorkRelationships(
+                    fromParentTaskID:
+                        parentID,
+                    toWorkItemID:
+                        itemID,
+                    replacingExisting:
+                        true
+                )
+
+
+        pendingParentRelationshipSourceID =
+            nil
+
+        showingParentRelationshipChoice =
+            false
+
+        errorMessage =
+            error
+    }
+
 
     private func parentName(
         _ item: WorkItem

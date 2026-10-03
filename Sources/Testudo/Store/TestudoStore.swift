@@ -3975,6 +3975,292 @@ extension TestudoStore {
     }
 }
 
+
+// ============================================================
+// MARK: - Parent relationship inheritance
+//
+// A child receives independent copies of the immediate Parent
+// Task's relationships that are explicitly marked
+// inheritedByChildren.
+//
+// The copied records are ordinary WorkEntityRelationships.
+// They remain fully editable inside the child and are never
+// live-linked back to the Parent Task.
+// ============================================================
+
+extension TestudoStore {
+
+    @discardableResult
+    func copyInheritedWorkRelationships(
+        fromParentTaskID parentTaskID:
+            UUID,
+        toWorkItemID childWorkItemID:
+            UUID,
+        replacingExisting:
+            Bool
+    ) -> String? {
+
+        guard
+            let parent =
+                data.workItems
+                    .first(
+                        where: {
+                            $0.id
+                                == parentTaskID
+                        }
+                    ),
+            parent.kind
+                == .task
+        else {
+            return
+                "Parent Task not found."
+        }
+
+
+        guard
+            let childIndex =
+                data.workItems
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == childWorkItemID
+                        }
+                    )
+        else {
+            return
+                "Child work item not found."
+        }
+
+
+        guard
+            parentTaskID
+                != childWorkItemID
+        else {
+            return
+                "A Task cannot inherit relationships from itself."
+        }
+
+
+        let parentRelationships =
+            data.workEntityRelationships
+                .filter {
+                    relationship in
+
+                    relationship.workItemID
+                        == parentTaskID
+                    &&
+                    relationship
+                        .inheritedByChildren
+                    &&
+                    data.entities
+                        .contains(
+                            where: {
+                                $0.id
+                                    == relationship
+                                        .entityID
+                            }
+                        )
+                }
+
+
+        let now =
+            Date()
+
+        let timeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+
+        var changed =
+            false
+
+
+        // ----------------------------------------------------
+        // When a pre-existing Task is attached to a Parent and
+        // the user chooses "Copy Parent Relationships", its old
+        // relationship set is replaced completely.
+        // ----------------------------------------------------
+
+        if replacingExisting {
+
+            let existing =
+                data.workEntityRelationships
+                    .filter {
+                        $0.workItemID
+                            == childWorkItemID
+                    }
+
+
+            if !existing.isEmpty {
+                for relationship in
+                    existing
+                {
+                    let entityName =
+                        data.entities
+                            .first(
+                                where: {
+                                    $0.id
+                                        == relationship
+                                            .entityID
+                                }
+                            )?
+                            .name
+                        ?? "Related entity"
+
+                    data.historyEvents
+                        .append(
+                            HistoryEvent(
+                                workItemID:
+                                    childWorkItemID,
+                                kind:
+                                    .relationshipRemoved,
+                                timestamp:
+                                    now,
+                                text:
+                                    "\(relationship.role.displayName): \(entityName)",
+                                actorMembershipID:
+                                    currentEnvironmentMembership?
+                                        .id,
+                                timeZoneID:
+                                    timeZoneID
+                            )
+                        )
+                }
+
+                data.workEntityRelationships
+                    .removeAll {
+                        $0.workItemID
+                            == childWorkItemID
+                    }
+
+                changed =
+                    true
+            }
+        }
+
+
+        // ----------------------------------------------------
+        // Copy only relationships missing from the child.
+        //
+        // This makes automatic inheritance during creation a
+        // merge operation, so a relationship explicitly entered
+        // in the creation form takes precedence.
+        // ----------------------------------------------------
+
+        for parentRelationship in
+            parentRelationships
+        {
+            let duplicate =
+                data.workEntityRelationships
+                    .contains {
+                        relationship in
+
+                        relationship.workItemID
+                            == childWorkItemID
+                        &&
+                        relationship.entityID
+                            == parentRelationship.entityID
+                        &&
+                        relationship.role
+                            == parentRelationship.role
+                    }
+
+            if duplicate {
+                continue
+            }
+
+
+            let copied =
+                WorkEntityRelationship(
+                    workItemID:
+                        childWorkItemID,
+                    entityID:
+                        parentRelationship
+                            .entityID,
+                    role:
+                        parentRelationship
+                            .role,
+                    inheritedByChildren:
+                        parentRelationship
+                            .inheritedByChildren,
+                    createdAt:
+                        now
+                )
+
+
+            data.workEntityRelationships
+                .append(
+                    copied
+                )
+
+
+            let entityName =
+                data.entities
+                    .first(
+                        where: {
+                            $0.id
+                                == copied
+                                    .entityID
+                        }
+                    )?
+                    .name
+                ?? "Related entity"
+
+
+            data.historyEvents
+                .append(
+                    HistoryEvent(
+                        workItemID:
+                            childWorkItemID,
+                        kind:
+                            .relationshipAdded,
+                        timestamp:
+                            now,
+                        text:
+                            "\(copied.role.displayName): \(entityName)",
+                        actorMembershipID:
+                            currentEnvironmentMembership?
+                                .id,
+                        timeZoneID:
+                            timeZoneID
+                    )
+                )
+
+
+            changed =
+                true
+        }
+
+
+        if changed {
+            data.workItems[
+                childIndex
+            ]
+            .updatedAt =
+                now
+
+            data.workItems[
+                childIndex
+            ]
+            .updatedTimeZoneID =
+                timeZoneID
+
+            data.workItems[
+                childIndex
+            ]
+            .updatedByMembershipID =
+                currentEnvironmentMembership?
+                    .id
+
+            save()
+        }
+
+
+        return nil
+    }
+}
+
+
 extension TestudoStore {
     func createChildWorkItem(
         parentTaskID: UUID,
@@ -4170,6 +4456,22 @@ extension TestudoStore {
         }
 
         save()
+
+
+        // A newly created Sub-task automatically receives
+        // inheritable relationships from its immediate Parent.
+        if kind == .task {
+            _ =
+                copyInheritedWorkRelationships(
+                    fromParentTaskID:
+                        parentTaskID,
+                    toWorkItemID:
+                        item.id,
+                    replacingExisting:
+                        false
+                )
+        }
+
 
         return (
             item.id,
