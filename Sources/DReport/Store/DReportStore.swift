@@ -536,7 +536,11 @@ final class DReportStore: ObservableObject {
         name:
             String,
         packageURL:
-            URL
+            URL,
+        adminUsername:
+            String,
+        adminPassword:
+            String
     ) -> String? {
 
         guard
@@ -554,6 +558,33 @@ final class DReportStore: ObservableObject {
                 in:
                     .whitespacesAndNewlines
             )
+
+
+        let cleanedAdminUsername =
+            adminUsername
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedAdminPassword =
+            adminPassword
+
+
+        guard
+            !cleanedAdminUsername.isEmpty
+        else {
+            return
+                "Administrator username is required."
+        }
+
+
+        guard
+            !cleanedAdminPassword.isEmpty
+        else {
+            return
+                "Administrator password is required."
+        }
 
 
         guard !cleanedName.isEmpty else {
@@ -648,7 +679,7 @@ final class DReportStore: ObservableObject {
                 personEntityID:
                     nil,
                 directoryUserIdentifier:
-                    nil,
+                    cleanedAdminUsername,
                 firstName:
                     localProfile.firstName,
                 lastName:
@@ -849,6 +880,8 @@ final class DReportStore: ObservableObject {
                         environmentID,
                     membershipID:
                         membership.id,
+                    staySignedIn:
+                        true,
                     lastOpenedAt:
                         now
                 )
@@ -871,6 +904,21 @@ final class DReportStore: ObservableObject {
 
 
         saveApplicationData()
+
+
+        if
+            let passwordError =
+                setEnvironmentMembershipPassword(
+                    membershipID:
+                        membership.id,
+                    newPassword:
+                        cleanedAdminPassword
+                )
+        {
+            return
+                "The Work Environment was created, but its administrator password could not be saved: \(passwordError)"
+        }
+
 
 
         return nil
@@ -1293,6 +1341,14 @@ final class DReportStore: ObservableObject {
                 )
 
 
+        guard
+            !cleanedDirectoryIdentifier.isEmpty
+        else {
+            return
+                "Username is required."
+        }
+
+
         if !cleanedDirectoryIdentifier.isEmpty {
             let duplicateIdentifier =
                 data.environmentMemberships
@@ -1320,7 +1376,7 @@ final class DReportStore: ObservableObject {
                 !duplicateIdentifier
             else {
                 return
-                    "That identity identifier is already used by another Environment membership."
+                    "That username is already used by another Environment membership."
             }
         }
 
@@ -1570,6 +1626,8 @@ final class DReportStore: ObservableObject {
                                 == environmentID
                         }
                     ),
+            access.staySignedIn
+                == true,
             let membershipID =
                 access.membershipID,
             let membership =
@@ -1580,9 +1638,21 @@ final class DReportStore: ObservableObject {
                                 == membershipID
                             && $0.environmentID
                                 == environmentID
+                            && $0.isActive
                         }
                     ),
-            membership.isActive
+            let username =
+                membership
+                    .directoryUserIdentifier?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !username.isEmpty,
+            environmentCredential(
+                for:
+                    membership.id
+            ) != nil
         else {
             environmentSessionIsOpen =
                 false
@@ -1592,19 +1662,8 @@ final class DReportStore: ObservableObject {
         }
 
 
-        if
-            environmentMembershipNeedsPassword(
-                id:
-                    membership.id
-            )
-        {
-            environmentSessionIsOpen =
-                false
-
-            return
-                .identityRequired
-        }
-
+        let now =
+            Date()
 
 
         if
@@ -1619,9 +1678,11 @@ final class DReportStore: ObservableObject {
                     )
         {
             applicationData
-                .environmentAccesses[accessIndex]
+                .environmentAccesses[
+                    accessIndex
+                ]
                 .lastOpenedAt =
-                Date()
+                now
         }
 
 
@@ -1639,17 +1700,18 @@ final class DReportStore: ObservableObject {
                 membershipIndex
             ]
             .lastAccessAt =
-                Date()
+                now
 
             save()
         }
 
 
-
         saveApplicationData()
+
 
         environmentSessionIsOpen =
             true
+
 
         return
             .opened
@@ -1658,11 +1720,14 @@ final class DReportStore: ObservableObject {
 
     @discardableResult
     func enterActiveEnvironment(
-        membershipID:
-            UUID,
+        username:
+            String,
         password:
-            String
+            String,
+        staySignedIn:
+            Bool
     ) -> String? {
+
         guard
             let environmentID =
                 activeEnvironmentID
@@ -1672,70 +1737,94 @@ final class DReportStore: ObservableObject {
         }
 
 
+        let cleanedUsername =
+            username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedPassword =
+            password
+
+
         guard
-            let membershipIndex =
+            !cleanedUsername.isEmpty,
+            !cleanedPassword.isEmpty
+        else {
+            return
+                "Username and password are required."
+        }
+
+
+        guard
+            let membership =
                 data.environmentMemberships
-                    .firstIndex(
+                    .first(
                         where: {
-                            $0.id
-                                == membershipID
-                            && $0.environmentID
-                                == environmentID
+                            guard
+                                $0.environmentID
+                                    == environmentID,
+                                $0.isActive,
+                                let identifier =
+                                    $0.directoryUserIdentifier?
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
+                                        ),
+                                !identifier.isEmpty
+                            else {
+                                return false
+                            }
+
+                            return
+                                identifier
+                                    .caseInsensitiveCompare(
+                                        cleanedUsername
+                                    )
+                                    == .orderedSame
                         }
                     )
         else {
             return
-                "Environment membership not found."
+                "Incorrect username or password."
         }
 
 
-        let membership =
-            data.environmentMemberships[
-                membershipIndex
-            ]
-
-
-        guard membership.isActive else {
-            return
-                "This Environment membership is disabled."
-        }
-
-
-        if
+        guard
             let credential =
                 environmentCredential(
                     for:
                         membership.id
                 )
-        {
-            guard
-                PasswordHasher.verify(
-                    password:
-                        password,
-                    saltBase64:
-                        credential
-                            .passwordSaltBase64,
-                    expectedHashBase64:
-                        credential
-                            .passwordHashBase64,
-                    iterations:
-                        credential
-                            .passwordIterations
-                )
-            else {
-                return
-                    "Incorrect password."
-            }
-
-        } else if
-            environmentMembershipHasPassword(
-                id:
-                    membership.id
-            )
-        {
+        else {
             return
-                "The Environment credential is unavailable."
+                "This Environment account does not have a password. Ask an Environment Administrator to configure its login credentials."
         }
+
+
+        guard
+            PasswordHasher.verify(
+                password:
+                    cleanedPassword,
+                saltBase64:
+                    credential
+                        .passwordSaltBase64,
+                expectedHashBase64:
+                    credential
+                        .passwordHashBase64,
+                iterations:
+                    credential
+                        .passwordIterations
+            )
+        else {
+            return
+                "Incorrect username or password."
+        }
+
+
+        let now =
+            Date()
 
 
         if
@@ -1750,15 +1839,28 @@ final class DReportStore: ObservableObject {
                     )
         {
             applicationData
-                .environmentAccesses[index]
+                .environmentAccesses[
+                    index
+                ]
                 .membershipID =
-                membershipID
+                membership.id
 
             applicationData
-                .environmentAccesses[index]
+                .environmentAccesses[
+                    index
+                ]
+                .staySignedIn =
+                staySignedIn
+
+            applicationData
+                .environmentAccesses[
+                    index
+                ]
                 .lastOpenedAt =
-                Date()
+                now
+
         } else {
+
             applicationData
                 .environmentAccesses
                 .append(
@@ -1766,37 +1868,98 @@ final class DReportStore: ObservableObject {
                         environmentID:
                             environmentID,
                         membershipID:
-                            membershipID,
+                            membership.id,
+                        staySignedIn:
+                            staySignedIn,
                         lastOpenedAt:
-                            Date()
+                            now
                     )
                 )
         }
 
 
-        data.environmentMemberships[
-            membershipIndex
-        ]
-        .lastAccessAt =
-            Date()
+        if
+            let membershipIndex =
+                data.environmentMemberships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == membership.id
+                        }
+                    )
+        {
+            data.environmentMemberships[
+                membershipIndex
+            ]
+            .lastAccessAt =
+                now
+
+            save()
+        }
+
+
+        saveApplicationData()
 
 
         environmentSessionIsOpen =
             true
 
 
-
-        saveApplicationData()
-        save()
-
         return nil
     }
 
 
     func closeWorkEnvironment() {
+
+        // Deliberately preserve EnvironmentAccess.
+        //
+        // If Stay signed in is enabled, selecting this Environment
+        // again can immediately reopen it.
+        environmentSessionIsOpen =
+            false
+    }
+
+
+    func signOutActiveEnvironment() {
+
+        if environmentSessionIsOpen {
+            save()
+        }
+
+
+        if
+            let environmentID =
+                activeEnvironmentID,
+            let accessIndex =
+                applicationData
+                    .environmentAccesses
+                    .firstIndex(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )
+        {
+            applicationData
+                .environmentAccesses[
+                    accessIndex
+                ]
+                .membershipID =
+                nil
+
+            applicationData
+                .environmentAccesses[
+                    accessIndex
+                ]
+                .staySignedIn =
+                false
+        }
+
+
         environmentSessionIsOpen =
             false
 
+        saveApplicationData()
     }
 
 
@@ -7036,6 +7199,16 @@ extension DReportStore {
                         .whitespacesAndNewlines
                 )
 
+        guard
+            !cleanedIdentifier.isEmpty
+        else {
+            return (
+                nil,
+                "Username is required."
+            )
+        }
+
+
         if !cleanedIdentifier.isEmpty {
             let duplicateIdentifier =
                 data.environmentMemberships
@@ -7062,7 +7235,7 @@ extension DReportStore {
             else {
                 return (
                     nil,
-                    "That identity identifier is already used by another Environment membership."
+                    "That username is already used by another Environment membership."
                 )
             }
         }

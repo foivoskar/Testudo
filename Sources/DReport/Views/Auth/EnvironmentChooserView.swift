@@ -430,13 +430,29 @@ private struct CreateWorkEnvironmentView:
     View
 {
     @EnvironmentObject
-    private var store: DReportStore
+    private var store:
+        DReportStore
 
-    @Environment(\.dismiss)
+    @Environment(
+        \.dismiss
+    )
     private var dismiss
+
 
     @State
     private var name =
+        ""
+
+    @State
+    private var username =
+        ""
+
+    @State
+    private var password =
+        ""
+
+    @State
+    private var passwordConfirmation =
         ""
 
     @State
@@ -444,40 +460,41 @@ private struct CreateWorkEnvironmentView:
         String?
 
 
-    var body: some View {
+    var body:
+        some View
+    {
         VStack(
-            alignment: .leading,
-            spacing: 20
+            alignment:
+                .leading,
+            spacing:
+                20
         ) {
+
             VStack(
-                alignment: .leading,
-                spacing: 5
+                alignment:
+                    .leading,
+                spacing:
+                    5
             ) {
+
                 Text(
                     "Create Work Environment"
                 )
-                .font(.title2)
+                .font(
+                    .title2
+                )
                 .fontWeight(
                     .semibold
                 )
 
+
                 Text(
-                    "You will become the Administrator of this Environment."
+                    "Create the Environment and its first Administrator account."
                 )
                 .foregroundStyle(
                     .secondary
                 )
             }
-
-            Text(
-                "The Environment will be saved as a portable .testudoenv package. Choose any local, cloud-synced or external location in the Save dialog."
-            )
-            .font(
-                .callout
-            )
-            .foregroundStyle(
-                .secondary
-            )
 
 
             TextField(
@@ -490,7 +507,72 @@ private struct CreateWorkEnvironmentView:
             )
 
 
-            if let errorMessage {
+            Divider()
+
+
+            Text(
+                "Administrator Login"
+            )
+            .font(
+                .headline
+            )
+
+
+            TextField(
+                "Username",
+                text:
+                    $username
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+
+
+            SecureField(
+                "Password",
+                text:
+                    $password
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+
+
+            SecureField(
+                "Confirm password",
+                text:
+                    $passwordConfirmation
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+
+
+            Text(
+                "This account belongs to the Work Environment. It is separate from your local Testudo profile."
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+
+            Text(
+                "The Environment will be saved as a portable .testudoenv package. You can choose a local, cloud-synced or external location."
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+
+            if
+                let errorMessage
+            {
                 Text(
                     errorMessage
                 )
@@ -504,13 +586,16 @@ private struct CreateWorkEnvironmentView:
 
 
             HStack {
+
                 Spacer()
+
 
                 Button(
                     "Cancel"
                 ) {
                     dismiss()
                 }
+
 
                 Button(
                     "Create Environment"
@@ -525,9 +610,12 @@ private struct CreateWorkEnvironmentView:
                 )
             }
         }
-        .padding(26)
+        .padding(
+            26
+        )
         .frame(
-            width: 460
+            width:
+                540
         )
     }
 
@@ -539,10 +627,18 @@ private struct CreateWorkEnvironmentView:
 
 
         let cleanedName =
-            name.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
+            name
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let cleanedUsername =
+            username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
 
 
         guard
@@ -550,6 +646,37 @@ private struct CreateWorkEnvironmentView:
         else {
             errorMessage =
                 "Environment name is required."
+
+            return
+        }
+
+
+        guard
+            !cleanedUsername.isEmpty
+        else {
+            errorMessage =
+                "Administrator username is required."
+
+            return
+        }
+
+
+        guard
+            !password.isEmpty
+        else {
+            errorMessage =
+                "Administrator password is required."
+
+            return
+        }
+
+
+        guard
+            password
+                == passwordConfirmation
+        else {
+            errorMessage =
+                "The passwords do not match."
 
             return
         }
@@ -607,7 +734,11 @@ private struct CreateWorkEnvironmentView:
                     name:
                         cleanedName,
                     packageURL:
-                        packageURL
+                        packageURL,
+                    adminUsername:
+                        cleanedUsername,
+                    adminPassword:
+                        password
                 )
 
 
@@ -615,8 +746,6 @@ private struct CreateWorkEnvironmentView:
             dismiss()
         }
     }
-
-
 }
 
 
@@ -628,7 +757,8 @@ private struct EnvironmentEntryView:
     View
 {
     @EnvironmentObject
-    private var store: DReportStore
+    private var store:
+        DReportStore
 
     let environmentID:
         UUID
@@ -636,13 +766,18 @@ private struct EnvironmentEntryView:
     let onEntered:
         () -> Void
 
+
     @State
-    private var selectedMembershipID:
-        UUID?
+    private var username =
+        ""
 
     @State
     private var password =
         ""
+
+    @State
+    private var staySignedIn =
+        false
 
     @State
     private var errorMessage:
@@ -652,7 +787,8 @@ private struct EnvironmentEntryView:
     private var environment:
         WorkEnvironment?
     {
-        store.workEnvironments
+        store
+            .workEnvironments
             .first {
                 $0.id
                     == environmentID
@@ -660,45 +796,51 @@ private struct EnvironmentEntryView:
     }
 
 
-    private var needsPassword:
+    private var canEnter:
         Bool
     {
-        guard
-            let selectedMembershipID
-        else {
-            return false
-        }
-
-        return
-            store
-                .environmentMembershipNeedsPassword(
-                    id:
-                        selectedMembershipID
-                )
+        !username
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .isEmpty
+        && !password.isEmpty
     }
 
 
-    var body: some View {
+    var body:
+        some View
+    {
         VStack(
-            alignment: .leading,
-            spacing: 20
+            alignment:
+                .leading,
+            spacing:
+                20
         ) {
+
             VStack(
-                alignment: .leading,
-                spacing: 5
+                alignment:
+                    .leading,
+                spacing:
+                    5
             ) {
+
                 Text(
                     environment?
                         .name
                     ?? "Work Environment"
                 )
-                .font(.title2)
+                .font(
+                    .title2
+                )
                 .fontWeight(
                     .semibold
                 )
 
+
                 Text(
-                    "Choose your identity for this Work Environment."
+                    "Sign in to this Work Environment."
                 )
                 .foregroundStyle(
                     .secondary
@@ -706,41 +848,61 @@ private struct EnvironmentEntryView:
             }
 
 
-            ScrollView {
-                LazyVStack(
-                    spacing: 8
-                ) {
-                    ForEach(
-                        store
-                            .activeEnvironmentMemberships
-                    ) {
-                        membership in
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    12
+            ) {
 
-                        membershipRow(
-                            membership
-                        )
-                    }
-                }
-            }
-            .frame(
-                minHeight: 120,
-                maxHeight: 260
-            )
+                TextField(
+                    "Username",
+                    text:
+                        $username
+                )
+                .textFieldStyle(
+                    .roundedBorder
+                )
 
 
-            if needsPassword {
                 SecureField(
-                    "Environment password",
+                    "Password",
                     text:
                         $password
                 )
                 .textFieldStyle(
                     .roundedBorder
                 )
+
+
+                Toggle(
+                    "Stay signed in",
+                    isOn:
+                        $staySignedIn
+                )
+
+
+                Text(
+                    "If enabled, this installation can reopen the Environment without asking for your credentials again until you explicitly sign out."
+                )
+                .font(
+                    .caption
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal:
+                        false,
+                    vertical:
+                        true
+                )
             }
 
 
-            if let errorMessage {
+            if
+                let errorMessage
+            {
                 Text(
                     errorMessage
                 )
@@ -754,7 +916,9 @@ private struct EnvironmentEntryView:
 
 
             HStack {
+
                 Spacer()
+
 
                 Button(
                     "Enter Environment"
@@ -765,126 +929,34 @@ private struct EnvironmentEntryView:
                     .borderedProminent
                 )
                 .disabled(
-                    selectedMembershipID
-                        == nil
+                    !canEnter
                 )
                 .keyboardShortcut(
                     .defaultAction
                 )
             }
         }
-        .padding(26)
-        .frame(
-            width: 500
+        .padding(
+            26
         )
-        .onAppear {
-            if
-                selectedMembershipID
-                    == nil
-            {
-                selectedMembershipID =
-                    store
-                        .activeEnvironmentMemberships
-                        .first?
-                        .id
-            }
-        }
-    }
-
-
-    private func membershipRow(
-        _ membership:
-            EnvironmentMembership
-    ) -> some View {
-        Button {
-            selectedMembershipID =
-                membership.id
-
-            password =
-                ""
-
-            errorMessage =
-                nil
-        } label: {
-            HStack {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        membership
-                            .displayName
-                    )
-                    .foregroundStyle(
-                        .primary
-                    )
-
-                    Text(
-                        membership
-                            .role
-                            .displayName
-                    )
-                    .font(
-                        .caption
-                    )
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
-
-                Spacer()
-
-                if
-                    selectedMembershipID
-                        == membership.id
-                {
-                    Image(
-                        systemName:
-                            "checkmark.circle.fill"
-                    )
-                    .foregroundStyle(
-                        Color.accentColor
-                    )
-                }
-            }
-            .padding(11)
-            .background(
-                Color.primary
-                    .opacity(
-                        selectedMembershipID
-                            == membership.id
-                        ? 0.07
-                        : 0.025
-                    ),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 8,
-                        style:
-                            .continuous
-                    )
-            )
-        }
-        .buttonStyle(
-            .plain
+        .frame(
+            width:
+                500
         )
     }
 
 
     private func enter() {
-        guard
-            let selectedMembershipID
-        else {
-            return
-        }
-
 
         errorMessage =
             store
                 .enterActiveEnvironment(
-                    membershipID:
-                        selectedMembershipID,
+                    username:
+                        username,
                     password:
-                        password
+                        password,
+                    staySignedIn:
+                        staySignedIn
                 )
 
 

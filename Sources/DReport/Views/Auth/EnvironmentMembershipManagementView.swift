@@ -673,9 +673,9 @@ private struct EnvironmentMembershipEditorView:
 
             editableTextRow(
                 label:
-                    "Identity identifier",
+                    "Username",
                 prompt:
-                    "Optional",
+                    "Required",
                 text:
                     $directoryIdentifier
             )
@@ -1228,6 +1228,16 @@ private struct EnvironmentPasswordEditorView:
 
 
     private func save() {
+
+        guard
+            !password.isEmpty
+        else {
+            errorMessage =
+                "Environment password is required."
+
+            return
+        }
+
         errorMessage =
             nil
 
@@ -1444,7 +1454,7 @@ private struct AddEnvironmentMembershipView:
 
 
                 TextField(
-                    "Identity identifier (optional)",
+                    "Username",
                     text:
                         $directoryIdentifier
                 )
@@ -1506,7 +1516,7 @@ private struct AddEnvironmentMembershipView:
                 )
 
                 SecureField(
-                    "Environment password (optional)",
+                    "Environment password",
                     text:
                         $password
                 )

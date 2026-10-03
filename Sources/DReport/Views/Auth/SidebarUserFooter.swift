@@ -216,6 +216,29 @@ struct SidebarUserFooter: View {
             .buttonStyle(
                 .plain
             )
+
+
+            Divider()
+
+
+            Button(
+                role:
+                    .destructive
+            ) {
+                showingPopover =
+                    false
+
+                store
+                    .signOutActiveEnvironment()
+
+            } label: {
+                Text(
+                    "Sign Out of Environment"
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
         }
         .padding(12)
         .frame(

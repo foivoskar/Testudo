@@ -347,6 +347,15 @@ struct EnvironmentAccess:
 
     var membershipID: UUID?
 
+    // Application-local remembered authentication.
+    //
+    // This never belongs to the portable Environment and never
+    // stores the user's password.
+    //
+    // Optional so existing ApplicationData files decode without
+    // requiring a schema migration.
+    var staySignedIn: Bool? = nil
+
     var lastOpenedAt: Date?
 
 
