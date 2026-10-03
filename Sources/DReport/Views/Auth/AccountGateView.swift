@@ -1,18 +1,40 @@
 import SwiftUI
 
 
-struct AccountGateView: View {
+struct AccountGateView:
+    View
+{
     @EnvironmentObject
-    private var store: DReportStore
+    private var store:
+        DReportStore
 
 
-    var body: some View {
+    var body:
+        some View
+    {
         Group {
+
             if
-                store.localUserProfile
+                store
+                    .localUserProfile
                     == nil
             {
                 LocalUserProfileSetupView()
+
+            } else if
+                !store
+                    .applicationCredentialIsConfigured
+            {
+                // Existing installations arrive here once after
+                // upgrading. New installations arrive here after
+                // creating the local profile.
+                ApplicationPasswordSetupView()
+
+            } else if
+                !store
+                    .applicationSessionIsOpen
+            {
+                ApplicationLoginView()
 
             } else if
                 store
@@ -21,6 +43,7 @@ struct AccountGateView: View {
                 ContentView()
 
             } else {
+
                 EnvironmentChooserView()
             }
         }

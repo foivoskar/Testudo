@@ -14,6 +14,10 @@ struct SidebarUserFooter: View {
     private var showingAdminTools =
         false
 
+    @State
+    private var showingApplicationSignOutConfirmation =
+        false
+
 
     var body: some View {
         if
@@ -123,6 +127,19 @@ struct SidebarUserFooter: View {
                     $showingAdminTools
             ) {
                 AdminToolsView()
+            }
+            .sheet(
+                isPresented:
+                    $showingApplicationSignOutConfirmation
+            ) {
+                ApplicationSignOutConfirmationView {
+
+                    store
+                        .signOutApplicationAndRemoveLocalData()
+
+                    showingApplicationSignOutConfirmation =
+                        false
+                }
             }
         }
     }
@@ -234,6 +251,47 @@ struct SidebarUserFooter: View {
             } label: {
                 Text(
                     "Sign Out of Environment"
+                )
+            }
+            .buttonStyle(
+                .plain
+            )
+
+
+            Divider()
+
+
+            Button(
+                "Log Out of Testudo"
+            ) {
+                showingPopover =
+                    false
+
+                store
+                    .logOutApplication()
+            }
+            .buttonStyle(
+                .plain
+            )
+
+
+            Button(
+                role:
+                    .destructive
+            ) {
+                showingPopover =
+                    false
+
+                DispatchQueue
+                    .main
+                    .async {
+                        showingApplicationSignOutConfirmation =
+                            true
+                    }
+
+            } label: {
+                Text(
+                    "Sign Out from Testudo…"
                 )
             }
             .buttonStyle(

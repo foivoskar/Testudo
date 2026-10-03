@@ -21,6 +21,14 @@ final class DReportStore: ObservableObject {
     var environmentSessionIsOpen:
         Bool = false
 
+
+    // Application-level authentication is separate from
+    // Environment authentication.
+    @Published
+    private(set)
+    var applicationSessionIsOpen:
+        Bool = false
+
     // Temporary legacy Environment database location.
     //
     // In Phase 2B this becomes the backing database of
@@ -260,7 +268,18 @@ final class DReportStore: ObservableObject {
         // Environment databases only for Environment entry.
         migrateKnownEnvironmentManifestsIfNeeded()
 
-        environmentSessionIsOpen = false
+        environmentSessionIsOpen =
+            false
+
+        applicationSessionIsOpen =
+            applicationData
+                .localUserProfile
+                != nil
+            && applicationData
+                .applicationCredential
+                != nil
+            && !applicationData
+                .applicationIsLoggedOut
     }
 
     // ========================================================
@@ -3384,13 +3403,7 @@ extension DReportStore {
 
     func resetApplication() {
 
-        environmentSessionIsOpen =
-            false
-
-        applicationData =
-            ApplicationData()
-
-        saveApplicationData()
+        signOutApplicationAndRemoveLocalData()
     }
 }
 
@@ -9386,5 +9399,319 @@ extension DReportStore {
 
 
         return nil
+    }
+}
+
+
+// ============================================================
+// MARK: - Local application authentication
+// ============================================================
+
+extension DReportStore {
+
+    var applicationCredentialIsConfigured:
+        Bool
+    {
+        applicationData
+            .applicationCredential
+            != nil
+    }
+
+
+    @discardableResult
+    func configureApplicationPassword(
+        _ password:
+            String
+    ) -> String? {
+
+        guard
+            applicationData
+                .localUserProfile
+                != nil
+        else {
+            return
+                "Create your local Testudo profile first."
+        }
+
+
+        guard
+            !password.isEmpty
+        else {
+            return
+                "Application password is required."
+        }
+
+
+        do {
+
+            let hash =
+                try PasswordHasher
+                    .createHash(
+                        password:
+                            password
+                    )
+
+            let now =
+                Date()
+
+
+            applicationData
+                .applicationCredential =
+                ApplicationCredential(
+                    passwordSaltBase64:
+                        hash.saltBase64,
+                    passwordHashBase64:
+                        hash.hashBase64,
+                    passwordIterations:
+                        hash.iterations,
+                    createdAt:
+                        applicationData
+                            .applicationCredential?
+                            .createdAt
+                        ?? now,
+                    updatedAt:
+                        now
+                )
+
+
+            applicationData
+                .applicationIsLoggedOut =
+                false
+
+            applicationData
+                .schemaVersion =
+                max(
+                    applicationData
+                        .schemaVersion,
+                    4
+                )
+
+
+            applicationSessionIsOpen =
+                true
+
+
+            saveApplicationData()
+
+
+            return nil
+
+        } catch {
+
+            return
+                "The application password could not be created."
+        }
+    }
+
+
+    @discardableResult
+    func unlockApplication(
+        password:
+            String
+    ) -> String? {
+
+        guard
+            let credential =
+                applicationData
+                    .applicationCredential
+        else {
+            return
+                "No application password is configured."
+        }
+
+
+        guard
+            PasswordHasher.verify(
+                password:
+                    password,
+                saltBase64:
+                    credential
+                        .passwordSaltBase64,
+                expectedHashBase64:
+                    credential
+                        .passwordHashBase64,
+                iterations:
+                    credential
+                        .passwordIterations
+            )
+        else {
+            return
+                "Incorrect password."
+        }
+
+
+        applicationData
+            .applicationIsLoggedOut =
+            false
+
+        applicationSessionIsOpen =
+            true
+
+
+        saveApplicationData()
+
+
+        // If the app was restarted while logged out, the in-memory
+        // Environment session no longer exists.
+        //
+        // Restore it automatically only when that Environment had
+        // explicitly enabled Stay signed in.
+        if
+            !environmentSessionIsOpen,
+            let environmentID =
+                applicationData
+                    .activeEnvironmentID
+        {
+            _ =
+                openWorkEnvironment(
+                    id:
+                        environmentID
+                )
+        }
+
+
+        return nil
+    }
+
+
+    func logOutApplication() {
+
+        if environmentSessionIsOpen {
+            save()
+        }
+
+
+        applicationData
+            .applicationIsLoggedOut =
+            true
+
+
+        saveApplicationData()
+
+
+        // Deliberately do NOT destroy:
+        //
+        // • LocalUserProfile
+        // • Work Environment registry
+        // • bookmarks
+        // • EnvironmentAccess mappings
+        // • Stay signed in states
+        // • the currently open in-memory Environment session
+        //
+        // Therefore logging back in during this run returns the
+        // user to the state they just left.
+        applicationSessionIsOpen =
+            false
+    }
+
+
+    func signOutApplicationAndRemoveLocalData() {
+
+        // Preserve external Environment data before forgetting it.
+        if environmentSessionIsOpen {
+            save()
+        }
+
+
+        applicationSessionIsOpen =
+            false
+
+        environmentSessionIsOpen =
+            false
+
+
+        // Remove all application-owned identity/registry state
+        // from memory first.
+        applicationData =
+            ApplicationData()
+
+        data =
+            DReportData()
+
+
+        let applicationDirectory =
+            applicationFileURL
+                .deletingLastPathComponent()
+
+
+        // The following are old/application-owned local files.
+        //
+        // IMPORTANT:
+        // We intentionally do NOT enumerate and delete arbitrary
+        // filesystem contents and we never delete .testudoenv
+        // packages. A user may have stored one anywhere, including
+        // theoretically inside Application Support.
+        let localOwnedPaths:
+            [URL] =
+            [
+                applicationFileURL,
+
+                applicationDirectory
+                    .appendingPathComponent(
+                        "DReportData.json"
+                    ),
+
+                applicationDirectory
+                    .appendingPathComponent(
+                        "Environments",
+                        isDirectory:
+                            true
+                    ),
+
+                applicationDirectory
+                    .appendingPathComponent(
+                        "TestDataBackups",
+                        isDirectory:
+                            true
+                    ),
+
+                applicationDirectory
+                    .appendingPathComponent(
+                        "TestDatasetManifest.json"
+                    ),
+            ]
+
+
+        for url in localOwnedPaths {
+
+            guard
+                FileManager.default
+                    .fileExists(
+                        atPath:
+                            url.path
+                    )
+            else {
+                continue
+            }
+
+
+            try?
+                FileManager.default
+                    .removeItem(
+                        at:
+                            url
+                    )
+        }
+
+
+        ApplicationLocalDataCleanup
+            .removeOwnedKeychainItems()
+
+
+        // Return the transient Environment database pointer to the
+        // application-owned legacy/default location.
+        fileURL =
+            applicationDirectory
+                .appendingPathComponent(
+                    "DReportData.json"
+                )
+
+
+        // Recreate only an EMPTY ApplicationData.json so the
+        // running application has a valid backing file.
+        //
+        // It contains no profile, Environment registry, bookmarks
+        // or remembered identity.
+        saveApplicationData()
     }
 }

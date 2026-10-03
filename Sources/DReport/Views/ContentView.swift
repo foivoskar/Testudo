@@ -3402,19 +3402,19 @@ struct SettingsView: View {
                 }
 
                 settingsSection(
-                    "Reset This Installation"
+                    "Sign Out from Testudo"
                 ) {
                     VStack(
                         alignment: .leading,
                         spacing: 12
                     ) {
                         Text(
-                            "Resetting removes this installation's local profile, Work Environment registry and local identity mappings."
+                            "Signing out removes this local Testudo profile, application password, Work Environment registry, bookmarks and remembered Environment identity mappings from this Mac."
                         )
                         .font(.callout)
 
                         Text(
-                            "Work Environment databases and their contents are not deleted."
+                            "Your .testudoenv packages and their contents are not deleted. If you only want to lock Testudo and return later to the same state, use Log Out instead."
                         )
                         .font(.callout)
                         .foregroundStyle(
@@ -3422,7 +3422,7 @@ struct SettingsView: View {
                         )
 
                         Button(
-                            "Reset Application…",
+                            "Sign Out from Testudo…",
                             role:
                                 .destructive
                         ) {
@@ -3480,9 +3480,9 @@ struct SettingsView: View {
             isPresented:
                 $showingResetConfirmation
         ) {
-            ResetLocalApplicationView {
+            ApplicationSignOutConfirmationView {
                 store
-                    .resetApplication()
+                    .signOutApplicationAndRemoveLocalData()
 
                 showingResetConfirmation =
                     false
@@ -3681,110 +3681,5 @@ struct SettingsView: View {
                 )
             }
         }
-    }
-}
-
-
-private struct ResetLocalApplicationView:
-    View
-{
-    @Environment(\.dismiss)
-    private var dismiss
-
-    @State
-    private var confirmation =
-        ""
-
-    let onReset:
-        () -> Void
-
-
-    private var isConfirmed:
-        Bool
-    {
-        confirmation
-            .trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
-            .uppercased()
-            == "RESET"
-    }
-
-
-    var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 18
-        ) {
-            Label(
-                "Reset This Installation",
-                systemImage:
-                    "exclamationmark.triangle.fill"
-            )
-            .font(.title2)
-            .fontWeight(
-                .semibold
-            )
-
-            Text(
-                "This removes the local user profile, the list of known Work Environments and local Environment identity mappings from this installation."
-            )
-
-            Text(
-                "Work Environment databases and their Tasks, Notes, Events, Themes, Organizations, Groups and People are not deleted."
-            )
-            .foregroundStyle(
-                .secondary
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 6
-            ) {
-                Text(
-                    "Type RESET to continue:"
-                )
-                .font(.callout)
-                .fontWeight(
-                    .medium
-                )
-
-                TextField(
-                    "RESET",
-                    text:
-                        $confirmation
-                )
-                .textFieldStyle(
-                    .roundedBorder
-                )
-            }
-
-            HStack {
-                Spacer()
-
-                Button(
-                    "Cancel"
-                ) {
-                    dismiss()
-                }
-
-                Button(
-                    "Reset Application",
-                    role:
-                        .destructive
-                ) {
-                    onReset()
-                    dismiss()
-                }
-                .disabled(
-                    !isConfirmed
-                )
-            }
-        }
-        .padding(24)
-        .frame(
-            width: 520
-        )
     }
 }

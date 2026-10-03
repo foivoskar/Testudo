@@ -67,7 +67,7 @@ struct LocalUserProfileSetupView: View {
             )
 
             Text(
-                "This profile belongs to you and to this installation of the application. It is not a sign-in account and it is independent of your Work Environments."
+                "This profile belongs to you and to this Testudo installation. After saving it, you will create an application password. Your Testudo login remains independent of all Work Environment accounts."
             )
             .foregroundStyle(
                 .secondary

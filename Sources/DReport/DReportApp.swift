@@ -22,7 +22,7 @@ struct DReportApp: App {
         .windowStyle(.hiddenTitleBar)
 
         Settings {
-            SettingsView()
+            ApplicationSettingsGateView()
                 .environmentObject(store)
         .environment(
             \.timeZone,

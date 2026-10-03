@@ -25,14 +25,58 @@ import Foundation
 // Those belong to an Environment database.
 // ============================================================
 
+// ============================================================
+// MARK: - Local application authentication
+//
+// This credential protects the local Testudo installation only.
+// It is completely independent from Work Environment accounts.
+// ============================================================
+
+struct ApplicationCredential:
+    Codable,
+    Hashable
+{
+    var passwordSaltBase64:
+        String
+
+    var passwordHashBase64:
+        String
+
+    var passwordIterations:
+        Int
+
+    var createdAt:
+        Date
+
+    var updatedAt:
+        Date
+}
+
+
 struct ApplicationData:
     Codable
 {
     var schemaVersion:
-        Int = 3
+        Int = 4
 
     var localUserProfile:
         LocalUserProfile?
+
+    // Password hash for the local Testudo user.
+    //
+    // This never travels with a Work Environment.
+    var applicationCredential:
+        ApplicationCredential?
+
+    // Persisted login state.
+    //
+    // false means the user remains signed in across ordinary
+    // application restarts.
+    //
+    // true means the user explicitly selected Log Out and must
+    // enter the application password before continuing.
+    var applicationIsLoggedOut:
+        Bool = false
 
     var workEnvironments:
         [WorkEnvironment] = []
@@ -55,6 +99,8 @@ struct ApplicationData:
     {
         case schemaVersion
         case localUserProfile
+        case applicationCredential
+        case applicationIsLoggedOut
         case workEnvironments
         case environmentAccesses
         case activeEnvironmentID
@@ -84,6 +130,21 @@ struct ApplicationData:
                 forKey:
                     .localUserProfile
             )
+
+        applicationCredential =
+            try container.decodeIfPresent(
+                ApplicationCredential.self,
+                forKey:
+                    .applicationCredential
+            )
+
+        applicationIsLoggedOut =
+            try container.decodeIfPresent(
+                Bool.self,
+                forKey:
+                    .applicationIsLoggedOut
+            ) ?? false
+
 
         workEnvironments =
             try container.decodeIfPresent(
