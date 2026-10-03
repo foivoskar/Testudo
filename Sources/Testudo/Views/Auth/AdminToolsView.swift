@@ -20,6 +20,18 @@ struct AdminToolsView:
     private var environmentAppearanceError:
         String?
 
+    @State
+    private var calendarPendingRemoval:
+        TestudoCalendar?
+
+    @State
+    private var calendarActionError:
+        String?
+
+    @State
+    private var syncingCalendarIDs:
+        Set<UUID> = []
+
 
     var body: some View {
         if
@@ -57,6 +69,8 @@ struct AdminToolsView:
                         environment
                     )
 
+                    connectedCalendarsSection
+
                     membersSection
                 }
                 .padding(
@@ -67,13 +81,42 @@ struct AdminToolsView:
                 width:
                     620,
                 height:
-                    650
+                    760
             )
             .sheet(
                 isPresented:
                     $showingMembers
             ) {
                 EnvironmentMembershipManagementView()
+            }
+            .alert(
+                item:
+                    $calendarPendingRemoval
+            ) {
+                calendar in
+
+                Alert(
+                    title:
+                        Text(
+                            "Remove External Calendar?"
+                        ),
+                    message:
+                        Text(
+                            "“\(calendar.name)” will be disconnected from this Work Environment. All events imported from this calendar and their Testudo relationships will be removed. The original external calendar itself will not be modified."
+                        ),
+                    primaryButton:
+                        .destructive(
+                            Text(
+                                "Remove Calendar"
+                            )
+                        ) {
+                            removeExternalCalendar(
+                                calendar
+                            )
+                        },
+                    secondaryButton:
+                        .cancel()
+                )
             }
 
         } else {
@@ -581,6 +624,340 @@ struct AdminToolsView:
                 )
             }
         }
+    }
+
+
+    private var connectedCalendarsSection:
+        some View
+    {
+        let calendars =
+            store.data.calendars
+                .filter {
+                    $0.sourceKind
+                        == .iCalSubscription
+                    || $0.sourceKind
+                        == .appleEventKit
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+
+
+        return VStack(
+            alignment:
+                .leading,
+            spacing:
+                10
+        ) {
+            HStack {
+                Text(
+                    "Connected Calendars"
+                )
+                .font(
+                    .headline
+                )
+
+                Spacer()
+
+                Text(
+                    "\(calendars.count)"
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+
+            Text(
+                "External calendars connected to this Work Environment. Event source data is read-only; Testudo relationships remain editable."
+            )
+            .font(
+                .callout
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
+
+            if calendars.isEmpty {
+                Text(
+                    "No external calendars are connected."
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+            } else {
+                VStack(
+                    alignment:
+                        .leading,
+                    spacing:
+                        12
+                ) {
+                    ForEach(
+                        calendars
+                    ) {
+                        calendar in
+
+                        HStack(
+                            alignment:
+                                .top,
+                            spacing:
+                                12
+                        ) {
+                            Image(
+                                systemName:
+                                    calendar
+                                        .sourceKind?
+                                        .systemImage
+                                    ?? "calendar"
+                            )
+                            .frame(
+                                width:
+                                    22
+                            )
+
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing:
+                                    3
+                            ) {
+                                Text(
+                                    calendar.name
+                                )
+                                .fontWeight(
+                                    .medium
+                                )
+
+                                Text(
+                                    calendar
+                                        .sourceKind?
+                                        .displayName
+                                    ?? "External Calendar"
+                                )
+                                .font(
+                                    .caption
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+
+                                Text(
+                                    calendar.lastSyncAt
+                                        .map {
+                                            "Last sync: \(TestudoTime.dateTime($0))"
+                                        }
+                                    ?? "Last sync: Never"
+                                )
+                                .font(
+                                    .caption
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+
+                                if
+                                    let error =
+                                        calendar
+                                            .lastSyncError,
+                                    !error.isEmpty
+                                {
+                                    Text(
+                                        error
+                                    )
+                                    .font(
+                                        .caption
+                                    )
+                                    .foregroundStyle(
+                                        .red
+                                    )
+                                }
+                            }
+
+                            Spacer()
+
+                            VStack(
+                                alignment:
+                                    .trailing,
+                                spacing:
+                                    8
+                            ) {
+                                if calendar.isReadOnly {
+                                    Label(
+                                        "Read-only",
+                                        systemImage:
+                                            "lock"
+                                    )
+                                    .font(
+                                        .caption
+                                    )
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+
+                                if
+                                    syncingCalendarIDs
+                                        .contains(
+                                            calendar.id
+                                        )
+                                {
+                                    ProgressView()
+                                        .controlSize(
+                                            .small
+                                        )
+
+                                } else {
+                                    Menu {
+                                        Button {
+                                            syncExternalCalendar(
+                                                calendar
+                                            )
+                                        } label: {
+                                            Label(
+                                                "Sync Now",
+                                                systemImage:
+                                                    "arrow.triangle.2.circlepath"
+                                            )
+                                        }
+
+
+                                        Divider()
+
+
+                                        Button(
+                                            role:
+                                                .destructive
+                                        ) {
+                                            calendarActionError =
+                                                nil
+
+                                            calendarPendingRemoval =
+                                                calendar
+
+                                        } label: {
+                                            Label(
+                                                "Remove Calendar…",
+                                                systemImage:
+                                                    "trash"
+                                            )
+                                        }
+
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                "ellipsis.circle"
+                                        )
+                                    }
+                                    .menuStyle(
+                                        .borderlessButton
+                                    )
+                                    .fixedSize()
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(
+                    .vertical,
+                    4
+                )
+            }
+
+
+            if
+                let calendarActionError,
+                !calendarActionError.isEmpty
+            {
+                Label(
+                    calendarActionError,
+                    systemImage:
+                        "exclamationmark.triangle"
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .red
+                )
+            }
+
+
+            Text(
+                "Secret iCal addresses are stored in Keychain and are never displayed here. Apple Calendar access is supplied by macOS EventKit; Testudo stores only the calendar connection metadata in the Work Environment."
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .secondary
+            )
+        }
+    }
+
+
+    private func syncExternalCalendar(
+        _ calendar:
+            TestudoCalendar
+    ) {
+        guard
+            !syncingCalendarIDs
+                .contains(
+                    calendar.id
+                )
+        else {
+            return
+        }
+
+        calendarActionError =
+            nil
+
+        syncingCalendarIDs
+            .insert(
+                calendar.id
+            )
+
+        Task {
+            let error =
+                await store
+                    .syncExternalCalendar(
+                        id:
+                            calendar.id
+                    )
+
+            syncingCalendarIDs
+                .remove(
+                    calendar.id
+                )
+
+            calendarActionError =
+                error
+        }
+    }
+
+
+    private func removeExternalCalendar(
+        _ calendar:
+            TestudoCalendar
+    ) {
+        calendarActionError =
+            store
+                .disconnectExternalCalendar(
+                    id:
+                        calendar.id
+                )
+
+        calendarPendingRemoval =
+            nil
     }
 
 

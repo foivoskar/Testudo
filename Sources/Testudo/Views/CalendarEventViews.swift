@@ -955,7 +955,7 @@ struct CalendarEventDetailView:
                                 )
                         {
                             Label(
-                                "Read-only iCal subscription. Event details come from the external calendar; only Testudo relationships can be changed.",
+                                "Read-only external calendar. Event details come from the connected calendar; only Testudo relationships can be changed.",
                                 systemImage:
                                     "lock"
                             )

@@ -159,6 +159,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>
     <true/>
 
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Testudo reads selected Apple Calendar events so they can be displayed as read-only events and linked to Testudo work. Testudo does not modify Apple Calendar events.</string>
+
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
@@ -209,11 +212,26 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 chmod +x "$APP/Contents/MacOS/Testudo"
 
+ENTITLEMENTS="$ROOT/.build/Testudo.entitlements"
+
+cat > "$ENTITLEMENTS" <<'ENTITLEMENTS_PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.personal-information.calendars</key>
+    <true/>
+</dict>
+</plist>
+ENTITLEMENTS_PLIST
+
 codesign \
     --force \
     --deep \
     --sign - \
-    "$APP" >/dev/null 2>&1 || true
+    --entitlements "$ENTITLEMENTS" \
+    "$APP" >/dev/null
 
 echo
 echo "Application created:"

@@ -166,16 +166,18 @@ private struct PersonListRow: View {
                         for: person.id
                     )
 
-                let affiliations =
-                    store.containers(
-                        for: person.id
+                let affiliation =
+                    store.displayAffiliation(
+                        for:
+                            person.id
                     )
 
                 let secondary =
                     secondaryText(
-                        profile: profile,
-                        affiliations:
-                            affiliations
+                        profile:
+                            profile,
+                        affiliation:
+                            affiliation
                     )
 
                 if !secondary.isEmpty {
@@ -214,28 +216,41 @@ private struct PersonListRow: View {
 
     private func secondaryText(
         profile: PersonProfile?,
-        affiliations: [Entity]
+        affiliation: Entity?
     ) -> String {
         var parts: [String] = []
 
         if
             let title =
-                profile?.jobTitle,
+                profile?
+                    .jobTitle
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
             !title.isEmpty
         {
-            parts.append(title)
+            parts.append(
+                title
+            )
         }
 
         if
-            let first =
-                affiliations.first
+            let affiliation
         {
-            parts.append(first.name)
+            parts.append(
+                store
+                    .affiliationDisplayName(
+                        affiliation
+                    )
+            )
         }
 
-        return parts.joined(
-            separator: " · "
-        )
+        return
+            parts.joined(
+                separator:
+                    " · "
+            )
     }
 }
 
@@ -808,6 +823,8 @@ struct PersonDetailView: View {
                     .group
             )
 
+            primaryAffiliationRow
+
             if let affiliationError {
                 Text(affiliationError)
                     .font(.caption)
@@ -816,6 +833,187 @@ struct PersonDetailView: View {
                     )
             }
         }
+    }
+
+
+    @ViewBuilder
+    private var primaryAffiliationRow:
+        some View
+    {
+        let affiliations =
+            store.containers(
+                for:
+                    personID
+            )
+            .filter {
+                $0.kind
+                    == .organization
+                || $0.kind
+                    == .group
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                == .orderedAscending
+            }
+
+        let explicitPrimary =
+            store.primaryAffiliation(
+                for:
+                    personID
+            )
+
+        let automaticAffiliation =
+            store.displayAffiliation(
+                for:
+                    personID
+            )
+
+
+        HStack(
+            alignment:
+                .center,
+            spacing:
+                14
+        ) {
+            Text(
+                "Primary"
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    120,
+                alignment:
+                    .leading
+            )
+
+
+            Menu {
+                Button {
+                    affiliationError =
+                        store
+                            .setPrimaryAffiliation(
+                                personID:
+                                    personID,
+                                containerID:
+                                    nil
+                            )
+
+                } label: {
+                    if explicitPrimary == nil {
+                        Label(
+                            "Automatic",
+                            systemImage:
+                                "checkmark"
+                        )
+                    } else {
+                        Text(
+                            "Automatic"
+                        )
+                    }
+                }
+
+
+                if !affiliations.isEmpty {
+                    Divider()
+                }
+
+
+                ForEach(
+                    affiliations
+                ) {
+                    affiliation in
+
+                    Button {
+                        affiliationError =
+                            store
+                                .setPrimaryAffiliation(
+                                    personID:
+                                        personID,
+                                    containerID:
+                                        affiliation.id
+                                )
+
+                    } label: {
+                        if
+                            explicitPrimary?
+                                .id
+                                == affiliation.id
+                        {
+                            Label(
+                                store
+                                    .affiliationDisplayName(
+                                        affiliation
+                                    ),
+                                systemImage:
+                                    "checkmark"
+                            )
+
+                        } else {
+                            Text(
+                                store
+                                    .affiliationDisplayName(
+                                        affiliation
+                                    )
+                            )
+                        }
+                    }
+                }
+
+            } label: {
+                HStack(
+                    spacing:
+                        6
+                ) {
+                    if
+                        let explicitPrimary
+                    {
+                        Text(
+                            store
+                                .affiliationDisplayName(
+                                    explicitPrimary
+                                )
+                        )
+
+                    } else if
+                        let automaticAffiliation
+                    {
+                        Text(
+                            "Automatic · \(store.affiliationDisplayName(automaticAffiliation))"
+                        )
+
+                    } else {
+                        Text(
+                            "Automatic"
+                        )
+                    }
+
+                    Image(
+                        systemName:
+                            "chevron.up.chevron.down"
+                    )
+                    .font(
+                        .caption2
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+            .menuStyle(
+                .borderlessButton
+            )
+
+
+            Spacer()
+        }
+        .font(
+            .callout
+        )
     }
 
 

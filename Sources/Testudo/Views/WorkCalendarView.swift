@@ -27,6 +27,10 @@ struct WorkCalendarView: View {
         false
 
     @State
+    private var showingAppleCalendarSetup =
+        false
+
+    @State
     private var isSyncingICal =
         false
 
@@ -110,6 +114,15 @@ struct WorkCalendarView: View {
                     store
                 )
         }
+        .sheet(
+            isPresented:
+                $showingAppleCalendarSetup
+        ) {
+            AppleCalendarConnectionView()
+                .environmentObject(
+                    store
+                )
+        }
     }
 
     private var calendarHeader:
@@ -175,6 +188,20 @@ struct WorkCalendarView: View {
             )
 
             Button {
+                showingAppleCalendarSetup =
+                    true
+            } label: {
+                Image(
+                    systemName:
+                        "calendar.badge.plus"
+                )
+            }
+            .buttonStyle(.plain)
+            .help(
+                "Connect Apple / iCloud Calendar"
+            )
+
+            Button {
                 syncICal()
             } label: {
                 if isSyncingICal {
@@ -196,7 +223,7 @@ struct WorkCalendarView: View {
                     .isEmpty
             )
             .help(
-                "Sync subscribed calendars"
+                "Sync connected external calendars"
             )
 
 
@@ -845,6 +872,8 @@ struct WorkCalendarView: View {
             .filter {
                 $0.sourceKind
                     == .iCalSubscription
+                || $0.sourceKind
+                    == .appleEventKit
             }
     }
 
@@ -864,7 +893,7 @@ struct WorkCalendarView: View {
         Task {
             let errors =
                 await store
-                    .syncAllICalCalendars()
+                    .syncAllExternalCalendars()
 
             isSyncingICal =
                 false

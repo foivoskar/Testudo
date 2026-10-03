@@ -70,9 +70,36 @@ enum CalendarSourceKind:
 {
     case local
     case iCalSubscription
+    case appleEventKit
 
     var id: String {
         rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .local:
+            return "Testudo"
+
+        case .iCalSubscription:
+            return "iCal Subscription"
+
+        case .appleEventKit:
+            return "Apple Calendar / iCloud"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .local:
+            return "calendar"
+
+        case .iCalSubscription:
+            return "link"
+
+        case .appleEventKit:
+            return "apple.logo"
+        }
     }
 }
 

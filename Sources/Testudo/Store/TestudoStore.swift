@@ -5237,6 +5237,37 @@ extension TestudoStore {
                 "One or more affiliations could not be found."
         }
 
+        let preservedPrimaryID =
+            data.memberships
+                .first {
+                    membership in
+
+                    guard
+                        membership
+                            .memberEntityID
+                            == personID,
+                        membership
+                            .isPrimary,
+                        let container =
+                            data.entities
+                                .first(
+                                    where: {
+                                        $0.id
+                                            == membership
+                                                .containerEntityID
+                                    }
+                                )
+                    else {
+                        return false
+                    }
+
+                    return
+                        container.kind
+                            == containerKind
+                }?
+                .containerEntityID
+
+
         // Remove only affiliations of the requested kind.
         // The other kind remains untouched.
         data.memberships.removeAll {
@@ -5276,7 +5307,8 @@ extension TestudoStore {
                     containerEntityID:
                         containerID,
                     isPrimary:
-                        false
+                        preservedPrimaryID
+                            == containerID
                 )
             )
         }
@@ -5317,36 +5349,395 @@ extension TestudoStore {
                         == memberID
                 }
 
+        let primaryIndices =
+            indices.filter {
+                data.memberships[$0]
+                    .isPrimary
+            }
+
+        // Zero Primary affiliations is now a valid state.
+        // In that case the UI uses the hierarchy-based
+        // automatic Organization fallback.
         guard
-            !indices.isEmpty
+            let firstPrimary =
+                primaryIndices.first
         else {
             return
         }
 
-        if
-            let firstPrimary =
-                indices.first(
-                    where: {
-                        data.memberships[$0]
-                            .isPrimary
-                    }
-                )
-        {
-            for index in indices {
-                data.memberships[index]
-                    .isPrimary =
+        // Defensive normalization: at most one explicit
+        // Primary affiliation may exist.
+        for index in indices {
+            data.memberships[index]
+                .isPrimary =
                     index
                     == firstPrimary
+        }
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Person Primary Affiliation
+// ============================================================
+
+extension TestudoStore
+{
+    func primaryAffiliation(
+        for personID:
+            UUID
+    ) -> Entity?
+    {
+        guard
+            let membership =
+                data.memberships
+                    .first(
+                        where: {
+                            $0.memberEntityID
+                                == personID
+                            && $0.isPrimary
+                        }
+                    )
+        else {
+            return nil
+        }
+
+        guard
+            let entity =
+                entity(
+                    id:
+                        membership
+                            .containerEntityID
+                ),
+            entity.kind
+                == .organization
+            || entity.kind
+                == .group
+        else {
+            return nil
+        }
+
+        return entity
+    }
+
+
+    func displayAffiliation(
+        for personID:
+            UUID
+    ) -> Entity?
+    {
+        // ----------------------------------------------------
+        // 1. Explicit Primary always wins.
+        // ----------------------------------------------------
+
+        if
+            let explicit =
+                primaryAffiliation(
+                    for:
+                        personID
+                )
+        {
+            return explicit
+        }
+
+
+        let affiliations =
+            containers(
+                for:
+                    personID
+            )
+
+
+        // ----------------------------------------------------
+        // 2. Automatic fallback:
+        //    choose the directly affiliated Organization that
+        //    is highest in the Organization hierarchy.
+        //
+        //    Example:
+        //
+        //      IPGP
+        //      ├── PSS
+        //      └── SNO
+        //
+        //    If the Person is directly affiliated with all
+        //    three, IPGP wins because its hierarchy depth is 0.
+        // ----------------------------------------------------
+
+        let organizations =
+            affiliations
+                .filter {
+                    $0.kind
+                        == .organization
+                }
+
+        if !organizations.isEmpty {
+            return
+                organizations
+                    .sorted {
+                        lhs,
+                        rhs in
+
+                        let lhsDepth =
+                            organizationHierarchyDepth(
+                                lhs.id
+                            )
+
+                        let rhsDepth =
+                            organizationHierarchyDepth(
+                                rhs.id
+                            )
+
+                        if
+                            lhsDepth
+                                != rhsDepth
+                        {
+                            return
+                                lhsDepth
+                                < rhsDepth
+                        }
+
+                        return
+                            lhs.name
+                                .localizedCaseInsensitiveCompare(
+                                    rhs.name
+                                )
+                            == .orderedAscending
+                    }
+                    .first
+        }
+
+
+        // ----------------------------------------------------
+        // 3. No Organization exists:
+        //    retain useful behaviour by falling back to a Group.
+        // ----------------------------------------------------
+
+        return
+            affiliations
+                .filter {
+                    $0.kind
+                        == .group
+                }
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                    == .orderedAscending
+                }
+                .first
+    }
+
+
+    func affiliationDisplayName(
+        _ affiliation:
+            Entity
+    ) -> String
+    {
+        let short =
+            affiliation
+                .shortName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            ?? ""
+
+        if !short.isEmpty {
+            return short
+        }
+
+        return affiliation.name
+    }
+
+
+    @discardableResult
+    func setPrimaryAffiliation(
+        personID:
+            UUID,
+        containerID:
+            UUID?
+    ) -> String?
+    {
+        guard
+            data.entities
+                .contains(
+                    where: {
+                        $0.id
+                            == personID
+                        && $0.kind
+                            == .person
+                    }
+                )
+        else {
+            return
+                "Person not found."
+        }
+
+
+        if
+            let containerID
+        {
+            guard
+                let affiliation =
+                    entity(
+                        id:
+                            containerID
+                    ),
+                affiliation.kind
+                    == .organization
+                || affiliation.kind
+                    == .group
+            else {
+                return
+                    "Primary affiliation not found."
             }
 
-        } else if
-            let first =
-                indices.first
-        {
-            data.memberships[first]
-                .isPrimary =
-                true
+
+            guard
+                data.memberships
+                    .contains(
+                        where: {
+                            $0.memberEntityID
+                                == personID
+                            && $0.containerEntityID
+                                == containerID
+                        }
+                    )
+            else {
+                return
+                    "The selected Primary must already be an affiliation of this Person."
+            }
         }
+
+
+        for index in
+            data.memberships.indices
+        {
+            guard
+                data.memberships[
+                    index
+                ]
+                .memberEntityID
+                    == personID
+            else {
+                continue
+            }
+
+            data.memberships[
+                index
+            ]
+            .isPrimary =
+                containerID != nil
+                && data.memberships[
+                    index
+                ]
+                .containerEntityID
+                    == containerID
+        }
+
+
+        if
+            let personIndex =
+                data.entities
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == personID
+                        }
+                    )
+        {
+            data.entities[
+                personIndex
+            ]
+            .updatedAt =
+                Date()
+        }
+
+        save()
+
+        return nil
+    }
+
+
+    private func organizationHierarchyDepth(
+        _ organizationID:
+            UUID,
+        visited:
+            Set<UUID> = []
+    ) -> Int
+    {
+        if
+            visited.contains(
+                organizationID
+            )
+        {
+            // Cycle protection. A malformed cyclic branch should
+            // never outrank a valid top-level Organization.
+            return 100_000
+        }
+
+
+        var nextVisited =
+            visited
+
+        nextVisited.insert(
+            organizationID
+        )
+
+
+        let parentOrganizationIDs =
+            data.memberships
+                .filter {
+                    $0.memberEntityID
+                        == organizationID
+                }
+                .compactMap {
+                    membership
+                    -> UUID?
+                    in
+
+                    guard
+                        let parent =
+                            entity(
+                                id:
+                                    membership
+                                        .containerEntityID
+                            ),
+                        parent.kind
+                            == .organization
+                    else {
+                        return nil
+                    }
+
+                    return parent.id
+                }
+
+
+        guard
+            !parentOrganizationIDs
+                .isEmpty
+        else {
+            return 0
+        }
+
+
+        let parentDepth =
+            parentOrganizationIDs
+                .map {
+                    organizationHierarchyDepth(
+                        $0,
+                        visited:
+                            nextVisited
+                    )
+                }
+                .min()
+            ?? 0
+
+        return
+            parentDepth
+            + 1
     }
 }
 
@@ -12011,5 +12402,888 @@ extension TestudoStore {
 
 
         return true
+    }
+}
+
+
+// ============================================================
+// MARK: - Read-only Apple Calendar / iCloud integration
+// ============================================================
+
+@MainActor
+extension TestudoStore
+{
+    func connectAppleCalendar(
+        calendarIdentifier:
+            String
+    ) async -> (
+        calendarID:
+            UUID?,
+        error:
+            String?
+    ) {
+        do {
+            let available =
+                try await
+                    AppleCalendarEventKitBridge
+                        .shared
+                        .availableCalendars()
+
+            guard
+                let candidate =
+                    available.first(
+                        where: {
+                            $0.identifier
+                                == calendarIdentifier
+                        }
+                    )
+            else {
+                return (
+                    nil,
+                    AppleCalendarEventKitError
+                        .calendarNotFound
+                        .localizedDescription
+                )
+            }
+
+
+            if
+                let existing =
+                    data.calendars
+                        .first(
+                            where: {
+                                $0.sourceKind
+                                    == .appleEventKit
+                                && $0.externalID
+                                    == calendarIdentifier
+                            }
+                        )
+            {
+                let error =
+                    await
+                        syncAppleCalendar(
+                            id:
+                                existing.id
+                        )
+
+                return (
+                    existing.id,
+                    error
+                )
+            }
+
+
+            let calendar =
+                TestudoCalendar(
+                    externalID:
+                        candidate
+                            .identifier,
+                    sourceKind:
+                        .appleEventKit,
+                    name:
+                        candidate
+                            .displayName,
+                    isEnabled:
+                        true,
+                    isReadOnly:
+                        true
+                )
+
+            data.calendars.append(
+                calendar
+            )
+
+            save()
+
+
+            let error =
+                await
+                    syncAppleCalendar(
+                        id:
+                            calendar.id
+                    )
+
+            return (
+                calendar.id,
+                error
+            )
+
+        } catch {
+            return (
+                nil,
+                error.localizedDescription
+            )
+        }
+    }
+
+
+    func syncAppleCalendar(
+        id:
+            UUID
+    ) async -> String?
+    {
+        guard
+            let index =
+                data.calendars
+                    .firstIndex(
+                        where: {
+                            $0.id == id
+                        }
+                    )
+        else {
+            return
+                "Calendar not found."
+        }
+
+
+        let calendar =
+            data.calendars[
+                index
+            ]
+
+        guard
+            calendar.sourceKind
+                == .appleEventKit,
+            calendar.isReadOnly
+        else {
+            return
+                "This is not an Apple Calendar connection."
+        }
+
+
+        guard
+            calendar.isEnabled
+        else {
+            return nil
+        }
+
+
+        guard
+            let identifier =
+                calendar
+                    .externalID,
+            !identifier.isEmpty
+        else {
+            return
+                "The Apple Calendar identifier is missing."
+        }
+
+
+        do {
+            let result =
+                try await
+                    AppleCalendarEventKitBridge
+                        .shared
+                        .fetchEvents(
+                            calendarIdentifier:
+                                identifier
+                        )
+
+            mergeAppleCalendarEvents(
+                result.events,
+                into:
+                    id,
+                windowStart:
+                    result
+                        .windowStart,
+                windowEnd:
+                    result
+                        .windowEnd
+            )
+
+
+            if
+                let freshIndex =
+                    data.calendars
+                        .firstIndex(
+                            where: {
+                                $0.id == id
+                            }
+                        )
+            {
+                data.calendars[
+                    freshIndex
+                ]
+                .name =
+                    result
+                        .calendar
+                        .displayName
+
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncAt =
+                    Date()
+
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncError =
+                    nil
+
+                data.calendars[
+                    freshIndex
+                ]
+                .updatedAt =
+                    Date()
+            }
+
+            save()
+
+            return nil
+
+        } catch {
+            if
+                let freshIndex =
+                    data.calendars
+                        .firstIndex(
+                            where: {
+                                $0.id == id
+                            }
+                        )
+            {
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncError =
+                    error
+                        .localizedDescription
+
+                data.calendars[
+                    freshIndex
+                ]
+                .updatedAt =
+                    Date()
+            }
+
+            save()
+
+            return
+                error.localizedDescription
+        }
+    }
+
+
+    func syncAllExternalCalendars()
+        async -> [String]
+    {
+        var errors =
+            await
+                syncAllICalCalendars()
+
+
+        let appleIDs =
+            data.calendars
+                .filter {
+                    $0.sourceKind
+                        == .appleEventKit
+                    && $0.isEnabled
+                }
+                .map(\.id)
+
+
+        for id in appleIDs {
+            if
+                let error =
+                    await
+                        syncAppleCalendar(
+                            id:
+                                id
+                        )
+            {
+                errors.append(
+                    error
+                )
+            }
+        }
+
+        return errors
+    }
+
+
+    private func mergeAppleCalendarEvents(
+        _ imported:
+            [AppleCalendarEventSnapshot],
+        into calendarID:
+            UUID,
+        windowStart:
+            Date,
+        windowEnd:
+            Date
+    ) {
+        let now =
+            Date()
+
+
+        // Remember which cached events existed in the fetch window
+        // before this sync. If an external event disappears, we keep
+        // its Testudo relationships and mark it as a conflict rather
+        // than deleting those relationships.
+        let previouslyCachedIDs =
+            Set(
+                data.calendarEvents
+                    .filter {
+                        $0.calendarID
+                            == calendarID
+                        && $0.startAt
+                            < windowEnd
+                        && $0.endAt
+                            > windowStart
+                    }
+                    .map(\.id)
+            )
+
+
+        var matchedIDs:
+            Set<UUID> = []
+
+
+        for source in imported {
+            var matchingIndex:
+                Int?
+
+
+            // ----------------------------------------------------
+            // Preferred local EventKit event identifier.
+            // ----------------------------------------------------
+
+            if
+                let eventIdentifier =
+                    source
+                        .eventIdentifier,
+                !eventIdentifier.isEmpty
+            {
+                matchingIndex =
+                    data.calendarEvents
+                        .firstIndex(
+                            where: {
+                                $0.calendarID
+                                    == calendarID
+                                && $0.externalID
+                                    == eventIdentifier
+                            }
+                        )
+            }
+
+
+            // ----------------------------------------------------
+            // Server identifier fallback.
+            //
+            // Apple documents that recurring occurrences can share
+            // the same external identifier, so occurrenceDate is
+            // used to distinguish them.
+            // ----------------------------------------------------
+
+            if
+                matchingIndex == nil,
+                let serverIdentifier =
+                    source
+                        .calendarItemExternalIdentifier,
+                !serverIdentifier.isEmpty
+            {
+                matchingIndex =
+                    data.calendarEvents
+                        .firstIndex(
+                            where: {
+                                event in
+
+                                guard
+                                    event.calendarID
+                                        == calendarID,
+                                    event.iCalUID
+                                        == serverIdentifier
+                                else {
+                                    return false
+                                }
+
+                                return
+                                    appleOccurrenceMatches(
+                                        event
+                                            .originalStartAt,
+                                        source
+                                            .occurrenceDate
+                                    )
+                            }
+                        )
+            }
+
+
+            // ----------------------------------------------------
+            // Last-resort cached-property recovery.
+            //
+            // calendarItemIdentifier can change after a complete
+            // calendar sync, so title/start/end provide a recovery
+            // path when EventKit IDs have changed.
+            // ----------------------------------------------------
+
+            if matchingIndex == nil {
+                matchingIndex =
+                    data.calendarEvents
+                        .firstIndex(
+                            where: {
+                                event in
+
+                                guard
+                                    event.calendarID
+                                        == calendarID,
+                                    event.title
+                                        == source.title
+                                else {
+                                    return false
+                                }
+
+                                return
+                                    abs(
+                                        event
+                                            .startAt
+                                            .timeIntervalSince(
+                                                source
+                                                    .startAt
+                                            )
+                                    )
+                                    < 1
+                                    && abs(
+                                        event
+                                            .endAt
+                                            .timeIntervalSince(
+                                                source
+                                                    .endAt
+                                            )
+                                    )
+                                    < 1
+                            }
+                        )
+            }
+
+
+            if let matchingIndex {
+                var existing =
+                    data.calendarEvents[
+                        matchingIndex
+                    ]
+
+                existing.externalID =
+                    source
+                        .eventIdentifier
+                    ?? source
+                        .calendarItemIdentifier
+
+                existing.iCalUID =
+                    source
+                        .calendarItemExternalIdentifier
+
+                existing.title =
+                    source.title
+
+                existing.notes =
+                    source.notes
+
+                existing.location =
+                    source.location
+
+                existing.startAt =
+                    source.startAt
+
+                existing.endAt =
+                    source.endAt
+
+                existing.isAllDay =
+                    source.isAllDay
+
+                existing.startTimeZoneID =
+                    source.timeZoneID
+
+                existing.endTimeZoneID =
+                    source.timeZoneID
+
+                existing.status =
+                    source.status
+
+                existing.recurrenceRules =
+                    source
+                        .recurrenceRules
+
+                existing.recurringEventExternalID =
+                    source
+                        .occurrenceDate
+                        == nil
+                    ? nil
+                    : source
+                        .calendarItemExternalIdentifier
+
+                existing.originalStartAt =
+                    source
+                        .occurrenceDate
+
+                existing.organizerName =
+                    source
+                        .organizerName
+
+                existing.organizerEmail =
+                    source
+                        .organizerEmail
+
+                existing.attendeeEmails =
+                    source
+                        .attendeeEmails
+
+                existing.externalURL =
+                    source
+                        .externalURL
+
+                existing.externalCreatedAt =
+                    source
+                        .createdAt
+
+                existing.externalUpdatedAt =
+                    source
+                        .updatedAt
+
+                existing.syncState =
+                    .synced
+
+                existing.lastSyncedAt =
+                    now
+
+                existing.updatedAt =
+                    now
+
+                data.calendarEvents[
+                    matchingIndex
+                ] =
+                    existing
+
+                matchedIDs.insert(
+                    existing.id
+                )
+
+            } else {
+                let newEvent =
+                    CalendarEvent(
+                        calendarID:
+                            calendarID,
+                        externalID:
+                            source
+                                .eventIdentifier
+                            ?? source
+                                .calendarItemIdentifier,
+                        iCalUID:
+                            source
+                                .calendarItemExternalIdentifier,
+                        externalURL:
+                            source
+                                .externalURL,
+                        title:
+                            source.title,
+                        notes:
+                            source.notes,
+                        location:
+                            source.location,
+                        startAt:
+                            source.startAt,
+                        endAt:
+                            source.endAt,
+                        isAllDay:
+                            source.isAllDay,
+                        startTimeZoneID:
+                            source
+                                .timeZoneID,
+                        endTimeZoneID:
+                            source
+                                .timeZoneID,
+                        status:
+                            source.status,
+                        recurrenceRules:
+                            source
+                                .recurrenceRules,
+                        recurringEventExternalID:
+                            source
+                                .occurrenceDate
+                                == nil
+                            ? nil
+                            : source
+                                .calendarItemExternalIdentifier,
+                        originalStartAt:
+                            source
+                                .occurrenceDate,
+                        organizerName:
+                            source
+                                .organizerName,
+                        organizerEmail:
+                            source
+                                .organizerEmail,
+                        attendeeEmails:
+                            source
+                                .attendeeEmails,
+                        syncState:
+                            .synced,
+                        externalCreatedAt:
+                            source
+                                .createdAt,
+                        externalUpdatedAt:
+                            source
+                                .updatedAt,
+                        lastSyncedAt:
+                            now
+                    )
+
+                data.calendarEvents.append(
+                    newEvent
+                )
+
+                matchedIDs.insert(
+                    newEvent.id
+                )
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // External event no longer returned by EventKit.
+        //
+        // Preserve the cached details and, importantly, preserve
+        // all Testudo relations. The Sync state communicates that
+        // the external item is no longer available.
+        // --------------------------------------------------------
+
+        for index in
+            data.calendarEvents.indices
+        {
+            let event =
+                data.calendarEvents[
+                    index
+                ]
+
+            guard
+                previouslyCachedIDs
+                    .contains(
+                        event.id
+                    ),
+                !matchedIDs
+                    .contains(
+                        event.id
+                    )
+            else {
+                continue
+            }
+
+            data.calendarEvents[
+                index
+            ]
+            .syncState =
+                .conflict
+
+            data.calendarEvents[
+                index
+            ]
+            .lastSyncedAt =
+                now
+
+            data.calendarEvents[
+                index
+            ]
+            .updatedAt =
+                now
+        }
+    }
+
+
+    private func appleOccurrenceMatches(
+        _ lhs:
+            Date?,
+        _ rhs:
+            Date?
+    ) -> Bool
+    {
+        switch (
+            lhs,
+            rhs
+        ) {
+        case (
+            nil,
+            nil
+        ):
+            return true
+
+        case let (
+            lhs?,
+            rhs?
+        ):
+            return
+                abs(
+                    lhs
+                        .timeIntervalSince(
+                            rhs
+                        )
+                )
+                < 1
+
+        default:
+            return false
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - External Calendar Management
+// ============================================================
+
+@MainActor
+extension TestudoStore
+{
+    func syncExternalCalendar(
+        id:
+            UUID
+    ) async -> String?
+    {
+        guard
+            let calendar =
+                dReportCalendar(
+                    id:
+                        id
+                )
+        else {
+            return
+                "Calendar not found."
+        }
+
+
+        switch calendar.sourceKind {
+        case .iCalSubscription:
+            return
+                await
+                    syncICalCalendar(
+                        id:
+                            id
+                    )
+
+        case .appleEventKit:
+            return
+                await
+                    syncAppleCalendar(
+                        id:
+                            id
+                    )
+
+        case .local,
+             .none:
+            return
+                "This is not an external calendar."
+        }
+    }
+
+
+    @discardableResult
+    func disconnectExternalCalendar(
+        id:
+            UUID
+    ) -> String?
+    {
+        guard
+            let calendar =
+                dReportCalendar(
+                    id:
+                        id
+                )
+        else {
+            return
+                "Calendar not found."
+        }
+
+
+        guard
+            calendar.sourceKind
+                == .iCalSubscription
+            || calendar.sourceKind
+                == .appleEventKit
+        else {
+            return
+                "This is not an external calendar."
+        }
+
+
+        // ----------------------------------------------------
+        // Remove private iCal credential from Keychain.
+        //
+        // Apple/EventKit connections do not store credentials
+        // inside Testudo.
+        // ----------------------------------------------------
+
+        if
+            calendar.sourceKind
+                == .iCalSubscription,
+            let key =
+                calendar
+                    .secretURLKeychainAccount
+        {
+            CalendarSecretStore
+                .delete(
+                    account:
+                        key
+                )
+        }
+
+
+        // ----------------------------------------------------
+        // Find every event imported from this calendar.
+        // ----------------------------------------------------
+
+        let eventIDs =
+            Set(
+                data.calendarEvents
+                    .filter {
+                        $0.calendarID
+                            == id
+                    }
+                    .map(\.id)
+            )
+
+
+        // ----------------------------------------------------
+        // Remove Testudo relationships belonging to those
+        // imported events.
+        // ----------------------------------------------------
+
+        data.calendarEventWorkLinks
+            .removeAll {
+                eventIDs.contains(
+                    $0.calendarEventID
+                )
+            }
+
+        data.calendarEventThemeLinks
+            .removeAll {
+                eventIDs.contains(
+                    $0.calendarEventID
+                )
+            }
+
+
+        // ----------------------------------------------------
+        // Remove imported events.
+        // ----------------------------------------------------
+
+        data.calendarEvents
+            .removeAll {
+                $0.calendarID
+                    == id
+            }
+
+
+        // ----------------------------------------------------
+        // Finally remove the calendar connection metadata.
+        // ----------------------------------------------------
+
+        data.calendars
+            .removeAll {
+                $0.id
+                    == id
+            }
+
+
+        save()
+
+        return nil
     }
 }
