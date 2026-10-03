@@ -447,7 +447,7 @@ struct ArchiveWorkListView:
             return "note.text"
 
         case .activity:
-            return "clock.arrow.circlepath"
+            return "waveform.path.ecg"
         }
     }
 

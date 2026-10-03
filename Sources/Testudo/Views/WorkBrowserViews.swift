@@ -1246,7 +1246,7 @@ struct WorkGuideRow: View {
             return "note.text"
 
         case .activity:
-            return "calendar"
+            return "waveform.path.ecg"
         }
     }
 
@@ -3051,7 +3051,7 @@ struct WorkItemDetailView: View {
             return "New Note"
 
         case .activity:
-            return "New Activity"
+            return "waveform.path.ecg"
         }
     }
 
@@ -3066,7 +3066,7 @@ struct WorkItemDetailView: View {
             return "note.text"
 
         case .activity:
-            return "clock.arrow.circlepath"
+            return "waveform.path.ecg"
         }
     }
 
@@ -3109,7 +3109,7 @@ struct WorkItemDetailView: View {
             return "note.text"
 
         case .activity:
-            return "clock.arrow.circlepath"
+            return "waveform.path.ecg"
         }
     }
 
@@ -4988,7 +4988,7 @@ struct WorkItemDetailView: View {
             return "note.text"
 
         case .activity:
-            return "calendar"
+            return "waveform.path.ecg"
         }
     }
 
