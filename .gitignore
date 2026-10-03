@@ -3,3 +3,19 @@
 .swiftpm/
 dist/
 *.xcuserstate
+
+# Testudo local/private data
+*.testudoenv
+*.testudouser
+ApplicationData.json
+TestudoData.json
+EnvironmentData.json
+EnvironmentCredentials.json
+TestDatasetManifest.json
+
+# Local environment / credentials
+.env
+.env.*
+*.pem
+*.p12
+*.pfx

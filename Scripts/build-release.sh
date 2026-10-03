@@ -34,7 +34,7 @@ mkdir -p \
 echo "Building Testudo.app..."
 echo
 
-./Scripts/build-app.sh
+./Scripts/build-app.sh release
 
 if [ ! -d "${APP_PATH}" ]; then
     echo
