@@ -1690,7 +1690,17 @@ struct WorkItemDetailView: View {
                             )
                     {
                         Text("·")
-                        Text(theme.name)
+
+                        TestudoDestinationLink(
+                            title:
+                                theme.name,
+                            destination:
+                                .theme(
+                                    theme.id
+                                ),
+                            color:
+                                .secondary
+                        )
                     }
 
                     if
@@ -1830,11 +1840,15 @@ struct WorkItemDetailView: View {
                                 .tertiary
                             )
                         } else {
-                            Text(
-                                item.body
-                            )
-                            .textSelection(
-                                .enabled
+                            TestudoDestinationLink(
+                                title:
+                                    item.body,
+                                destination:
+                                    .work(
+                                        item.id
+                                    ),
+                                color:
+                                    .primary
                             )
                         }
                     }
@@ -1913,6 +1927,12 @@ struct WorkItemDetailView: View {
                 "Theme",
             selectedTitles:
                 current.map(\.name),
+            selectedDestinations:
+                current.map {
+                    .theme(
+                        $0.id
+                    )
+                },
             selectorTitle:
                 "Themes",
             selectorMessage:
@@ -1974,6 +1994,17 @@ struct WorkItemDetailView: View {
                             displayTitle(
                                 $0
                             )
+                        ]
+                    }
+                ?? [],
+            selectedDestinations:
+                currentParent
+                    .map {
+                        [
+                            TestudoDetailDestination
+                                .work(
+                                    $0.id
+                                )
                         ]
                     }
                 ?? [],
@@ -2265,28 +2296,62 @@ struct WorkItemDetailView: View {
     ) -> some View {
         let path =
             hierarchyPath(
-                for: item
+                for:
+                    item
             )
 
         if path.count > 1 {
             InspectorSection(
-                title: "Location"
+                title:
+                    "Location"
             ) {
-                Text(
-                    path.joined(
-                        separator:
-                            "  ›  "
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
-                .textSelection(
-                    .enabled
-                )
+                ScrollView(
+                    .horizontal,
+                    showsIndicators:
+                        false
+                ) {
+                    HStack(
+                        spacing:
+                            6
+                    ) {
+                        ForEach(
+                            path
+                        ) {
+                            node in
+
+                            if
+                                node.id
+                                    != path
+                                        .first?
+                                        .id
+                            {
+                                Text(
+                                    "›"
+                                )
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+
+                            TestudoDestinationLink(
+                                title:
+                                    displayTitle(
+                                        node
+                                    ),
+                                destination:
+                                    .work(
+                                        node.id
+                                    ),
+                                color:
+                                    .secondary
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+
 
     @ViewBuilder
     private func childrenSection(
@@ -3371,6 +3436,15 @@ struct WorkItemDetailView: View {
                     role
             )
 
+        let relatedEntities =
+            relationships
+                .compactMap {
+                    store.entity(
+                        id:
+                            $0.entityID
+                    )
+                }
+
         VStack(
             alignment: .leading,
             spacing: 8
@@ -3438,14 +3512,28 @@ struct WorkItemDetailView: View {
                         .foregroundStyle(
                             .tertiary
                         )
+
+                } else if
+                    !relatedEntities
+                        .isEmpty
+                {
+                    TestudoEntityLinks(
+                        entities:
+                            relatedEntities,
+                        font:
+                            .callout,
+                        color:
+                            .primary
+                    )
+
                 } else {
                     Text(
                         relationshipNames(
                             relationships
                         )
                     )
-                    .textSelection(
-                        .enabled
+                    .foregroundStyle(
+                        .secondary
                     )
                 }
 
@@ -3998,14 +4086,33 @@ struct WorkItemDetailView: View {
                     alignment: .leading
                 )
 
-                Text(
-                    store.entity(
-                        id:
-                            relationship
-                                .entityID
-                    )?.name
-                    ?? "Unknown"
-                )
+                if
+                    let relatedEntity =
+                        store.entity(
+                            id:
+                                relationship
+                                    .entityID
+                        )
+                {
+                    TestudoEntityLinks(
+                        entities:
+                            [
+                                relatedEntity
+                            ],
+                        font:
+                            .callout,
+                        color:
+                            .primary
+                    )
+
+                } else {
+                    Text(
+                        "Unknown"
+                    )
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
 
                 Spacer()
 
@@ -5134,16 +5241,18 @@ struct WorkItemDetailView: View {
 
     private func hierarchyPath(
         for item: WorkItem
-    ) -> [String] {
-        var path = [
-            displayTitle(item)
-        ]
+    ) -> [WorkItem] {
+        var path =
+            [
+                item
+            ]
 
         var parentID =
             item.parentWorkItemID
 
         var visited =
             Set<UUID>()
+
 
         while
             let currentID =
@@ -5153,7 +5262,8 @@ struct WorkItemDetailView: View {
             ),
             let parent =
                 store.workItem(
-                    id: currentID
+                    id:
+                        currentID
                 )
         {
             visited.insert(
@@ -5161,16 +5271,19 @@ struct WorkItemDetailView: View {
             )
 
             path.insert(
-                displayTitle(parent),
-                at: 0
+                parent,
+                at:
+                    0
             )
 
             parentID =
                 parent.parentWorkItemID
         }
 
+
         return path
     }
+
 
     private func displayTitle(
         _ item: WorkItem

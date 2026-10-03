@@ -13,6 +13,12 @@ struct DetailSelectionRow<PopoverContent: View>:
     let valueIsEmpty:
         Bool
 
+    let navigationTitles:
+        [String]
+
+    let navigationDestinations:
+        [TestudoDetailDestination]
+
     let buttonSystemImage:
         String
 
@@ -34,6 +40,8 @@ struct DetailSelectionRow<PopoverContent: View>:
         label: String,
         valueText: String,
         valueIsEmpty: Bool = false,
+        navigationTitles: [String] = [],
+        navigationDestinations: [TestudoDetailDestination] = [],
         buttonSystemImage: String = "pencil",
         helpText: String? = nil,
         isPresented: Binding<Bool>,
@@ -49,6 +57,12 @@ struct DetailSelectionRow<PopoverContent: View>:
 
         self.valueIsEmpty =
             valueIsEmpty
+
+        self.navigationTitles =
+            navigationTitles
+
+        self.navigationDestinations =
+            navigationDestinations
 
         self.buttonSystemImage =
             buttonSystemImage
@@ -85,17 +99,43 @@ struct DetailSelectionRow<PopoverContent: View>:
                         .leading
                 )
 
-            Text(valueText)
+            if
+                !valueIsEmpty,
+                !navigationTitles.isEmpty,
+                navigationTitles.count
+                    == navigationDestinations.count
+            {
+                TestudoDestinationLinks(
+                    titles:
+                        navigationTitles,
+                    destinations:
+                        navigationDestinations,
+                    color:
+                        .primary
+                )
+                .lineLimit(
+                    2
+                )
+
+            } else {
+                Text(
+                    valueText
+                )
                 .foregroundStyle(
                     valueIsEmpty
                     ? Color.secondary
-                        .opacity(0.65)
+                        .opacity(
+                            0.65
+                        )
                     : Color.primary
                 )
-                .lineLimit(2)
+                .lineLimit(
+                    2
+                )
                 .textSelection(
                     .enabled
                 )
+            }
 
             Spacer(
                 minLength: 8

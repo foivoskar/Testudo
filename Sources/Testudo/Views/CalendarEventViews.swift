@@ -48,8 +48,17 @@ private struct CalendarEditActions:
 private struct CalendarPropertyRow:
     View
 {
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
     let label: String
     let value: String
+
+    var navigationDestination:
+        TestudoDetailDestination? =
+            nil
 
     var editable:
         Bool = true
@@ -71,19 +80,45 @@ private struct CalendarPropertyRow:
                     alignment: .leading
                 )
 
-            Text(
-                value.isEmpty
-                ? "None"
-                : value
-            )
-            .foregroundStyle(
-                value.isEmpty
-                ? .tertiary
-                : .primary
-            )
-            .textSelection(
-                .enabled
-            )
+            if
+                let navigationDestination,
+                !value.isEmpty
+            {
+                Button {
+                    detailNavigation(
+                        navigationDestination
+                    )
+
+                } label: {
+                    Text(
+                        value
+                    )
+                    .foregroundStyle(
+                        .primary
+                    )
+                }
+                .buttonStyle(
+                    .plain
+                )
+                .help(
+                    "Open \(value)"
+                )
+
+            } else {
+                Text(
+                    value.isEmpty
+                    ? "None"
+                    : value
+                )
+                .foregroundStyle(
+                    value.isEmpty
+                    ? .tertiary
+                    : .primary
+                )
+                .textSelection(
+                    .enabled
+                )
+            }
 
             Spacer()
 
@@ -1597,9 +1632,23 @@ struct CalendarEventDetailView:
             }
         } else {
             CalendarPropertyRow(
-                label: label,
+                label:
+                    label,
                 value:
                     value ?? "",
+                navigationDestination:
+                    field == .notes
+                    &&
+                    !(value ?? "")
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                    ? .calendarEvent(
+                        event.id
+                    )
+                    : nil,
                 editable:
                     !store
                         .isReadOnlyCalendarEvent(
@@ -1635,6 +1684,12 @@ struct CalendarEventDetailView:
                 "Tasks",
             selectedTitles:
                 current.map(workName),
+            selectedDestinations:
+                current.map {
+                    .work(
+                        $0.id
+                    )
+                },
             selectorTitle:
                 "Related Tasks",
             selectorMessage:
@@ -1681,6 +1736,12 @@ struct CalendarEventDetailView:
                 "Themes",
             selectedTitles:
                 current.map(\.name),
+            selectedDestinations:
+                current.map {
+                    .theme(
+                        $0.id
+                    )
+                },
             selectorTitle:
                 "Related Themes",
             selectorMessage:

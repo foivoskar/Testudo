@@ -937,10 +937,16 @@ struct PersonDetailView: View {
                 Text("Notes")
                     .font(.headline)
 
-                Text(profile.notes)
-                    .textSelection(
-                        .enabled
-                    )
+                TestudoDestinationLink(
+                    title:
+                        profile.notes,
+                    destination:
+                        .person(
+                            personID
+                        ),
+                    color:
+                        .primary
+                )
             }
         }
     }
@@ -1673,14 +1679,18 @@ private struct RelatedWorkRow: View {
                     item.title != nil,
                     !item.body.isEmpty
                 {
-                    Text(
-                        item.body
+                    TestudoDestinationLink(
+                        title:
+                            item.body,
+                        destination:
+                            .work(
+                                item.id
+                            ),
+                        color:
+                            .secondary
                     )
                     .font(
                         .callout
-                    )
-                    .foregroundStyle(
-                        .secondary
                     )
                     .lineLimit(
                         3

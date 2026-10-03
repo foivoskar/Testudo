@@ -1385,6 +1385,15 @@ struct ContentView: View {
                     id:
                         id
                 )
+
+        case .calendarEvent(
+            let id
+        ):
+            entry =
+                .calendarEvent(
+                    id:
+                        id
+                )
         }
 
 

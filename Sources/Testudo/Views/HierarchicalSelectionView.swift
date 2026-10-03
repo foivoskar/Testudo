@@ -56,6 +56,9 @@ struct HierarchicalSelectionSummaryRow:
     let selectedTitles:
         [String]
 
+    var selectedDestinations:
+        [TestudoDetailDestination] = []
+
     let selectorTitle:
         String
 
@@ -91,6 +94,10 @@ struct HierarchicalSelectionSummaryRow:
                 summaryText,
             valueIsEmpty:
                 selectedTitles.isEmpty,
+            navigationTitles:
+                selectedTitles,
+            navigationDestinations:
+                selectedDestinations,
             buttonSystemImage:
                 buttonSystemImage,
             helpText:

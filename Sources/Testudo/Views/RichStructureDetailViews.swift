@@ -794,6 +794,22 @@ struct RichThemeDetailView: View {
                     label,
                 value:
                     value ?? "",
+                navigationDestination:
+                    (
+                        field == .summary
+                        || field == .notes
+                    )
+                    &&
+                    !(value ?? "")
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                    ? .theme(
+                        theme.id
+                    )
+                    : nil,
                 onEdit: {
                     beginText(
                         field,
@@ -1557,20 +1573,8 @@ private struct RelatedTasksSplitPane<
                 ) {
                     task in
 
-                    Button {
-                        detailNavigation(
-                            .work(
-                                task.id
-                            )
-                        )
-
-                    } label: {
-                        taskRow(
-                            task
-                        )
-                    }
-                    .buttonStyle(
-                        .plain
+                    taskRow(
+                        task
                     )
 
 
@@ -1603,24 +1607,36 @@ private struct RelatedTasksSplitPane<
             spacing:
                 10
         ) {
-            Image(
-                systemName:
+            Button {
+                detailNavigation(
+                    .work(
+                        task.id
+                    )
+                )
+
+            } label: {
+                Image(
+                    systemName:
+                        taskIcon(
+                            task
+                        )
+                )
+                .testudoTaskStatusSymbolColor(
                     taskIcon(
                         task
                     )
-            )
-            .testudoTaskStatusSymbolColor(
-                taskIcon(
-                    task
                 )
-            )
-            .frame(
-                width:
-                    20
-            )
-            .padding(
-                .top,
-                2
+                .frame(
+                    width:
+                        20
+                )
+                .padding(
+                    .top,
+                    2
+                )
+            }
+            .buttonStyle(
+                .plain
             )
 
 
@@ -1630,10 +1646,17 @@ private struct RelatedTasksSplitPane<
                 spacing:
                     3
             ) {
-                Text(
-                    taskTitle(
-                        task
-                    )
+                TestudoDestinationLink(
+                    title:
+                        taskTitle(
+                            task
+                        ),
+                    destination:
+                        .work(
+                            task.id
+                        ),
+                    color:
+                        .primary
                 )
                 .font(
                     .callout
@@ -1641,18 +1664,23 @@ private struct RelatedTasksSplitPane<
                 .fontWeight(
                     .medium
                 )
-                .foregroundStyle(
-                    .primary
-                )
 
 
                 HStack(
                     spacing:
                         6
                 ) {
-                    Text(
-                        "Task"
+                    TestudoDestinationLink(
+                        title:
+                            "Task",
+                        destination:
+                            .work(
+                                task.id
+                            ),
+                        color:
+                            .secondary
                     )
+
 
                     if
                         let status =
@@ -1660,9 +1688,15 @@ private struct RelatedTasksSplitPane<
                     {
                         Text("·")
 
-                        Text(
-                            status
-                                .displayName
+                        TestudoDestinationLink(
+                            title:
+                                status.displayName,
+                            destination:
+                                .work(
+                                    task.id
+                                ),
+                            color:
+                                .secondary
                         )
                     }
 
@@ -1676,8 +1710,15 @@ private struct RelatedTasksSplitPane<
                     {
                         Text("·")
 
-                        Text(
-                            theme.name
+                        TestudoDestinationLink(
+                            title:
+                                theme.name,
+                            destination:
+                                .theme(
+                                    theme.id
+                                ),
+                            color:
+                                .secondary
                         )
                     }
 
@@ -1688,16 +1729,20 @@ private struct RelatedTasksSplitPane<
                     {
                         Text("·")
 
-                        Text(
-                            "Due \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: task.deadlineTimeZoneID))"
+                        TestudoDestinationLink(
+                            title:
+                                "Due \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: task.deadlineTimeZoneID))",
+                            destination:
+                                .work(
+                                    task.id
+                                ),
+                            color:
+                                .secondary
                         )
                     }
                 }
                 .font(
                     .caption2
-                )
-                .foregroundStyle(
-                    .secondary
                 )
 
 
@@ -1721,14 +1766,18 @@ private struct RelatedTasksSplitPane<
                     !body.isEmpty,
                     !explicitTitle.isEmpty
                 {
-                    Text(
-                        body
+                    TestudoDestinationLink(
+                        title:
+                            body,
+                        destination:
+                            .work(
+                                task.id
+                            ),
+                        color:
+                            .secondary
                     )
                     .font(
                         .caption
-                    )
-                    .foregroundStyle(
-                        .secondary
                     )
                     .lineLimit(
                         2
@@ -1751,9 +1800,6 @@ private struct RelatedTasksSplitPane<
         .padding(
             .vertical,
             7
-        )
-        .contentShape(
-            Rectangle()
         )
     }
 
@@ -2717,6 +2763,20 @@ struct RichStructureEntityDetailView:
                     label,
                 value:
                     value ?? "",
+                navigationDestination:
+                    field == .notes
+                    &&
+                    !(value ?? "")
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                    ? detailDestination(
+                        for:
+                            entity
+                    )
+                    : nil,
                 onEdit: {
                     beginText(
                         field,
@@ -3396,6 +3456,32 @@ struct RichStructureEntityDetailView:
                         $0.id
                     )
             }
+    }
+
+
+    private func detailDestination(
+        for entity:
+            Entity
+    ) -> TestudoDetailDestination {
+        switch entity.kind {
+        case .organization:
+            return
+                .organization(
+                    entity.id
+                )
+
+        case .group:
+            return
+                .group(
+                    entity.id
+                )
+
+        case .person:
+            return
+                .person(
+                    entity.id
+                )
+        }
     }
 
 

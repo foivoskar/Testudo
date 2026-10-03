@@ -20,6 +20,7 @@ enum TestudoDetailDestination:
     case organization(UUID)
     case group(UUID)
     case person(UUID)
+    case calendarEvent(UUID)
 }
 
 
@@ -45,6 +46,42 @@ struct TestudoDetailNavigationAction:
     ) {
         handler(
             destination
+        )
+    }
+
+
+    func open(
+        _ item:
+            WorkItem
+    ) {
+        handler(
+            .work(
+                item.id
+            )
+        )
+    }
+
+
+    func open(
+        _ theme:
+            Theme
+    ) {
+        handler(
+            .theme(
+                theme.id
+            )
+        )
+    }
+
+
+    func open(
+        _ event:
+            CalendarEvent
+    ) {
+        handler(
+            .calendarEvent(
+                event.id
+            )
         )
     }
 
@@ -106,6 +143,141 @@ extension EnvironmentValues {
                 TestudoDetailNavigationKey.self
             ] =
                 newValue
+        }
+    }
+}
+
+
+// ============================================================
+// MARK: - Shared clickable references
+// ============================================================
+
+struct TestudoDestinationLink:
+    View
+{
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
+
+    let title:
+        String
+
+    let destination:
+        TestudoDetailDestination
+
+    var color:
+        Color = .primary
+
+
+    var body:
+        some View
+    {
+        Button {
+            detailNavigation(
+                destination
+            )
+
+        } label: {
+            Text(
+                title
+            )
+            .foregroundStyle(
+                color
+            )
+        }
+        .buttonStyle(
+            .plain
+        )
+        .contentShape(
+            Rectangle()
+        )
+        .help(
+            "Open \(title)"
+        )
+    }
+}
+
+
+struct TestudoDestinationLinks:
+    View
+{
+    let titles:
+        [String]
+
+    let destinations:
+        [TestudoDetailDestination]
+
+    var color:
+        Color = .primary
+
+    var maximumVisible:
+        Int = 3
+
+
+    private var count:
+        Int
+    {
+        min(
+            titles.count,
+            destinations.count,
+            maximumVisible
+        )
+    }
+
+
+    var body:
+        some View
+    {
+        ScrollView(
+            .horizontal,
+            showsIndicators:
+                false
+        ) {
+            HStack(
+                spacing:
+                    0
+            ) {
+                ForEach(
+                    0..<count,
+                    id:
+                        \.self
+                ) {
+                    index in
+
+                    if index > 0 {
+                        Text(
+                            ", "
+                        )
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                    }
+
+                    TestudoDestinationLink(
+                        title:
+                            titles[index],
+                        destination:
+                            destinations[index],
+                        color:
+                            color
+                    )
+                }
+
+
+                if
+                    titles.count
+                        > count
+                {
+                    Text(
+                        " +\(titles.count - count) more"
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
         }
     }
 }
