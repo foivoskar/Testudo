@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_DIR="$HOME/Library/Application Support/DReport"
-DATA="$APP_DIR/DReportData.json"
+APP_DIR="$HOME/Library/Application Support/Testudo"
+DATA="$APP_DIR/TestudoData.json"
 BACKUP_DIR="$APP_DIR/TestDataBackups"
 MANIFEST="$APP_DIR/TestDatasetManifest.json"
 
@@ -10,22 +10,22 @@ mkdir -p "$APP_DIR"
 mkdir -p "$BACKUP_DIR"
 
 if [ ! -f "$DATA" ]; then
-    echo "ERROR: DReportData.json does not exist."
-    echo "Open DReport and create the first Administrator first."
+    echo "ERROR: TestudoData.json does not exist."
+    echo "Open Testudo and create the first Administrator first."
     exit 1
 fi
 
-pkill -x DReport 2>/dev/null || true
+pkill -x Testudo 2>/dev/null || true
 sleep 1
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP="$BACKUP_DIR/DReportData-before-test-$STAMP.json"
+BACKUP="$BACKUP_DIR/TestudoData-before-test-$STAMP.json"
 
 cp "$DATA" "$BACKUP"
 
 echo
 echo "=========================================="
-echo "  DREPORT TEST DATASET"
+echo "  TESTUDO TEST DATASET"
 echo "=========================================="
 echo
 echo "Backup:"
@@ -42,8 +42,8 @@ import json
 import os
 import uuid
 
-app_dir = Path.home() / "Library/Application Support/DReport"
-data_path = app_dir / "DReportData.json"
+app_dir = Path.home() / "Library/Application Support/Testudo"
+data_path = app_dir / "TestudoData.json"
 manifest_path = app_dir / "TestDatasetManifest.json"
 
 data = json.loads(data_path.read_text())
@@ -800,9 +800,9 @@ software = make_theme(
     age_days=100,
 )
 
-dreport_theme = make_theme(
-    "DReport",
-    "Development and testing of the DReport application.",
+testudo_theme = make_theme(
+    "Testudo",
+    "Development and testing of the Testudo application.",
     parent=software,
     age_days=30,
 )
@@ -828,7 +828,7 @@ outreach = make_theme(
 northstar = make_entity(
     "organization",
     "Northstar University",
-    "Demo university used by the DReport test dataset.",
+    "Demo university used by the Testudo test dataset.",
 )
 
 faculty = make_entity(
@@ -960,7 +960,7 @@ def add_person(
     entity_id = make_entity(
         "person",
         display_name,
-        "DReport demo person.",
+        "Testudo demo person.",
         age_days=60,
     )
 
@@ -1252,7 +1252,7 @@ make_membership(
     True
 )
 
-test_password = "DReportTest!2026"
+test_password = "TestudoTest!2026"
 
 elena_user = make_user(
     elena,
@@ -1280,7 +1280,7 @@ if actor_id is None:
         "demo_admin",
         "Demo",
         "Administrator",
-        jobTitle="DReport Administrator",
+        jobTitle="Testudo Administrator",
         professionalEmail="admin@example.test",
         notes="Automatically created because no existing Administrator was found.",
     )
@@ -1498,10 +1498,10 @@ hardware_note = make_work(
     creator=actor_id,
 )
 
-dreport = make_work(
+testudo = make_work(
     "task",
-    dreport_theme,
-    "DReport v0.1",
+    testudo_theme,
+    "Testudo v0.1",
     "Build a local-first daily work reporting and task management application.",
     status="inProgress",
     created_days=-20,
@@ -1512,10 +1512,10 @@ dreport = make_work(
 
 people_users = make_work(
     "task",
-    dreport_theme,
+    testudo_theme,
     "Implement People and Users",
     "Separate domain People from authenticated Users and support account linking.",
-    parent=dreport,
+    parent=testudo,
     status="completed",
     created_days=-5,
     completed_days=0,
@@ -1524,10 +1524,10 @@ people_users = make_work(
 
 today_dashboard = make_work(
     "task",
-    dreport_theme,
+    testudo_theme,
     "Implement Today dashboard",
     "Show what needs attention now: deadlines, reminders, events and ongoing work.",
-    parent=dreport,
+    parent=testudo,
     status="todo",
     created_days=-1,
     deadline_days=3,
@@ -1536,10 +1536,10 @@ today_dashboard = make_work(
 
 events_reminders = make_work(
     "task",
-    dreport_theme,
+    testudo_theme,
     "Implement Events and Reminders",
     "Replace Activity with Event and add reminder dates to Notes and Events.",
-    parent=dreport,
+    parent=testudo,
     status="todo",
     created_days=0,
     deadline_days=5,
@@ -1548,10 +1548,10 @@ events_reminders = make_work(
 
 ui_note = make_work(
     "note",
-    dreport_theme,
+    testudo_theme,
     "Sidebar visual direction",
     "Keep the sidebar visually close to macOS Mail: compact, quiet, aligned and without unnecessary separator lines.",
-    parent=dreport,
+    parent=testudo,
     created_days=0,
     logged_days=0,
     creator=actor_id,
@@ -1559,10 +1559,10 @@ ui_note = make_work(
 
 design_review = make_work(
     "activity",
-    dreport_theme,
-    "DReport design review",
+    testudo_theme,
+    "Testudo design review",
     "Reviewed People/User model, profile editing and account administration.",
-    parent=dreport,
+    parent=testudo,
     created_days=0,
     logged_days=0,
     creator=actor_id,
@@ -1570,10 +1570,10 @@ design_review = make_work(
 
 test_dataset = make_work(
     "task",
-    dreport_theme,
+    testudo_theme,
     "Prepare comprehensive test dataset",
-    "Populate all major parts of DReport with realistic demo data.",
-    parent=dreport,
+    "Populate all major parts of Testudo with realistic demo data.",
+    parent=testudo,
     status="completed",
     created_days=0,
     completed_days=0,
@@ -1771,14 +1771,14 @@ make_relation(
 )
 
 make_relation(
-    dreport,
+    testudo,
     amina,
     "with",
     True,
 )
 
 make_relation(
-    dreport,
+    testudo,
     open_working_group,
     "relatedTo",
     False,
@@ -1926,7 +1926,7 @@ if test_users:
         print(
             " ",
             user["username"],
-            " / DReportTest!2026",
+            " / TestudoTest!2026",
             " [",
             user.get(
                 "role",
@@ -1951,11 +1951,11 @@ PY
 
 echo
 echo "=========================================="
-echo "  STARTING DREPORT"
+echo "  STARTING TESTUDO"
 echo "=========================================="
 echo
 
-open "$PWD/dist/DReport.app"
+open "$PWD/dist/Testudo.app"
 
 echo
 echo "Done."

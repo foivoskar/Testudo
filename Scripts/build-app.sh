@@ -6,23 +6,23 @@ cd "$ROOT"
 
 CONFIG="${1:-debug}"
 
-echo "Building DReport ($CONFIG)..."
+echo "Building Testudo ($CONFIG)..."
 echo
 
 swift build -c "$CONFIG"
 
-BIN="$ROOT/.build/$CONFIG/DReport"
+BIN="$ROOT/.build/$CONFIG/Testudo"
 
 if [ ! -f "$BIN" ]; then
-    BIN="$(find "$ROOT/.build" -type f -path "*/$CONFIG/DReport" -print -quit)"
+    BIN="$(find "$ROOT/.build" -type f -path "*/$CONFIG/Testudo" -print -quit)"
 fi
 
 if [ -z "${BIN:-}" ] || [ ! -f "$BIN" ]; then
-    echo "ERROR: DReport executable was not found after build."
+    echo "ERROR: Testudo executable was not found after build."
     exit 1
 fi
 
-APP="$ROOT/dist/DReport.app"
+APP="$ROOT/dist/Testudo.app"
 
 rm -rf "$APP"
 
@@ -30,9 +30,9 @@ mkdir -p \
     "$APP/Contents/MacOS" \
     "$APP/Contents/Resources"
 
-cp "$BIN" "$APP/Contents/MacOS/DReport"
+cp "$BIN" "$APP/Contents/MacOS/Testudo"
 
-TESTUDO_ICON="$ROOT/Sources/DReport/Resources/testudo_icon_blue.png"
+TESTUDO_ICON="$ROOT/Sources/Testudo/Resources/testudo_icon_blue.png"
 
 if [ ! -f "$TESTUDO_ICON" ]; then
     echo "ERROR: Missing Testudo visual asset:"
@@ -52,19 +52,19 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>en</string>
 
     <key>CFBundleExecutable</key>
-    <string>DReport</string>
+    <string>Testudo</string>
 
     <key>CFBundleIdentifier</key>
-    <string>com.dreport.DReport</string>
+    <string>com.testudo.Testudo</string>
 
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
 
     <key>CFBundleName</key>
-    <string>DReport</string>
+    <string>Testudo</string>
 
     <key>CFBundleDisplayName</key>
-    <string>DReport</string>
+    <string>Testudo</string>
 
     <key>CFBundlePackageType</key>
     <string>APPL</string>
@@ -129,7 +129,7 @@ PLIST
 
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-chmod +x "$APP/Contents/MacOS/DReport"
+chmod +x "$APP/Contents/MacOS/Testudo"
 
 codesign \
     --force \

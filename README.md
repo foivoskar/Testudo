@@ -1,6 +1,6 @@
-# DReport
+# Testudo
 
-DReport is a standalone macOS application for structured daily work
+Testudo is a standalone macOS application for structured daily work
 recording, hierarchical task management and reporting.
 
 The project is currently under initial development.

@@ -3,20 +3,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "DReport",
+    name: "Testudo",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .executable(
-            name: "DReport",
-            targets: ["DReport"]
+            name: "Testudo",
+            targets: ["Testudo"]
         )
     ],
     targets: [
         .executableTarget(
-            name: "DReport",
-            path: "Sources/DReport"
+            name: "Testudo",
+            path: "Sources/Testudo"
         )
     ]
 )
