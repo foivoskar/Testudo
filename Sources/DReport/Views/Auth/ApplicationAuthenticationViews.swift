@@ -423,6 +423,40 @@ struct ApplicationSignOutConfirmationView:
 
 
             Text(
+                "Before signing out, you can save your personal profile as a .testudouser file."
+            )
+            .fontWeight(
+                .medium
+            )
+
+
+            Text(
+                "Importing that file later restores your profile information and avatar, but not your application password or your Work Environment registry."
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .fixedSize(
+                horizontal:
+                    false,
+                vertical:
+                    true
+            )
+
+
+            TestudoUserProfileExportButton(
+                title:
+                    "Export My Profile Before Signing Out…"
+            )
+
+
+            Divider()
+
+
+            Text(
                 "Signing out removes this Testudo user's local profile, application password, registered Work Environments, local bookmarks, Environment identity mappings and remembered sign-ins from this Mac."
             )
             .fixedSize(
@@ -434,7 +468,7 @@ struct ApplicationSignOutConfirmationView:
 
 
             Text(
-                "Your .testudoenv packages and all data stored inside them are NOT deleted or modified. To use them again, the next local user must open those Environment packages again."
+                "Your .testudoenv packages and all data stored inside them are NOT deleted or modified. After signing in as a new local user, reopen the Environment packages you want to use."
             )
             .foregroundStyle(
                 .secondary
@@ -506,7 +540,7 @@ struct ApplicationSignOutConfirmationView:
         )
         .frame(
             width:
-                560
+                580
         )
     }
 }

@@ -3333,6 +3333,40 @@ struct SettingsView: View {
                 }
 
                 settingsSection(
+                    "Portable Profile"
+                ) {
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            10
+                    ) {
+
+                        Text(
+                            "Save your personal Testudo profile as a portable .testudouser file."
+                        )
+                        .font(
+                            .callout
+                        )
+
+
+                        Text(
+                            "The file contains your profile information only. It does not contain your application password, Work Environments, Environment passwords or remembered sign-ins."
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+
+                        TestudoUserProfileExportButton()
+                    }
+                }
+
+
+                settingsSection(
                     "My Profile in Current Environment"
                 ) {
                     CurrentEnvironmentProfileImportSummaryView()

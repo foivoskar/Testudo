@@ -9715,3 +9715,240 @@ extension DReportStore {
         saveApplicationData()
     }
 }
+
+
+// ============================================================
+// MARK: - Portable Testudo user profile
+// ============================================================
+
+extension DReportStore {
+
+    @discardableResult
+    func exportLocalUserProfile(
+        to destinationURL:
+            URL
+    ) -> String? {
+
+        guard
+            let profile =
+                applicationData
+                    .localUserProfile
+        else {
+            return
+                "No local Testudo profile exists."
+        }
+
+
+        let destinationURL =
+            TestudoUserProfileFile
+                .normalizedURL(
+                    destinationURL
+                )
+
+
+        let document =
+            TestudoUserProfileDocument(
+                profile:
+                    profile
+            )
+
+
+        do {
+
+            let encoder =
+                JSONEncoder()
+
+            encoder.outputFormatting =
+                [
+                    .prettyPrinted,
+                    .sortedKeys,
+                ]
+
+            encoder.dateEncodingStrategy =
+                .iso8601
+
+
+            let encoded =
+                try encoder
+                    .encode(
+                        document
+                    )
+
+
+            try encoded
+                .write(
+                    to:
+                        destinationURL,
+                    options:
+                        .atomic
+                )
+
+
+            return nil
+
+        } catch {
+
+            return
+                "The Testudo user profile could not be exported."
+        }
+    }
+
+
+    @discardableResult
+    func importLocalUserProfile(
+        from sourceURL:
+            URL
+    ) -> String? {
+
+        guard
+            applicationData
+                .localUserProfile
+                == nil
+        else {
+            return
+                "A local Testudo profile already exists."
+        }
+
+
+        guard
+            sourceURL
+                .pathExtension
+                .caseInsensitiveCompare(
+                    TestudoUserProfileFile
+                        .filenameExtension
+                )
+                == .orderedSame
+        else {
+            return
+                "Select a .testudouser file."
+        }
+
+
+        do {
+
+            let raw =
+                try Data(
+                    contentsOf:
+                        sourceURL
+                )
+
+
+            let decoder =
+                JSONDecoder()
+
+            decoder.dateDecodingStrategy =
+                .iso8601
+
+
+            let document =
+                try decoder
+                    .decode(
+                        TestudoUserProfileDocument.self,
+                        from:
+                            raw
+                    )
+
+
+            guard
+                document.schemaVersion
+                    == 1
+            else {
+                return
+                    "This .testudouser file uses an unsupported profile format."
+            }
+
+
+            let importedProfile =
+                document.profile
+
+
+            guard
+                !importedProfile
+                    .firstName
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+            else {
+                return
+                    "The imported profile does not contain a first name."
+            }
+
+
+            guard
+                !importedProfile
+                    .lastName
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+            else {
+                return
+                    "The imported profile does not contain a last name."
+            }
+
+
+            // Preserve the exported profile exactly.
+            //
+            // The application credential is deliberately NOT
+            // imported. AccountGate will therefore immediately
+            // request creation of a new application password.
+            applicationData
+                .localUserProfile =
+                importedProfile
+
+            applicationData
+                .applicationCredential =
+                nil
+
+            applicationData
+                .applicationIsLoggedOut =
+                false
+
+            applicationData
+                .schemaVersion =
+                max(
+                    applicationData
+                        .schemaVersion,
+                    4
+                )
+
+
+            // A .testudouser file NEVER restores Environment state.
+            applicationData
+                .workEnvironments =
+                []
+
+            applicationData
+                .environmentAccesses =
+                []
+
+            applicationData
+                .activeEnvironmentID =
+                nil
+
+
+            environmentSessionIsOpen =
+                false
+
+            applicationSessionIsOpen =
+                false
+
+            data =
+                DReportData()
+
+
+            saveApplicationData()
+
+
+            return nil
+
+        } catch {
+
+            return
+                "The .testudouser file could not be read."
+        }
+    }
+}

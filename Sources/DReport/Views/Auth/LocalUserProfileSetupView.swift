@@ -29,6 +29,8 @@ struct LocalUserProfileSetupView: View {
                 ) {
                     header
 
+                    TestudoUserProfileImportCard()
+
                     profileCard
                 }
                 .frame(
@@ -59,7 +61,7 @@ struct LocalUserProfileSetupView: View {
             spacing: 6
         ) {
             Text(
-                "Create Your Profile"
+                "Create or Restore Your Profile"
             )
             .font(.largeTitle)
             .fontWeight(
@@ -67,7 +69,7 @@ struct LocalUserProfileSetupView: View {
             )
 
             Text(
-                "This profile belongs to you and to this Testudo installation. After saving it, you will create an application password. Your Testudo login remains independent of all Work Environment accounts."
+                "Create a new local profile or restore one from a .testudouser file. Afterward, you will create a new application password. Work Environments remain separate and must be opened from their .testudoenv packages."
             )
             .foregroundStyle(
                 .secondary
