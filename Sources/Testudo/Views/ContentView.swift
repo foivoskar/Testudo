@@ -7,6 +7,7 @@ enum SidebarSection:
     CaseIterable,
     Identifiable
 {
+    case newEntry
     case today
     case calendar
     case allTasks
@@ -26,6 +27,9 @@ enum SidebarSection:
 
     var title: String {
         switch self {
+        case .newEntry:
+            return "New Entry"
+
         case .today:
             return "Today"
         case .calendar:
@@ -55,6 +59,9 @@ enum SidebarSection:
 
     var icon: String {
         switch self {
+        case .newEntry:
+            return "square.and.pencil"
+
         case .today:
             return "calendar"
         case .calendar:
@@ -410,7 +417,7 @@ struct ContentView: View {
                 List(selection: $selection) {
                     Button {
                         selection =
-                            .allTasks
+                            .newEntry
 
                         workCreationRequest =
                             WorkCreationRequest(
@@ -466,6 +473,9 @@ struct ContentView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .tag(
+                        SidebarSection.newEntry
+                    )
                     .padding(
                         .vertical,
                         3
@@ -914,6 +924,28 @@ struct ContentView: View {
     private func registerWorkSelection(
         _ id: UUID?
     ) {
+        if
+            let id,
+            selection == .newEntry
+        {
+            workCreationRequest =
+                nil
+
+            selection =
+                .allTasks
+
+            registerDetailNavigation(
+                .work(
+                    section:
+                        .allTasks,
+                    id:
+                        id
+                )
+            )
+
+            return
+        }
+
         guard
             let id,
             let section =
@@ -1071,6 +1103,15 @@ struct ContentView: View {
     ) {
         guard let newSection
         else {
+            return
+        }
+
+        if newSection != .newEntry {
+            workCreationRequest =
+                nil
+        }
+
+        if newSection == .newEntry {
             return
         }
 
@@ -1460,7 +1501,8 @@ struct ContentView: View {
              .timeline:
             return true
 
-        case .themes,
+        case .newEntry,
+             .themes,
              .organizations,
              .groups,
              .people:
@@ -1582,7 +1624,8 @@ private struct SectionContentView: View {
 
     private var showsOuterHeader: Bool {
         switch section {
-        case .today,
+        case .newEntry,
+             .today,
              .calendar,
              .allTasks,
              .todo,
@@ -1603,6 +1646,14 @@ private struct SectionContentView: View {
     @ViewBuilder
     private var sectionBody: some View {
         switch section {
+        case .newEntry:
+            WorkListView(
+                mode:
+                    .all,
+                selection:
+                    $selectedWorkItemID
+            )
+
         case .today:
             TodayDashboardView(
                 selection:
@@ -1839,6 +1890,10 @@ private struct SectionContentView: View {
 
     private var subtitle: String {
         switch section {
+        case .newEntry:
+            return
+                "Create a new work entry"
+
         case .calendar:
             return "Deadlines and reminders"
 
@@ -1967,6 +2022,47 @@ private struct ThemeNodeView: View {
     private var createKind:
         WorkItemKind?
 
+    @State
+    private var showingCreateSubtheme =
+        false
+
+    private var hierarchyDepth:
+        Int
+    {
+        var depth =
+            0
+
+        var currentParentID =
+            theme.parentThemeID
+
+        var visited =
+            Set<UUID>()
+
+        while
+            let parentID =
+                currentParentID,
+            visited
+                .insert(
+                    parentID
+                )
+                .inserted,
+            let parent =
+                store.theme(
+                    id:
+                        parentID
+                )
+        {
+            depth +=
+                1
+
+            currentParentID =
+                parent.parentThemeID
+        }
+
+        return depth
+    }
+
+
     private var isSelectedTheme:
         Bool
     {
@@ -2022,6 +2118,15 @@ private struct ThemeNodeView: View {
                 Spacer()
 
                 Menu {
+                    Button(
+                        "New Sub-theme"
+                    ) {
+                        showingCreateSubtheme =
+                            true
+                    }
+
+                    Divider()
+
                     Button("New Task") {
                         createKind = .task
                     }
@@ -2042,6 +2147,13 @@ private struct ThemeNodeView: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
+            .padding(
+                .leading,
+                CGFloat(
+                    hierarchyDepth
+                )
+                * 10
+            )
             .frame(
                 height: 46,
                 alignment: .center
@@ -2085,6 +2197,17 @@ private struct ThemeNodeView: View {
                             }
                         }
                     )
+            )
+        }
+        .sheet(
+            isPresented:
+                $showingCreateSubtheme
+        ) {
+            CreateThemeView(
+                isPresented:
+                    $showingCreateSubtheme,
+                initialParentID:
+                    theme.id
             )
         }
     }
@@ -3195,6 +3318,23 @@ private struct CreateThemeView: View {
 
     @State
     private var parentID: UUID?
+
+    init(
+        isPresented:
+            Binding<Bool>,
+        initialParentID:
+            UUID? = nil
+    ) {
+        self._isPresented =
+            isPresented
+
+        self._parentID =
+            State(
+                initialValue:
+                    initialParentID
+            )
+    }
+
 
     var body: some View {
         VStack(
