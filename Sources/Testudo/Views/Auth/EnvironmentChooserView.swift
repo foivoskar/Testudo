@@ -570,12 +570,45 @@ struct EnvironmentChooserView:
             )
 
 
+            Button {
+                loadDemoEnvironment()
+
+            } label: {
+
+                Label(
+                    "Load Demo Environment",
+                    systemImage:
+                        "sparkles"
+                )
+            }
+            .buttonStyle(
+                .bordered
+            )
+
+
             Spacer()
         }
         .padding(
             .top,
             2
         )
+    }
+
+
+    private func loadDemoEnvironment() {
+
+        errorMessage =
+            nil
+
+
+        if
+            let error =
+                store
+                    .createDemoEnvironment()
+        {
+            errorMessage =
+                error
+        }
     }
 
 

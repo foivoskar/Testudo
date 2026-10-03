@@ -1640,6 +1640,17 @@ final class TestudoStore: ObservableObject {
         }
 
 
+        if
+            openManagedDemoEnvironmentSessionIfAvailable(
+                environmentID:
+                    environmentID
+            )
+        {
+            return
+                .opened
+        }
+
+
         guard
             let access =
                 applicationData
@@ -11334,5 +11345,674 @@ extension TestudoStore {
             saveEnvironmentCredentialStore(
                 credentialStore
             )
+    }
+}
+
+
+// ============================================================
+// MARK: - Managed Demo Environments
+// ============================================================
+
+extension TestudoStore {
+
+    private var managedDemoEnvironmentDirectory:
+        URL
+    {
+        applicationFileURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "Demo Environments",
+                isDirectory:
+                    true
+            )
+    }
+
+
+    private func nextDemoEnvironmentName()
+        -> String
+    {
+        let usedNames =
+            Set(
+                applicationData
+                    .workEnvironments
+                    .map {
+                        $0.name
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .lowercased()
+                    }
+            )
+
+
+        if
+            !usedNames
+                .contains(
+                    "demo"
+                )
+        {
+            return
+                "Demo"
+        }
+
+
+        var index =
+            2
+
+
+        while
+            usedNames
+                .contains(
+                    "demo-\(index)"
+                )
+        {
+            index += 1
+        }
+
+
+        return
+            "Demo-\(index)"
+    }
+
+
+    private func uniqueManagedDemoPackageURL(
+        displayName:
+            String
+    ) -> URL {
+
+        let root =
+            managedDemoEnvironmentDirectory
+
+
+        let normalURL =
+            root
+                .appendingPathComponent(
+                    "\(displayName).testudoenv",
+                    isDirectory:
+                        true
+                )
+
+
+        if
+            !FileManager
+                .default
+                .fileExists(
+                    atPath:
+                        normalURL.path
+                )
+        {
+            return
+                normalURL
+        }
+
+
+        var index =
+            2
+
+
+        while true {
+
+            let candidate =
+                root
+                    .appendingPathComponent(
+                        "\(displayName)-instance-\(index).testudoenv",
+                        isDirectory:
+                            true
+                    )
+
+
+            if
+                !FileManager
+                    .default
+                    .fileExists(
+                        atPath:
+                            candidate.path
+                    )
+            {
+                return
+                    candidate
+            }
+
+
+            index += 1
+        }
+    }
+
+
+    @discardableResult
+    func createDemoEnvironment()
+        -> String?
+    {
+        guard
+            let localProfile =
+                applicationData
+                    .localUserProfile
+        else {
+            return
+                "Create your Testudo application profile first."
+        }
+
+
+        let displayName =
+            nextDemoEnvironmentName()
+
+
+        let destinationURL =
+            uniqueManagedDemoPackageURL(
+                displayName:
+                    displayName
+            )
+
+
+        let environmentID =
+            UUID()
+
+        let now =
+            Date()
+
+
+        let payload =
+            DemoEnvironmentGenerator
+                .make(
+                    environmentID:
+                        environmentID,
+                    localProfile:
+                        localProfile,
+                    generatedAt:
+                        now
+                )
+
+
+        let identityProvider =
+            EnvironmentIdentityProviderConfiguration(
+                kind:
+                    .localAccounts,
+                displayName:
+                    "Local Environment Accounts",
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
+        let manifest =
+            EnvironmentManifest(
+                schemaVersion:
+                    2,
+                environmentID:
+                    environmentID,
+                name:
+                    displayName,
+                identityProvider:
+                    identityProvider,
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
+        // Intentionally empty.
+        //
+        // Demo memberships have no passwords and no recovery
+        // credentials until the Administrator explicitly sets
+        // them while exploring the Demo.
+        let credentialStore =
+            EnvironmentCredentialStore(
+                environmentID:
+                    environmentID,
+                credentials:
+                    []
+            )
+
+
+        let marker =
+            DemoEnvironmentMarker(
+                generatedAt:
+                    now,
+                rangeStart:
+                    payload.rangeStart,
+                rangeEnd:
+                    payload.rangeEnd,
+                displayName:
+                    displayName
+            )
+
+
+        let dataURL =
+            destinationURL
+                .appendingPathComponent(
+                    "EnvironmentData.json"
+                )
+
+        let manifestURL =
+            destinationURL
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+        let credentialsURL =
+            destinationURL
+                .appendingPathComponent(
+                    "EnvironmentCredentials.json"
+                )
+
+        let markerURL =
+            destinationURL
+                .appendingPathComponent(
+                    "DemoEnvironment.json"
+                )
+
+
+        let encoder =
+            JSONEncoder()
+
+        encoder.outputFormatting =
+            [
+                .prettyPrinted,
+                .sortedKeys,
+            ]
+
+        encoder.dateEncodingStrategy =
+            .iso8601
+
+
+        do {
+
+            try FileManager
+                .default
+                .createDirectory(
+                    at:
+                        managedDemoEnvironmentDirectory,
+                    withIntermediateDirectories:
+                        true
+                )
+
+
+            try FileManager
+                .default
+                .createDirectory(
+                    at:
+                        destinationURL,
+                    withIntermediateDirectories:
+                        false
+                )
+
+
+            try encoder
+                .encode(
+                    payload.data
+                )
+                .write(
+                    to:
+                        dataURL,
+                    options:
+                        .atomic
+                )
+
+
+            try encoder
+                .encode(
+                    manifest
+                )
+                .write(
+                    to:
+                        manifestURL,
+                    options:
+                        .atomic
+                )
+
+
+            try encoder
+                .encode(
+                    credentialStore
+                )
+                .write(
+                    to:
+                        credentialsURL,
+                    options:
+                        .atomic
+                )
+
+
+            try encoder
+                .encode(
+                    marker
+                )
+                .write(
+                    to:
+                        markerURL,
+                    options:
+                        .atomic
+                )
+
+        } catch {
+
+            try?
+                FileManager
+                    .default
+                    .removeItem(
+                        at:
+                            destinationURL
+                    )
+
+
+            return
+                "The Demo Environment could not be created: \(error.localizedDescription)"
+        }
+
+
+        let storage =
+            EnvironmentStorageConfiguration(
+                kind:
+                    .testudoPackage,
+                displayName:
+                    destinationURL
+                        .lastPathComponent,
+                path:
+                    destinationURL.path,
+                bookmarkData:
+                    nil,
+                createdAt:
+                    now,
+                updatedAt:
+                    now,
+                lastConnectedAt:
+                    now
+            )
+
+
+        let environment =
+            WorkEnvironment(
+                id:
+                    environmentID,
+                name:
+                    displayName,
+                storage:
+                    storage,
+                identityProvider:
+                    identityProvider,
+                createdAt:
+                    now,
+                updatedAt:
+                    now
+            )
+
+
+        applicationData
+            .workEnvironments
+            .append(
+                environment
+            )
+
+
+        applicationData
+            .environmentAccesses
+            .append(
+                EnvironmentAccess(
+                    environmentID:
+                        environmentID,
+                    membershipID:
+                        payload
+                            .administratorMembershipID,
+                    staySignedIn:
+                        true,
+                    lastOpenedAt:
+                        now
+                )
+            )
+
+
+        applicationData
+            .activeEnvironmentID =
+            environmentID
+
+
+        fileURL =
+            dataURL
+
+        data =
+            payload.data
+
+        environmentSessionIsOpen =
+            true
+
+
+        saveApplicationData()
+
+
+        return nil
+    }
+
+
+    // --------------------------------------------------------
+    // Demo packages are credential-free by design.
+    //
+    // Only packages generated inside Testudo's own managed Demo
+    // directory qualify. A random external .testudoenv cannot
+    // bypass authentication merely by adding a marker file.
+    // --------------------------------------------------------
+
+    private func openManagedDemoEnvironmentSessionIfAvailable(
+        environmentID:
+            UUID
+    ) -> Bool {
+
+        guard
+            let environment =
+                applicationData
+                    .workEnvironments
+                    .first(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    ),
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
+                )
+        else {
+            return false
+        }
+
+
+        let normalizedPackage =
+            packageURL
+                .standardizedFileURL
+
+        let normalizedRoot =
+            managedDemoEnvironmentDirectory
+                .standardizedFileURL
+
+
+        guard
+            normalizedPackage
+                .deletingLastPathComponent()
+                == normalizedRoot
+        else {
+            return false
+        }
+
+
+        let markerURL =
+            normalizedPackage
+                .appendingPathComponent(
+                    "DemoEnvironment.json"
+                )
+
+
+        guard
+            let markerData =
+                try? Data(
+                    contentsOf:
+                        markerURL
+                )
+        else {
+            return false
+        }
+
+
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
+
+
+        guard
+            (
+                try?
+                    decoder.decode(
+                        DemoEnvironmentMarker.self,
+                        from:
+                            markerData
+                    )
+            )
+            != nil
+        else {
+            return false
+        }
+
+
+        let existingAccess =
+            applicationData
+                .environmentAccesses
+                .first(
+                    where: {
+                        $0.environmentID
+                            == environmentID
+                    }
+                )
+
+
+        let preferredMembership =
+            existingAccess?
+                .membershipID
+                .flatMap {
+                    membershipID
+                    in
+
+                    data
+                        .environmentMemberships
+                        .first(
+                            where: {
+                                $0.id
+                                    == membershipID
+                                && $0.environmentID
+                                    == environmentID
+                                && $0.isActive
+                            }
+                        )
+                }
+
+
+        guard
+            let membership =
+                preferredMembership
+                ?? data
+                    .environmentMemberships
+                    .first(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                            && $0.isActive
+                            && $0.role
+                                == .administrator
+                        }
+                    )
+        else {
+            return false
+        }
+
+
+        let now =
+            Date()
+
+
+        if
+            let accessIndex =
+                applicationData
+                    .environmentAccesses
+                    .firstIndex(
+                        where: {
+                            $0.environmentID
+                                == environmentID
+                        }
+                    )
+        {
+            applicationData
+                .environmentAccesses[
+                    accessIndex
+                ]
+                .membershipID =
+                membership.id
+
+            applicationData
+                .environmentAccesses[
+                    accessIndex
+                ]
+                .staySignedIn =
+                true
+
+            applicationData
+                .environmentAccesses[
+                    accessIndex
+                ]
+                .lastOpenedAt =
+                now
+
+        } else {
+
+            applicationData
+                .environmentAccesses
+                .append(
+                    EnvironmentAccess(
+                        environmentID:
+                            environmentID,
+                        membershipID:
+                            membership.id,
+                        staySignedIn:
+                            true,
+                        lastOpenedAt:
+                            now
+                    )
+                )
+        }
+
+
+        if
+            let membershipIndex =
+                data
+                    .environmentMemberships
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == membership.id
+                        }
+                    )
+        {
+            data
+                .environmentMemberships[
+                    membershipIndex
+                ]
+                .lastAccessAt =
+                now
+
+            save()
+        }
+
+
+        saveApplicationData()
+
+
+        environmentSessionIsOpen =
+            true
+
+
+        return true
     }
 }
