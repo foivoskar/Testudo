@@ -1375,21 +1375,27 @@ struct RichThemeDetailView: View {
 // ============================================================
 
 // ============================================================
-// MARK: - Shared Related Tasks Split Pane
+// MARK: - Shared Related Work Split Pane
 //
-// Shared by Theme, Organization and Group.
+// Used identically by:
+//   • People
+//   • Themes
+//   • Organizations
+//   • Groups
 //
-// No related Tasks:
-//     full-height details.
+// No Related Work:
+//     full-height detail view.
 //
-// Related Tasks:
-//     upper 50% = independently scrollable Task list
-//     lower 50% = independently scrollable detail view
+// Related Work present:
+//     upper 50% = independently scrollable Related Work
+//     lower 50% = independently scrollable detail view.
 //
-// This mirrors PersonDetailView structurally.
+// The row presentation follows the compact style previously
+// used by Related Tasks, with the creation date retained at
+// the right side as in the former People Related Work view.
 // ============================================================
 
-private struct RelatedTasksSplitPane<
+struct RelatedWorkSplitPane<
     DetailContent:
         View
 >: View {
@@ -1403,7 +1409,8 @@ private struct RelatedTasksSplitPane<
     )
     private var detailNavigation
 
-    let tasks:
+
+    let items:
         [WorkItem]
 
     private let detailContent:
@@ -1411,14 +1418,14 @@ private struct RelatedTasksSplitPane<
 
 
     init(
-        tasks:
+        items:
             [WorkItem],
         @ViewBuilder
         detailContent:
             @escaping () -> DetailContent
     ) {
-        self.tasks =
-            tasks
+        self.items =
+            items
 
         self.detailContent =
             detailContent
@@ -1429,7 +1436,7 @@ private struct RelatedTasksSplitPane<
         some View
     {
         Group {
-            if tasks.isEmpty {
+            if items.isEmpty {
                 detailContent()
 
             } else {
@@ -1469,7 +1476,7 @@ private struct RelatedTasksSplitPane<
                 spacing:
                     0
             ) {
-                relatedTasksScroll
+                relatedWorkScroll
                     .frame(
                         height:
                             paneHeight
@@ -1499,11 +1506,11 @@ private struct RelatedTasksSplitPane<
     }
 
 
-    private var relatedTasksScroll:
+    private var relatedWorkScroll:
         some View
     {
         ScrollView {
-            relatedTasksSection
+            relatedWorkSection
                 .padding(
                     .horizontal,
                     24
@@ -1530,7 +1537,7 @@ private struct RelatedTasksSplitPane<
     }
 
 
-    private var relatedTasksSection:
+    private var relatedWorkSection:
         some View
     {
         VStack(
@@ -1541,7 +1548,7 @@ private struct RelatedTasksSplitPane<
         ) {
             HStack {
                 Text(
-                    "Related Tasks"
+                    "Related Work"
                 )
                 .font(
                     .title3
@@ -1553,7 +1560,7 @@ private struct RelatedTasksSplitPane<
                 Spacer()
 
                 Text(
-                    "\(tasks.count)"
+                    "\(items.count)"
                 )
                 .font(
                     .caption
@@ -1569,18 +1576,18 @@ private struct RelatedTasksSplitPane<
                     0
             ) {
                 ForEach(
-                    tasks
+                    items
                 ) {
-                    task in
+                    item in
 
-                    taskRow(
-                        task
+                    relatedWorkRow(
+                        item
                     )
 
 
                     if
-                        task.id
-                            != tasks
+                        item.id
+                            != items
                                 .last?
                                 .id
                     {
@@ -1596,8 +1603,8 @@ private struct RelatedTasksSplitPane<
     }
 
 
-    private func taskRow(
-        _ task:
+    private func relatedWorkRow(
+        _ item:
             WorkItem
     ) -> some View
     {
@@ -1607,23 +1614,28 @@ private struct RelatedTasksSplitPane<
             spacing:
                 10
         ) {
+
+            // ------------------------------------------------
+            // Icon
+            // ------------------------------------------------
+
             Button {
                 detailNavigation(
                     .work(
-                        task.id
+                        item.id
                     )
                 )
 
             } label: {
                 Image(
                     systemName:
-                        taskIcon(
-                            task
+                        workIcon(
+                            item
                         )
                 )
                 .testudoTaskStatusSymbolColor(
-                    taskIcon(
-                        task
+                    workIcon(
+                        item
                     )
                 )
                 .frame(
@@ -1640,20 +1652,28 @@ private struct RelatedTasksSplitPane<
             )
 
 
+            // ------------------------------------------------
+            // Main content
+            //
+            // Typography intentionally follows the previous
+            // Related Tasks design.
+            // ------------------------------------------------
+
             VStack(
                 alignment:
                     .leading,
                 spacing:
                     3
             ) {
+
                 TestudoDestinationLink(
                     title:
-                        taskTitle(
-                            task
+                        workTitle(
+                            item
                         ),
                     destination:
                         .work(
-                            task.id
+                            item.id
                         ),
                     color:
                         .primary
@@ -1670,12 +1690,15 @@ private struct RelatedTasksSplitPane<
                     spacing:
                         6
                 ) {
+
                     TestudoDestinationLink(
                         title:
-                            "Task",
+                            workTypeName(
+                                item
+                            ),
                         destination:
                             .work(
-                                task.id
+                                item.id
                             ),
                         color:
                             .secondary
@@ -1684,16 +1707,17 @@ private struct RelatedTasksSplitPane<
 
                     if
                         let status =
-                            task.status
+                            item.status
                     {
                         Text("·")
 
                         TestudoDestinationLink(
                             title:
-                                status.displayName,
+                                status
+                                    .displayName,
                             destination:
                                 .work(
-                                    task.id
+                                    item.id
                                 ),
                             color:
                                 .secondary
@@ -1705,7 +1729,7 @@ private struct RelatedTasksSplitPane<
                         let theme =
                             store.theme(
                                 id:
-                                    task.themeID
+                                    item.themeID
                             )
                     {
                         Text("·")
@@ -1725,16 +1749,16 @@ private struct RelatedTasksSplitPane<
 
                     if
                         let deadline =
-                            task.deadlineAt
+                            item.deadlineAt
                     {
                         Text("·")
 
                         TestudoDestinationLink(
                             title:
-                                "Due \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: task.deadlineTimeZoneID))",
+                                "Due \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))",
                             destination:
                                 .work(
-                                    task.id
+                                    item.id
                                 ),
                             color:
                                 .secondary
@@ -1747,14 +1771,14 @@ private struct RelatedTasksSplitPane<
 
 
                 let body =
-                    task.body
+                    item.body
                         .trimmingCharacters(
                             in:
                                 .whitespacesAndNewlines
                         )
 
                 let explicitTitle =
-                    task.title?
+                    item.title?
                         .trimmingCharacters(
                             in:
                                 .whitespacesAndNewlines
@@ -1771,7 +1795,7 @@ private struct RelatedTasksSplitPane<
                             body,
                         destination:
                             .work(
-                                task.id
+                                item.id
                             ),
                         color:
                             .secondary
@@ -1794,7 +1818,33 @@ private struct RelatedTasksSplitPane<
 
             Spacer(
                 minLength:
-                    0
+                    12
+            )
+
+
+            // ------------------------------------------------
+            // Creation date
+            //
+            // Retains the right-hand date treatment from the
+            // former People Related Work row.
+            // ------------------------------------------------
+
+            Text(
+                item.createdAt,
+                format:
+                    .dateTime
+                    .day()
+                    .month()
+                    .year()
+            )
+            .font(
+                .caption
+            )
+            .foregroundStyle(
+                .tertiary
+            )
+            .lineLimit(
+                1
             )
         }
         .padding(
@@ -1804,14 +1854,14 @@ private struct RelatedTasksSplitPane<
     }
 
 
-    private func taskTitle(
-        _ task:
+    private func workTitle(
+        _ item:
             WorkItem
     ) -> String {
 
         if
             let title =
-                task.title?
+                item.title?
                     .trimmingCharacters(
                         in:
                             .whitespacesAndNewlines
@@ -1823,7 +1873,7 @@ private struct RelatedTasksSplitPane<
 
 
         let body =
-            task.body
+            item.body
                 .trimmingCharacters(
                     in:
                         .whitespacesAndNewlines
@@ -1834,45 +1884,90 @@ private struct RelatedTasksSplitPane<
         }
 
 
-        return "Task"
+        return
+            workTypeName(
+                item
+            )
     }
 
 
-    private func taskIcon(
-        _ task:
+    private func workTypeName(
+        _ item:
             WorkItem
     ) -> String {
 
-        switch task.status {
-        case .completed:
-            return
-                "checkmark.circle"
+        switch item.kind {
+        case .task:
+            return "Task"
 
-        case .closed:
-            return
-                "archivebox"
+        case .note:
+            return "Note"
 
-        case .inProgress:
-            return
-                "clock"
+        case .activity:
+            return "Activity"
+        }
+    }
 
-        case .todo,
-             nil:
+
+    private func workIcon(
+        _ item:
+            WorkItem
+    ) -> String {
+
+        switch item.kind {
+
+        case .task:
+            switch item.status {
+            case .completed:
+                return
+                    "checkmark.circle"
+
+            case .closed:
+                return
+                    "archivebox"
+
+            case .inProgress:
+                return
+                    "clock"
+
+            case .todo,
+                 nil:
+                return
+                    "circle"
+            }
+
+
+        case .note:
+            if item.reminderAt != nil {
+                return
+                    "bell"
+            }
+
             return
-                "circle"
+                "note.text"
+
+
+        case .activity:
+            return
+                "waveform.path.ecg"
         }
     }
 }
 
 
 // ============================================================
-// MARK: - Entity Related Tasks
+// MARK: - Entity Related Work
 //
 // Organization and Group share the same Work relationship
 // semantics.
 // ============================================================
 
-private struct EntityRelatedTasksDetail<
+//
+// Organization and Group share the same Work relationship
+// semantics.
+// ============================================================
+
+private struct EntityRelatedWorkDetail<
     DetailContent:
         View
 >: View {
@@ -1880,6 +1975,7 @@ private struct EntityRelatedTasksDetail<
     @EnvironmentObject
     private var store:
         TestudoStore
+
 
     let entityID:
         UUID
@@ -1906,28 +2002,50 @@ private struct EntityRelatedTasksDetail<
     var body:
         some View
     {
-        RelatedTasksSplitPane(
-            tasks:
-                relatedTasks
+        RelatedWorkSplitPane(
+            items:
+                relatedWork
         ) {
             detailContent()
         }
     }
 
 
-    private var relatedTasks:
+    /*
+     Related Work includes every WorkItem kind:
+
+       • Task
+       • Note
+       • Activity/Event
+
+     A parent Entity aggregates Related Work from its complete
+     descendant subtree.
+
+     Example:
+
+       Organization
+         └─ Group
+             └─ Person
+
+     Work related to the Group or Person is also visible in
+     the Organization's Related Work pane.
+
+     Work relationship inheritance through Parent Tasks remains
+     unchanged: inheritedByChildren is still respected.
+    */
+    private var relatedWork:
         [WorkItem]
     {
-        store.data
+        let entityIDs =
+            relatedEntityIDs
+
+        return store.data
             .workItems
             .filter {
-                item in
-
-                item.kind
-                    == .task
-                &&
                 workItemIsRelated(
-                    item
+                    $0,
+                    toAny:
+                        entityIDs
                 )
             }
             .sorted {
@@ -1937,9 +2055,31 @@ private struct EntityRelatedTasksDetail<
     }
 
 
+    private var relatedEntityIDs:
+        Set<UUID>
+    {
+        var ids =
+            Set(
+                store
+                    .entityDescendantIDs(
+                        of:
+                            entityID
+                    )
+            )
+
+        ids.insert(
+            entityID
+        )
+
+        return ids
+    }
+
+
     private func workItemIsRelated(
         _ item:
-            WorkItem
+            WorkItem,
+        toAny entityIDs:
+            Set<UUID>
     ) -> Bool {
 
         if
@@ -1950,8 +2090,10 @@ private struct EntityRelatedTasksDetail<
                         $0.workItemID
                             == item.id
                         &&
-                        $0.entityID
-                            == entityID
+                        entityIDs
+                            .contains(
+                                $0.entityID
+                            )
                     }
                 )
         {
@@ -1989,8 +2131,10 @@ private struct EntityRelatedTasksDetail<
                             $0.workItemID
                                 == parentID
                             &&
-                            $0.entityID
-                                == entityID
+                            entityIDs
+                                .contains(
+                                    $0.entityID
+                                )
                             &&
                             $0.inheritedByChildren
                         }
@@ -2048,7 +2192,7 @@ struct OrganizationDetailView:
     var body:
         some View
     {
-        EntityRelatedTasksDetail(
+        EntityRelatedWorkDetail(
             entityID:
                 organizationID
         ) {
@@ -2097,7 +2241,7 @@ struct GroupDetailView:
     var body:
         some View
     {
-        EntityRelatedTasksDetail(
+        EntityRelatedWorkDetail(
             entityID:
                 groupID
         ) {
@@ -2150,9 +2294,9 @@ struct ThemeRelatedTasksDetailView:
     var body:
         some View
     {
-        RelatedTasksSplitPane(
-            tasks:
-                relatedTasks
+        RelatedWorkSplitPane(
+            items:
+                relatedWork
         ) {
             RichThemeDetailView(
                 themeID:
@@ -2164,27 +2308,67 @@ struct ThemeRelatedTasksDetailView:
     }
 
 
-    // Tasks directly assigned to this Theme.
-    //
-    // Tasks belonging to descendant Themes remain associated
-    // with those descendant Themes rather than being duplicated
-    // in every ancestor's Related Tasks pane.
-    private var relatedTasks:
+    /*
+     All Work belonging to this Theme or any descendant Theme
+     is shown:
+
+       • Task
+       • Note
+       • Activity/Event
+
+     Descendant aggregation is recursive, so a top-level Theme
+     includes Work from children, grandchildren and every deeper
+     level.
+
+     The canonical membership helper supports both legacy
+     themeID and current multi-Theme themeIDs.
+    */
+    private var relatedWork:
         [WorkItem]
     {
-        store.data
+        let themeIDs =
+            relatedThemeIDs
+
+        return store.data
             .workItems
             .filter {
-                $0.kind
-                    == .task
-                &&
-                $0.themeID
-                    == themeID
+                item in
+
+                themeIDs
+                    .contains {
+                        id in
+
+                        store.workItem(
+                            item,
+                            belongsToThemeID:
+                                id
+                        )
+                    }
             }
             .sorted {
                 $0.updatedAt
                     > $1.updatedAt
             }
+    }
+
+
+    private var relatedThemeIDs:
+        Set<UUID>
+    {
+        var ids =
+            Set(
+                store
+                    .themeDescendantIDs(
+                        of:
+                            themeID
+                    )
+            )
+
+        ids.insert(
+            themeID
+        )
+
+        return ids
     }
 }
 
