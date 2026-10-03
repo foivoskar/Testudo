@@ -134,14 +134,6 @@ struct EnvironmentChooserView:
                 18
         ) {
 
-            TestudoBrandIcon(
-                size:
-                    74,
-                showsBackground:
-                    true
-            )
-
-
             VStack(
                 alignment:
                     .leading,
@@ -348,9 +340,9 @@ struct EnvironmentChooserView:
 
                     TestudoBrandIcon(
                         size:
-                            58,
+                            50,
                         showsBackground:
-                            true
+                            false
                     )
 
 
