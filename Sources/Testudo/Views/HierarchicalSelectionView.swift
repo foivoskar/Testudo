@@ -711,16 +711,32 @@ enum HierarchySelectionData {
     static func taskNodes(
         store: TestudoStore,
         excludingWorkItemIDs:
-            Set<UUID> = []
+            Set<UUID> = [],
+        themeID:
+            UUID? = nil
     ) -> [HierarchySelectionNode] {
         let tasks =
             store.data.workItems
                 .filter {
-                    $0.kind == .task
-                    && !excludingWorkItemIDs
-                        .contains(
-                            $0.id
-                        )
+                    item in
+
+                    guard
+                        item.kind == .task,
+                        !excludingWorkItemIDs
+                            .contains(
+                                item.id
+                            )
+                    else {
+                        return false
+                    }
+
+                    if let themeID {
+                        return
+                            item.themeID
+                                == themeID
+                    }
+
+                    return true
                 }
 
         let taskIDs =

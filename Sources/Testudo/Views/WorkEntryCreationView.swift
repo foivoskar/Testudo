@@ -183,33 +183,147 @@ struct WorkEntryCreationView: View {
                             alignment:
                                 .leading,
                             spacing:
-                                12
+                                16
                         ) {
-                            TextField(
-                                "Title (optional)",
-                                text:
-                                    $title
-                            )
-
-                            TextEditor(
-                                text:
-                                    $bodyText
-                            )
-                            .frame(
-                                minHeight:
-                                    150
-                            )
-                            .overlay {
-                                RoundedRectangle(
-                                    cornerRadius:
-                                        6
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing:
+                                    7
+                            ) {
+                                Text(
+                                    "Title"
                                 )
-                                .stroke(
-                                    Color.secondary
-                                        .opacity(
-                                            0.18
+                                .font(
+                                    .caption
+                                        .weight(
+                                            .medium
                                         )
                                 )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+
+                                TextField(
+                                    "Optional title",
+                                    text:
+                                        $title
+                                )
+                                .textFieldStyle(
+                                    .plain
+                                )
+                                .padding(
+                                    .horizontal,
+                                    11
+                                )
+                                .frame(
+                                    height:
+                                        36
+                                )
+                                .background(
+                                    Color(
+                                        nsColor:
+                                            .textBackgroundColor
+                                    ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                8,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            8,
+                                        style:
+                                            .continuous
+                                    )
+                                    .stroke(
+                                        Color.primary
+                                            .opacity(
+                                                0.12
+                                            ),
+                                        lineWidth:
+                                            1
+                                    )
+                                }
+                            }
+
+
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing:
+                                    7
+                            ) {
+                                Text(
+                                    kind == .note
+                                    ? "Note"
+                                    : (
+                                        kind == .activity
+                                        ? "What happened?"
+                                        : "Description"
+                                    )
+                                )
+                                .font(
+                                    .caption
+                                        .weight(
+                                            .medium
+                                        )
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+
+
+                                TextEditor(
+                                    text:
+                                        $bodyText
+                                )
+                                .font(
+                                    .body
+                                )
+                                .scrollContentBackground(
+                                    .hidden
+                                )
+                                .padding(
+                                    8
+                                )
+                                .frame(
+                                    minHeight:
+                                        120
+                                )
+                                .background(
+                                    Color(
+                                        nsColor:
+                                            .textBackgroundColor
+                                    ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                10,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            10,
+                                        style:
+                                            .continuous
+                                    )
+                                    .stroke(
+                                        Color.primary
+                                            .opacity(
+                                                0.12
+                                            ),
+                                        lineWidth:
+                                            1
+                                    )
+                                }
                             }
                         }
                     }
@@ -384,78 +498,126 @@ struct WorkEntryCreationView: View {
     private var themeRow:
         some View
     {
-        LabeledContent(
-            "Theme"
-        ) {
-            Picker(
-                "",
-                selection:
-                    $themeID
-            ) {
-                Text("No Theme")
-                    .tag(
-                        Optional<UUID>
-                            .none
-                    )
-
-                ForEach(
-                    sortedThemes
-                ) { theme in
-                    Text(theme.name)
-                        .tag(
-                            Optional(
-                                theme.id
-                            )
+        HierarchicalSelectionSummaryRow(
+            label:
+                "Theme",
+            selectedTitles:
+                themeID
+                    .flatMap {
+                        store.theme(
+                            id:
+                                $0
                         )
-                }
+                    }
+                    .map {
+                        [
+                            $0.name
+                        ]
+                    }
+                ?? [],
+            selectorTitle:
+                "Theme",
+            selectorMessage:
+                "Choose a Theme from the existing Theme hierarchy.",
+            nodes:
+                HierarchySelectionData
+                    .themeNodes(
+                        store:
+                            store
+                    ),
+            initialSelection:
+                Set(
+                    themeID
+                        .map {
+                            [$0]
+                        }
+                    ?? []
+                ),
+            buttonSystemImage:
+                "chevron.right",
+            maximumSelectionCount:
+                1,
+            onSave: {
+                selection in
+
+                themeID =
+                    selection.first
+
+                return nil
             }
-            .labelsHidden()
-            .frame(
-                maxWidth:
-                    320
-            )
-        }
+        )
     }
+
 
     private var parentRow:
         some View
     {
-        LabeledContent(
-            "Parent"
-        ) {
-            Picker(
-                "",
-                selection:
-                    $parentWorkItemID
-            ) {
-                Text("No Parent")
-                    .tag(
-                        Optional<UUID>
-                            .none
-                    )
+        HierarchicalSelectionSummaryRow(
+            label:
+                "Parent",
+            selectedTitles:
+                parentWorkItemID
+                    .flatMap {
+                        store.workItem(
+                            id:
+                                $0
+                        )
+                    }
+                    .map {
+                        [
+                            parentLabel(
+                                $0
+                            )
+                        ]
+                    }
+                ?? [],
+            selectorTitle:
+                "Parent Task",
+            selectorMessage:
+                "Choose a Parent Task from the Task hierarchy. Sub-tasks are shown beneath their immediate Parent.",
+            nodes:
+                HierarchySelectionData
+                    .taskNodes(
+                        store:
+                            store,
+                        themeID:
+                            themeID
+                    ),
+            initialSelection:
+                Set(
+                    parentWorkItemID
+                        .map {
+                            [$0]
+                        }
+                    ?? []
+                ),
+            buttonSystemImage:
+                "chevron.right",
+            maximumSelectionCount:
+                1,
+            onSave: {
+                selection in
 
-                ForEach(
-                    availableParents
-                ) { task in
-                    Text(
-                        parentLabel(
-                            task
+                parentWorkItemID =
+                    selection.first
+
+                if
+                    let parentWorkItemID,
+                    let parent =
+                        store.workItem(
+                            id:
+                                parentWorkItemID
                         )
-                    )
-                    .tag(
-                        Optional(
-                            task.id
-                        )
-                    )
+                {
+                    themeID =
+                        parent.themeID
                 }
+
+                return nil
             }
-            .labelsHidden()
-            .frame(
-                maxWidth:
-                    380
-            )
-        }
+        )
     }
+
 
     @ViewBuilder
     private var timingSection:
@@ -732,6 +894,9 @@ struct WorkEntryCreationView: View {
             ) {
                 create()
             }
+            .buttonStyle(
+                .borderedProminent
+            )
             .keyboardShortcut(
                 .defaultAction
             )
@@ -752,12 +917,48 @@ struct WorkEntryCreationView: View {
             alignment:
                 .leading,
             spacing:
-                10
+                14
         ) {
-            Text(title)
-                .font(.headline)
+            Text(
+                title
+            )
+            .font(
+                .headline
+            )
 
             content()
+        }
+        .padding(
+            16
+        )
+        .background(
+            Color.primary
+                .opacity(
+                    0.025
+                ),
+            in:
+                RoundedRectangle(
+                    cornerRadius:
+                        12,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius:
+                    12,
+                style:
+                    .continuous
+            )
+            .stroke(
+                Color.primary
+                    .opacity(
+                        0.06
+                    ),
+                lineWidth:
+                    1
+            )
         }
     }
 
