@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.4}
-\newcommand{\DocumentedTestudoVersion}{0.1.8}
-\newcommand{\DocumentedTestudoBuild}{9}
+\newcommand{\ManualVersion}{1.5}
+\newcommand{\DocumentedTestudoVersion}{0.1.9}
+\newcommand{\DocumentedTestudoBuild}{10}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.1.8. This release retains the Task lifecycle introduced in 0.1.7 and adds four principal improvements: a complete application-level My Profile and \fileext{.testudouser} transfer model; explicit one-time copying from an Environment Person profile into My Profile; correct expansion of recurring iCal subscription events, including exclusions and recurrence exceptions; and clearer management of Testudo's disposable Demo Environment. Calendar synchronization failures are now visible to the user, and About Testudo presents complete version, project and licensing information in a dedicated window.
+This edition is aligned with Testudo 0.1.9. This release improves iCal credential handling for Work Environments used across multiple Macs. Secret iCal addresses remain machine-local in macOS Keychain, missing credentials no longer create machine-specific errors inside the shared \fileext{.testudoenv} package, and an existing subscription can restore its Secret address on another Mac without replacing its Calendar identity or imported-event relationships. Keychain failures are reported more precisely. The About Testudo window also allows its descriptive text to wrap fully instead of truncating it.
 }
 
 \manualwarning{Early-release software}{
@@ -1010,6 +1010,12 @@ Events imported from an iCal subscription are read-only.
 
 The secret subscription address is treated as sensitive and is stored in macOS Keychain rather than in ordinary Testudo data.
 
+The Keychain credential is local to the Mac on which it was entered. A shared \fileext{.testudoenv} package stores only the identifier used to locate that local credential; it does not contain the Secret iCal address itself.
+
+When the same Work Environment is opened on another Mac, the Calendar and its imported events may therefore already be present while the local Secret address is absent. Use \button{Restore Secret Address} to provide the credential on that Mac. Restoration keeps the existing Calendar identity and updates the existing imported subscription rather than creating a second Calendar.
+
+A missing local Keychain credential is treated as a machine-local condition and is not written into the shared Work Environment as a synchronization error.
+
 \manualwarning{Treat secret iCal URLs as credentials}{
 Anyone with a secret subscription URL may be able to read the calendar feed. Do not place the URL in screenshots, Notes or shared documentation.
 }
@@ -1132,7 +1138,7 @@ Recovery answers are stored only as salted hashes. Administrators cannot view ot
 
 \section{External calendar secrets}
 
-Secret iCal URLs use macOS Keychain integration rather than ordinary Environment data.
+Secret iCal URLs use macOS Keychain integration rather than ordinary Environment data. The Secret value is machine-local; it is not transferred merely because a \fileext{.testudoenv} package is synchronized to another Mac. Testudo 0.1.9 can restore the credential for an existing subscription without changing that Calendar's identity.
 
 \section{Sensitive portable files}
 
@@ -1236,7 +1242,7 @@ Check macOS Calendar permission, verify that the desired calendar is available i
 
 \section{iCal synchronisation fails}
 
-Possible causes include an invalid or expired secret address, connectivity problems, or changes at the calendar provider. Reconnect the source if the URL has changed.
+Possible causes include an invalid or expired secret address, connectivity problems, changes at the calendar provider, or a Secret address that has not yet been stored in the current Mac's Keychain. If Testudo reports that this Mac does not have the Secret iCal address, use \button{Restore Secret Address} and enter the existing subscription URL. This restores the credential in place and should be preferred to disconnecting and recreating the Calendar when the existing Calendar identity and relationships must be preserved. If macOS asks for Keychain access after Testudo has been rebuilt, authorize the application and retry synchronization.
 
 \section{A Task cannot be Closed}
 

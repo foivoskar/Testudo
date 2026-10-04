@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.1.8 · build 9 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.1.9 · build 10 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,60 +38,36 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.1.8
-Build 9
+Testudo 0.1.9
+Build 10
 ```
 
-### What changed in 0.1.8
+### What changed in 0.1.9
 
-Testudo 0.1.8 improves application identity, external calendars, managed Demo environments and application information.
+Testudo 0.1.9 improves iCal credential recovery across Macs and refines the About Testudo presentation.
 
-#### Complete My Profile and `.testudouser`
+#### iCal credentials across multiple Macs
 
-**My Profile** now exposes the complete application-level Testudo user profile, including identity, professional contact details, workplace information, research identifiers, online profiles, preferences, notes, tags and avatar.
+Secret iCal subscription addresses remain private, machine-local credentials stored in macOS Keychain. They are not written into a shared `.testudoenv` package.
 
-The complete profile is preserved when exporting and importing a `.testudouser` file.
+When the same Work Environment is opened on another Mac, Testudo now distinguishes between:
 
-When the active Work Environment membership is linked to a Person, Testudo can perform an explicit one-time **Environment Profile → My Profile** copy. The user chooses which populated fields to import.
+- a Secret iCal address that is genuinely absent from that Mac;
+- a Keychain item that exists but cannot currently be accessed;
+- invalid Keychain data;
+- ordinary calendar-server or network synchronization errors.
 
-Application and Environment profiles remain independent. This is an explicit copy operation, not live synchronization.
+A missing machine-local credential no longer writes a misleading synchronization failure into the shared Work Environment.
 
-#### Managed Demo Environment removal
+The new **Restore Secret Address** action reconnects an existing iCal subscription on the current Mac without creating a new Calendar identity. It preserves the existing Calendar UUID, imported-event identities and Testudo relationships.
 
-Removing an ordinary registered Work Environment continues to forget only its local registration and does not delete its `.testudoenv` package.
+Keychain credential replacement is also non-destructive: Testudo updates an existing Keychain item rather than deleting it before attempting to add a replacement.
 
-The Testudo-managed Demo Environment is disposable. Choosing **Remove Environment** for that managed Demo now permanently deletes the Demo package and its associated Demo iCal credentials.
-
-Environment sign-out and environment switching remain non-destructive.
-
-#### Recurring external calendar events
-
-iCal subscriptions now expand recurring calendar series into concrete Calendar Events instead of storing only the original recurrence master.
-
-The recurrence importer supports common RFC 5545 recurrence components, including:
-
-- daily, weekly, monthly and yearly recurrence;
-- `INTERVAL`, `COUNT` and `UNTIL`;
-- `BYDAY`, `BYMONTHDAY`, `BYMONTH` and `BYSETPOS`;
-- `WKST`;
-- `RDATE` and `EXDATE`;
-- explicit `RECURRENCE-ID` exceptions.
-
-Generated occurrences receive stable external identities so subsequent synchronizations can update them correctly.
-
-Calendar synchronization failures are also surfaced to the user rather than failing silently.
+Because Testudo currently uses source-first local builds with ad-hoc signing, macOS may ask the user to authorize Keychain access again after a rebuilt application receives a different code signature.
 
 #### About Testudo
 
-**About Testudo** now uses a dedicated native window showing:
-
-- the Testudo application icon;
-- dynamic Version and Build information;
-- a concise description of Testudo;
-- creator and copyright information;
-- links to the GitHub repository and MIT License.
-
-The complete About content is visible directly without a scrollable text block.
+Long descriptive text in the About Testudo window now wraps onto as many lines as required instead of being truncated with an ellipsis.
 
 ---
 
@@ -171,7 +147,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.1.8-macOS-arm64.dmg
+dist/Testudo-0.1.9-macOS-arm64.dmg
 ```
 
 ### Updating

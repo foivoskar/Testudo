@@ -31,6 +31,10 @@ struct WorkCalendarView: View {
         false
 
     @State
+    private var showingICalSecretRecovery =
+        false
+
+    @State
     private var isSyncingICal =
         false
 
@@ -138,6 +142,15 @@ struct WorkCalendarView: View {
                     store
                 )
         }
+        .sheet(
+            isPresented:
+                $showingICalSecretRecovery
+        ) {
+            ICalSecretRecoveryView()
+                .environmentObject(
+                    store
+                )
+        }
         .alert(
             "Calendar Sync Failed",
             isPresented:
@@ -156,6 +169,20 @@ struct WorkCalendarView: View {
                     }
                 )
         ) {
+            if
+                syncErrorNeedsSecretRecovery
+            {
+                Button(
+                    "Restore Secret Address…"
+                ) {
+                    iCalSyncError =
+                        nil
+
+                    showingICalSecretRecovery =
+                        true
+                }
+            }
+
             Button(
                 "OK"
             ) {
@@ -231,6 +258,25 @@ struct WorkCalendarView: View {
             .help(
                 "Connect iCal Calendar"
             )
+
+            Button {
+                showingICalSecretRecovery =
+                    true
+            } label: {
+                Image(
+                    systemName:
+                        "key.horizontal"
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                iCalSubscribedCalendars
+                    .isEmpty
+            )
+            .help(
+                "Restore iCal Secret Address"
+            )
+
 
             Button {
                 showingAppleCalendarSetup =
@@ -929,6 +975,17 @@ struct WorkCalendarView: View {
         )
     }
 
+    private var iCalSubscribedCalendars:
+        [TestudoCalendar]
+    {
+        store.data.calendars
+            .filter {
+                $0.sourceKind
+                    == .iCalSubscription
+            }
+    }
+
+
     private var subscribedCalendars:
         [TestudoCalendar]
     {
@@ -939,6 +996,29 @@ struct WorkCalendarView: View {
                 || $0.sourceKind
                     == .appleEventKit
             }
+    }
+
+
+    private var syncErrorNeedsSecretRecovery:
+        Bool
+    {
+        guard
+            let error =
+                iCalSyncError?
+                    .lowercased()
+        else {
+            return
+                false
+        }
+
+
+        return
+            error.contains(
+                "keychain"
+            )
+            || error.contains(
+                "secret ical address"
+            )
     }
 
 

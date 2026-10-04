@@ -6,10 +6,35 @@ import Security
 // MARK: - Secret URL Keychain storage
 // ============================================================
 
+enum CalendarSecretReadResult {
+    case success(String)
+    case notFound
+    case invalidData
+    case failure(OSStatus)
+}
+
+
 enum CalendarSecretStore {
     private static let service =
         "Testudo.iCalSubscriptions"
 
+
+    // ========================================================
+    // MARK: Save / update
+    //
+    // Never delete an existing credential merely to replace
+    // its value.
+    //
+    // With source-built / ad-hoc-signed applications macOS may
+    // require Keychain authorization again after a rebuild.
+    //
+    // Deleting first would create a destructive failure mode:
+    // an authorized delete followed by a failed add could lose
+    // the credential completely.
+    //
+    // Update the existing item when possible; add only when the
+    // account genuinely does not exist.
+    // ========================================================
 
     static func save(
         secret: String,
@@ -29,38 +54,78 @@ enum CalendarSecretStore {
                 account
         ]
 
-        SecItemDelete(
-            baseQuery as CFDictionary
-        )
 
-        var insert =
-            baseQuery
+        let update:
+            [String: Any] =
+        [
+            kSecValueData as String:
+                data
+        ]
 
-        insert[
-            kSecValueData as String
-        ] = data
 
-        let status =
-            SecItemAdd(
-                insert as CFDictionary,
-                nil
+        let updateStatus =
+            SecItemUpdate(
+                baseQuery as CFDictionary,
+                update as CFDictionary
             )
 
-        guard status == errSecSuccess
-        else {
+
+        switch updateStatus {
+
+        case errSecSuccess:
+            return
+
+        case errSecItemNotFound:
+            var insert =
+                baseQuery
+
+            insert[
+                kSecValueData as String
+            ] = data
+
+
+            let addStatus =
+                SecItemAdd(
+                    insert as CFDictionary,
+                    nil
+                )
+
+
+            guard
+                addStatus
+                    == errSecSuccess
+            else {
+                throw NSError(
+                    domain:
+                        NSOSStatusErrorDomain,
+                    code:
+                        Int(addStatus)
+                )
+            }
+
+        default:
             throw NSError(
                 domain:
                     NSOSStatusErrorDomain,
                 code:
-                    Int(status)
+                    Int(updateStatus)
             )
         }
     }
 
 
+    // ========================================================
+    // MARK: Read
+    //
+    // Preserve the actual Keychain result.
+    //
+    // "Not found" is fundamentally different from a credential
+    // that exists but cannot currently be read by this build.
+    // ========================================================
+
     static func read(
         account: String
-    ) -> String? {
+    ) -> CalendarSecretReadResult {
         let query:
             [String: Any] =
         [
@@ -76,8 +141,10 @@ enum CalendarSecretStore {
                 kSecMatchLimitOne
         ]
 
+
         var result:
             CFTypeRef?
+
 
         let status =
             SecItemCopyMatching(
@@ -85,18 +152,68 @@ enum CalendarSecretStore {
                 &result
             )
 
-        guard
-            status == errSecSuccess,
-            let data =
-                result as? Data
-        else {
-            return nil
+
+        if
+            status
+                == errSecItemNotFound
+        {
+            return
+                .notFound
         }
 
-        return String(
-            data: data,
-            encoding: .utf8
-        )
+
+        guard
+            status
+                == errSecSuccess
+        else {
+            return
+                .failure(
+                    status
+                )
+        }
+
+
+        guard
+            let data =
+                result as? Data,
+            let secret =
+                String(
+                    data:
+                        data,
+                    encoding:
+                        .utf8
+                )
+        else {
+            return
+                .invalidData
+        }
+
+
+        return
+            .success(
+                secret
+            )
+    }
+
+
+    static func statusMessage(
+        _ status:
+            OSStatus
+    ) -> String {
+        if
+            let message =
+                SecCopyErrorMessageString(
+                    status,
+                    nil
+                )
+        {
+            return
+                message as String
+        }
+
+
+        return
+            "OSStatus \(status)"
     }
 
 

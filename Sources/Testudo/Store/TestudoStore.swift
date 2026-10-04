@@ -7738,11 +7738,14 @@ extension TestudoStore {
                         }
                     )
         else {
-            return "Calendar not found."
+            return
+                "Calendar not found."
         }
+
 
         let calendar =
             data.calendars[index]
+
 
         guard
             calendar.sourceKind
@@ -7752,32 +7755,77 @@ extension TestudoStore {
                 calendar
                     .secretURLKeychainAccount
         else {
-            return "This is not an iCal subscription."
+            return
+                "This is not an iCal subscription."
         }
 
-        guard
-            let secretAddress =
+
+        // ----------------------------------------------------
+        // Keychain state is machine-local.
+        //
+        // Never write a missing / denied Keychain state into
+        // the shared .testudoenv package.
+        // ----------------------------------------------------
+
+        let secretAddress:
+            String
+
+
+        switch
+            CalendarSecretStore
+                .read(
+                    account:
+                        keychainAccount
+                )
+        {
+
+        case .success(
+            let storedSecret
+        ):
+            secretAddress =
+                storedSecret
+
+
+        case .notFound:
+            return
+                "This Mac does not have the Secret iCal address for “\(calendar.name)”. Use Restore Secret Address to reconnect this existing calendar on this Mac."
+
+
+        case .invalidData:
+            return
+                "The Secret iCal address for “\(calendar.name)” exists in macOS Keychain but could not be decoded. Use Restore Secret Address to replace it safely."
+
+
+        case .failure(
+            let status
+        ):
+            let detail =
                 CalendarSecretStore
-                    .read(
-                        account:
-                            keychainAccount
-                    ),
+                    .statusMessage(
+                        status
+                    )
+
+            return
+                "macOS Keychain could not provide the Secret iCal address for “\(calendar.name)”. \(detail) (OSStatus \(status)). If macOS asks for Keychain access, choose Allow or Always Allow and try Sync again."
+        }
+
+
+        guard
             let url =
                 URL(
                     string:
                         secretAddress
-                )
+                ),
+            let scheme =
+                url.scheme?
+                    .lowercased(),
+            scheme == "https"
+                || scheme == "http"
         else {
-            data.calendars[index]
-                .lastSyncError =
-                "The Secret iCal address is missing from Keychain."
-
-            save()
-
             return
-                data.calendars[index]
-                    .lastSyncError
+                "The Secret iCal address stored in macOS Keychain for “\(calendar.name)” is invalid. Use Restore Secret Address to replace it safely."
         }
+
 
         do {
             let (
@@ -7787,8 +7835,10 @@ extension TestudoStore {
                 try await URLSession
                     .shared
                     .data(
-                        from: url
+                        from:
+                            url
                     )
+
 
             if
                 let http =
@@ -7812,6 +7862,7 @@ extension TestudoStore {
                 )
             }
 
+
             let parsed =
                 try ICalendarParser
                     .parse(
@@ -7819,11 +7870,13 @@ extension TestudoStore {
                             downloaded
                     )
 
+
             mergeICalEvents(
                 parsed.events,
                 into:
                     id
             )
+
 
             if
                 let freshIndex =
@@ -7845,11 +7898,19 @@ extension TestudoStore {
                 ]
                 .lastSyncError =
                     nil
+
+                data.calendars[
+                    freshIndex
+                ]
+                .updatedAt =
+                    Date()
             }
+
 
             save()
 
             return nil
+
 
         } catch {
             if
@@ -7865,12 +7926,201 @@ extension TestudoStore {
                     freshIndex
                 ]
                 .lastSyncError =
-                    error.localizedDescription
+                    error
+                        .localizedDescription
+
+                data.calendars[
+                    freshIndex
+                ]
+                .updatedAt =
+                    Date()
             }
+
 
             save()
 
-            return error.localizedDescription
+            return
+                error
+                    .localizedDescription
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Restore machine-local iCal credential
+    //
+    // This deliberately reuses:
+    //
+    //   • the existing TestudoCalendar UUID;
+    //   • the existing Keychain account identifier;
+    //   • the existing imported event identities;
+    //   • existing Work / Theme relationships.
+    //
+    // It does NOT create a second calendar subscription.
+    // ========================================================
+
+    func restoreICalSecretAddress(
+        id:
+            UUID,
+        secretAddress:
+            String
+    ) async -> String? {
+        guard
+            let index =
+                data.calendars
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == id
+                        }
+                    )
+        else {
+            return
+                "Calendar not found."
+        }
+
+
+        let calendar =
+            data.calendars[index]
+
+
+        guard
+            calendar.sourceKind
+                == .iCalSubscription,
+            calendar.isReadOnly,
+            let keychainAccount =
+                calendar
+                    .secretURLKeychainAccount
+        else {
+            return
+                "This is not an iCal subscription."
+        }
+
+
+        let cleanedAddress =
+            secretAddress
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+
+        guard
+            let url =
+                URL(
+                    string:
+                        cleanedAddress
+                ),
+            let scheme =
+                url.scheme?
+                    .lowercased(),
+            scheme == "https"
+                || scheme == "http"
+        else {
+            return
+                "Please enter a valid iCal URL."
+        }
+
+
+        do {
+            // Validate the supplied address before replacing
+            // any machine-local Keychain value.
+
+            let (
+                downloaded,
+                response
+            ) =
+                try await URLSession
+                    .shared
+                    .data(
+                        from:
+                            url
+                    )
+
+
+            if
+                let http =
+                    response
+                        as? HTTPURLResponse,
+                !(200..<300)
+                    .contains(
+                        http.statusCode
+                    )
+            {
+                return
+                    "The calendar server returned HTTP \(http.statusCode)."
+            }
+
+
+            let parsed =
+                try ICalendarParser
+                    .parse(
+                        data:
+                            downloaded
+                    )
+
+
+            // Only after validation succeeds do we write the
+            // machine-local secret.
+
+            try CalendarSecretStore
+                .save(
+                    secret:
+                        cleanedAddress,
+                    account:
+                        keychainAccount
+                )
+
+
+            // Keep the existing calendar identity and update its
+            // imported events in place.
+
+            mergeICalEvents(
+                parsed.events,
+                into:
+                    id
+            )
+
+
+            if
+                let freshIndex =
+                    data.calendars
+                        .firstIndex(
+                            where: {
+                                $0.id
+                                    == id
+                            }
+                        )
+            {
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncAt =
+                    Date()
+
+                data.calendars[
+                    freshIndex
+                ]
+                .lastSyncError =
+                    nil
+
+                data.calendars[
+                    freshIndex
+                ]
+                .updatedAt =
+                    Date()
+            }
+
+
+            save()
+
+            return nil
+
+
+        } catch {
+            return
+                error
+                    .localizedDescription
         }
     }
 

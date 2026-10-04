@@ -320,6 +320,15 @@ private struct AboutTestudoView:
                 .multilineTextAlignment(
                     .center
                 )
+                .lineLimit(
+                    nil
+                )
+                .fixedSize(
+                    horizontal:
+                        false,
+                    vertical:
+                        true
+                )
 
 
                 Text(
@@ -336,6 +345,15 @@ private struct AboutTestudoView:
                 )
                 .multilineTextAlignment(
                     .center
+                )
+                .lineLimit(
+                    nil
+                )
+                .fixedSize(
+                    horizontal:
+                        false,
+                    vertical:
+                        true
                 )
                 .lineSpacing(
                     3
