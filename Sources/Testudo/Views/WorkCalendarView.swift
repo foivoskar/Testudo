@@ -52,14 +52,29 @@ struct WorkCalendarView: View {
             count: 7
         )
 
+
+    private let calendarSelectionColor =
+        Color(
+            red:
+                52.0 / 255.0,
+            green:
+                120.0 / 255.0,
+            blue:
+                246.0 / 255.0
+        )
+
     var body: some View {
         VStack(spacing: 0) {
             calendarHeader
 
             monthCalendar
                 .padding(
+                    .top,
+                    10
+                )
+                .padding(
                     .horizontal,
-                    12
+                    14
                 )
                 .padding(
                     .bottom,
@@ -282,25 +297,31 @@ struct WorkCalendarView: View {
     private var monthCalendar:
         some View
     {
-        VStack(spacing: 5) {
+        VStack(spacing: 8) {
             LazyVGrid(
                 columns: columns,
                 spacing: 3
             ) {
                 ForEach(
-                    weekdaySymbols,
-                    id: \.self
-                ) { symbol in
+                    Array(
+                        weekdaySymbols
+                            .enumerated()
+                    ),
+                    id: \.offset
+                ) { _, symbol in
                     Text(symbol)
                         .font(
                             .system(
-                                size: 10,
+                                size: 11,
                                 weight:
-                                    .medium
+                                    .semibold
                             )
                         )
                         .foregroundStyle(
-                            .secondary
+                            Color.primary
+                                .opacity(
+                                    0.58
+                                )
                         )
                         .frame(
                             maxWidth:
@@ -308,10 +329,23 @@ struct WorkCalendarView: View {
                         )
                 }
             }
+            .padding(
+                .horizontal,
+                2
+            )
+
+            Divider()
+                .opacity(
+                    0.28
+                )
+                .padding(
+                    .horizontal,
+                    2
+                )
 
             LazyVGrid(
                 columns: columns,
-                spacing: 4
+                spacing: 5
             ) {
                 ForEach(
                     Array(
@@ -363,20 +397,20 @@ struct WorkCalendarView: View {
         } label: {
             ZStack {
                 RoundedRectangle(
-                    cornerRadius: 7
+                    cornerRadius: 8
                 )
                 .fill(
                     selected
-                    ? Color.accentColor
+                    ? calendarSelectionColor
                     : Color.clear
                 )
 
                 if today && !selected {
                     RoundedRectangle(
-                        cornerRadius: 7
+                        cornerRadius: 8
                     )
                     .stroke(
-                        Color.accentColor,
+                        calendarSelectionColor,
                         lineWidth: 1
                     )
                 }
@@ -540,16 +574,16 @@ struct WorkCalendarView: View {
                                 event:
                                     event
                             )
-                            .middleColumnSelectionStyle(
-                                selectedCalendarEventID
-                                    == event.id,
-                                leadingExtension:
-                                    4,
-                                trailingExtension:
-                                    4
-                            )
                         }
                         .buttonStyle(.plain)
+                        .middleColumnSelectionStyle(
+                            selectedCalendarEventID
+                                == event.id,
+                            leadingExtension:
+                                4,
+                            trailingExtension:
+                                4
+                        )
                     }
                 }
             }
@@ -597,16 +631,16 @@ struct WorkCalendarView: View {
                             context:
                                 occurrence.context
                         )
-                        .middleColumnSelectionStyle(
-                            selectedWorkItemID
-                                == occurrence.item.id,
-                            leadingExtension:
-                                4,
-                            trailingExtension:
-                                4
-                        )
                     }
                     .buttonStyle(.plain)
+                    .middleColumnSelectionStyle(
+                        selectedWorkItemID
+                            == occurrence.item.id,
+                        leadingExtension:
+                            4,
+                        trailingExtension:
+                            4
+                    )
                 }
             }
         }
