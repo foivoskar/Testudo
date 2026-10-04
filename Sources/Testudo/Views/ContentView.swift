@@ -1,6 +1,6 @@
 import SwiftUI
 import Foundation
-import AppKit
+@preconcurrency import AppKit
 
 enum SidebarSection:
     String,
@@ -137,6 +137,7 @@ private struct DetailTrackpadNavigationCapture:
         coordinator.uninstall()
     }
 
+    @MainActor
     final class Coordinator {
         weak var hostView: NSView?
 
@@ -177,12 +178,9 @@ private struct DetailTrackpadNavigationCapture:
                         [weak self]
                         event in
 
-                        nonisolated(unsafe) let eventForMainActor = event
-                        nonisolated(unsafe) weak var handlerForMainActor = self
-
                         MainActor.assumeIsolated {
-                            handlerForMainActor?.handle(
-                                eventForMainActor
+                            self?.handle(
+                                event
                             )
                         }
 
@@ -305,9 +303,6 @@ private struct DetailTrackpadNavigationCapture:
             gestureTriggered = false
         }
 
-        deinit {
-            uninstall()
-        }
     }
 }
 

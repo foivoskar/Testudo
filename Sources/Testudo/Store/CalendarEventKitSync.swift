@@ -1,5 +1,5 @@
 import Foundation
-import EventKit
+@preconcurrency import EventKit
 
 
 // ============================================================
@@ -203,9 +203,41 @@ final class AppleCalendarEventKitBridge
             return
 
         case .notDetermined:
-            let granted =
-                try await eventStore
-                    .requestFullAccessToEvents()
+            let store =
+                eventStore
+
+            let granted:
+                Bool =
+                try await
+                    withCheckedThrowingContinuation {
+                        (
+                            continuation:
+                                CheckedContinuation<
+                                    Bool,
+                                    Error
+                                >
+                        ) in
+
+                        store
+                            .requestFullAccessToEvents {
+                                granted,
+                                error in
+
+                                if let error {
+                                    continuation
+                                        .resume(
+                                            throwing:
+                                                error
+                                        )
+                                } else {
+                                    continuation
+                                        .resume(
+                                            returning:
+                                                granted
+                                        )
+                                }
+                            }
+                    }
 
             guard granted else {
                 throw
