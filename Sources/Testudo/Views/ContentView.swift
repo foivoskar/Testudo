@@ -14,6 +14,7 @@ enum SidebarSection:
     case todo
     case inProgress
     case completed
+    case discontinued
     case archive
     case timeline
     case themes
@@ -42,6 +43,8 @@ enum SidebarSection:
             return "In Progress"
         case .completed:
             return "Completed"
+        case .discontinued:
+            return "Discontinued"
         case .archive:
             return "Archive"
         case .timeline:
@@ -74,6 +77,8 @@ enum SidebarSection:
             return "clock"
         case .completed:
             return "checkmark.circle"
+        case .discontinued:
+            return "xmark.circle"
         case .archive:
             return "archivebox"
         case .timeline:
@@ -363,6 +368,10 @@ private enum DetailNavigationEntry:
 }
 
 struct ContentView: View {
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
     @State
     private var selection:
         SidebarSection? = .today
@@ -516,6 +525,10 @@ struct ContentView: View {
 
                         sidebarRow(
                             .completed
+                        )
+
+                        sidebarRow(
+                            .discontinued
                         )
 
                         sidebarRow(
@@ -1187,7 +1200,18 @@ struct ContentView: View {
 
         // Changing only the Work filter while the exact same
         // Work object remains visible must not create a fake
-        // browser-history step. Update only its section context.
+        // browser-history step.
+        //
+        // Archive needs one additional rule:
+        //
+        // an archived Work item is actually represented in the
+        // middle column only by Archive. When the user leaves
+        // Archive, SwiftUI changes the sidebar section before a
+        // different middle-column item is selected. We must not
+        // rewrite the existing history entry during that
+        // intermediate state, otherwise Back/Forward would
+        // restore the correct detail object under the wrong
+        // sidebar/middle-column section.
         if
             case
                 .work(
@@ -1197,12 +1221,48 @@ struct ContentView: View {
                 entry,
             case
                 .work(
-                    _,
+                    let currentSection,
                     let currentID
                 )? =
                 currentDetailEntry,
             newID == currentID
         {
+            let item =
+                store.workItem(
+                    id:
+                        newID
+                )
+
+            let isArchived =
+                item.map {
+                    store.isArchivedWorkItem(
+                        $0
+                    )
+                }
+                ?? false
+
+            // Leaving Archive while the same archived object is
+            // still selected is only an intermediate UI state.
+            // Preserve its Archive navigation context until the
+            // user actually chooses another destination.
+            if
+                currentSection == .archive,
+                isArchived,
+                newSection != .archive
+            {
+                return
+            }
+
+            // Likewise, merely switching the sidebar to Archive
+            // must not claim that a non-archived Work item lives
+            // there while the old selection is still present.
+            if
+                newSection == .archive,
+                !isArchived
+            {
+                return
+            }
+
             currentDetailEntry =
                 .work(
                     section:
@@ -1286,11 +1346,12 @@ struct ContentView: View {
              .todo,
              .inProgress,
              .completed,
+             .discontinued,
+             .archive,
              .timeline:
             return true
 
         case .newEntry,
-             .archive,
              .themes,
              .organizations,
              .groups,
@@ -1670,6 +1731,7 @@ struct ContentView: View {
              .todo,
              .inProgress,
              .completed,
+             .discontinued,
              .archive,
              .timeline:
             return true
@@ -1804,6 +1866,7 @@ private struct SectionContentView: View {
              .todo,
              .inProgress,
              .completed,
+             .discontinued,
              .archive,
              .timeline:
             return false
@@ -1863,6 +1926,12 @@ private struct SectionContentView: View {
         case .completed:
             WorkListView(
                 mode: .completed,
+                selection:
+                    $selectedWorkItemID
+            )
+        case .discontinued:
+            WorkListView(
+                mode: .discontinued,
                 selection:
                     $selectedWorkItemID
             )
@@ -2010,6 +2079,16 @@ private struct SectionContentView: View {
                 ? "1 task"
                 : "\(count) tasks"
 
+        case "discontinued":
+            let count =
+                store.tasks(
+                    with: .discontinued
+                ).count
+
+            return count == 1
+                ? "1 task"
+                : "\(count) tasks"
+
         case "timeline":
             let count =
                 store.data.historyEvents.count
@@ -2089,6 +2168,10 @@ private struct SectionContentView: View {
         case .completed:
             return
                 "Completed work"
+
+        case .discontinued:
+            return
+                "Work retained after being stopped, failed or superseded"
 
         case .archive:
             return
@@ -2583,7 +2666,10 @@ private struct WorkItemNodeView: View {
                                 ? Color.white.opacity(0.85)
                                 : (
                                     deadline < Date()
-                                    && status != .completed
+                                    && (
+                                        status == .todo
+                                        || status == .inProgress
+                                    )
                                     ? Color.red
                                     : Color.secondary
                                 )
@@ -2645,6 +2731,9 @@ private struct WorkItemNodeView: View {
             Menu("Status") {
                 ForEach(
                     TaskStatus.allCases
+                        .filter {
+                            $0 != .discontinued
+                        }
                 ) { status in
                     Button(
                         status.displayName
@@ -2717,6 +2806,10 @@ private struct WorkItemNodeView: View {
         case .task:
             if item.status == .completed {
                 return "checkmark.circle"
+            }
+
+            if item.status == .discontinued {
+                return "xmark.circle"
             }
 
             if item.status == .inProgress {
@@ -2870,6 +2963,9 @@ private struct StatusTaskListView: View {
                     Menu("Status") {
                         ForEach(
                             TaskStatus.allCases
+                        .filter {
+                            $0 != .discontinued
+                        }
                         ) { newStatus in
                             Button(
                                 newStatus.displayName
@@ -2892,14 +2988,19 @@ private struct StatusTaskListView: View {
         switch status {
         case .todo:
             return "circle"
+
         case .inProgress:
             return "clock"
+
         case .completed:
             return "checkmark.circle"
-                case .closed:
+
+        case .closed:
             return "archivebox"
 
-}
+        case .discontinued:
+            return "xmark.circle"
+        }
     }
 }
 
@@ -2920,7 +3021,7 @@ private struct TodayView: View {
                 )
             } description: {
                 Text(
-                    "Work created, started, completed or logged today will appear here."
+                    "Work created, started, completed, discontinued or logged today will appear here."
                 )
             }
             .frame(
@@ -3045,6 +3146,8 @@ private struct WorkSummaryRow: View {
                 return "clock"
             case .completed:
                 return "checkmark.circle"
+            case .discontinued:
+                return "xmark.circle"
             case .closed:
                 return "archivebox"
 
@@ -3186,6 +3289,14 @@ private struct TimelineView: View {
             return "Started"
         case .completed:
             return "Completed"
+        case .discontinued:
+            return "Discontinued"
+
+        case .closed:
+            return "Closed"
+
+        case .reopened:
+            return "Reopened"
         case .activityLogged:
             return "Activity logged"
         case .relationshipAdded:
@@ -3213,6 +3324,14 @@ private struct TimelineView: View {
             return "play.circle"
         case .completed:
             return "checkmark.circle"
+        case .discontinued:
+            return "xmark.circle"
+
+        case .closed:
+            return "archivebox"
+
+        case .reopened:
+            return "arrow.uturn.backward.circle"
         case .activityLogged:
             return "waveform.path.ecg"
         case .relationshipAdded:

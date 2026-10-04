@@ -1906,6 +1906,10 @@ struct RelatedWorkSplitPane<
                 return
                     "checkmark.circle"
 
+            case .discontinued:
+                return
+                    "xmark.circle"
+
             case .closed:
                 return
                     "archivebox"

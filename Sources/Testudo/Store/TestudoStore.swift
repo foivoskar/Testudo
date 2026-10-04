@@ -2334,22 +2334,155 @@ final class TestudoStore: ObservableObject {
     private static func decode(
         _ rawData: Data
     ) -> TestudoData? {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
 
         do {
-            return try decoder.decode(
-                TestudoData.self,
-                from: rawData
-            )
+            var decoded =
+                try decoder.decode(
+                    TestudoData.self,
+                    from:
+                        rawData
+                )
+
+            // -----------------------------------------------
+            // Legacy Closed archive migration
+            //
+            // Testudo <= 0.1.6 represented archival state as
+            // TaskStatus.closed.
+            //
+            // Current Testudo preserves the real workflow
+            // status and stores archival state independently
+            // in closedAt.
+            // -----------------------------------------------
+
+            for index in
+                decoded.workItems.indices
+            {
+                guard
+                    decoded.workItems[index].kind
+                        == .task,
+                    decoded.workItems[index].status
+                        == .closed
+                else {
+                    continue
+                }
+
+                let itemID =
+                    decoded.workItems[index].id
+
+                let legacyCloseEvent =
+                    decoded.historyEvents
+                        .filter {
+                            $0.workItemID
+                                == itemID
+                            && $0.newValue
+                                == TaskStatus.closed.rawValue
+                        }
+                        .max {
+                            $0.timestamp
+                                < $1.timestamp
+                        }
+
+                let closedAt =
+                    legacyCloseEvent?
+                        .timestamp
+                    ?? decoded.workItems[index]
+                        .updatedAt
+
+                let closedTimeZoneID =
+                    legacyCloseEvent?
+                        .timeZoneID
+                    ?? decoded.workItems[index]
+                        .updatedTimeZoneID
+
+                let previousStatus =
+                    legacyCloseEvent?
+                        .previousValue
+                        .flatMap {
+                            TaskStatus(
+                                rawValue:
+                                    $0
+                            )
+                        }
+
+                if
+                    let previousStatus,
+                    previousStatus
+                        != .closed
+                {
+                    decoded.workItems[index]
+                        .status =
+                        previousStatus
+
+                } else if
+                    decoded.workItems[index]
+                        .discontinuedAt != nil
+                {
+                    decoded.workItems[index]
+                        .status =
+                        .discontinued
+
+                } else {
+                    decoded.workItems[index]
+                        .status =
+                        .completed
+                }
+
+                // Closed is valid only on the root Task.
+                if
+                    decoded.workItems[index]
+                        .parentWorkItemID == nil
+                {
+                    decoded.workItems[index]
+                        .closedAt =
+                        closedAt
+
+                    decoded.workItems[index]
+                        .closedTimeZoneID =
+                        closedTimeZoneID
+                }
+            }
+
+            // Existing "Status changed to Closed" records
+            // become archive-lifecycle records. We retain their
+            // original timestamps and old/new values.
+            for index in
+                decoded.historyEvents.indices
+            {
+                if
+                    decoded.historyEvents[index]
+                        .kind
+                        == .statusChanged,
+                    decoded.historyEvents[index]
+                        .newValue
+                        == TaskStatus.closed.rawValue
+                {
+                    decoded.historyEvents[index]
+                        .kind =
+                        .closed
+
+                    decoded.historyEvents[index]
+                        .text =
+                        "Task closed and moved to Archive"
+                }
+            }
+
+            return decoded
+
         } catch {
             print(
                 "Testudo: could not decode stored data:",
                 error
             )
+
             return nil
         }
     }
+
 
     private func saveApplicationData() {
         let encoder =
@@ -2667,7 +2800,7 @@ final class TestudoStore: ObservableObject {
     func rootWorkItems(
         for themeID: UUID
     ) -> [WorkItem] {
-        data.workItems
+        activeWorkItems
             .filter {
                 $0.themeID == themeID
                 && $0.parentWorkItemID == nil
@@ -2728,11 +2861,24 @@ final class TestudoStore: ObservableObject {
             return
         }
 
+        // Closed is no longer a workflow status.
+        // .closed exists only for decoding historical files.
+        if status == .closed {
+            return
+        }
+
+        // Archived Tasks must first be reopened.
         if
-            status == .closed,
             data.workItems[index]
-                .parentWorkItemID != nil
+                .closedAt != nil
         {
+            return
+        }
+
+        // Discontinued carries additional lifecycle metadata.
+        // It must be entered through the full Work editor so a
+        // reason is always recorded.
+        if status == .discontinued {
             return
         }
 
@@ -2786,12 +2932,33 @@ final class TestudoStore: ObservableObject {
             data.workItems[index]
                 .completedTimeZoneID =
                 currentTimeZoneID
-        } else if status != .closed {
+        } else {
             data.workItems[index].completedAt =
                 nil
 
             data.workItems[index]
                 .completedTimeZoneID =
+                nil
+        }
+
+        if
+            data.workItems[index]
+                .discontinuedAt != nil
+        {
+            data.workItems[index]
+                .discontinuedAt =
+                nil
+
+            data.workItems[index]
+                .discontinuedTimeZoneID =
+                nil
+
+            data.workItems[index]
+                .discontinuationReason =
+                nil
+
+            data.workItems[index]
+                .discontinuationNote =
                 nil
         }
 
@@ -2900,6 +3067,16 @@ final class TestudoStore: ObservableObject {
             {
                 return
                     "Started date cannot be later than the completed date."
+            }
+
+            if
+                let discontinuedAt =
+                    data.workItems[index]
+                        .discontinuedAt,
+                startedAt > discontinuedAt
+            {
+                return
+                    "Started date cannot be later than the discontinued date."
             }
         }
 
@@ -3049,6 +3226,221 @@ final class TestudoStore: ObservableObject {
     }
 
 
+    @discardableResult
+    func updateTaskDiscontinuationDetails(
+        workItemID: UUID,
+        discontinuedAt: Date,
+        discontinuedTimeZoneID: String?,
+        reason: TaskDiscontinuationReason,
+        note: String,
+        recordAudit: Bool = true
+    ) -> String? {
+        guard
+            let index =
+                data.workItems.firstIndex(
+                    where: {
+                        $0.id
+                            == workItemID
+                    }
+                ),
+            data.workItems[index]
+                .kind
+                == .task
+        else {
+            return "Task not found."
+        }
+
+        guard
+            data.workItems[index]
+                .status
+                == .discontinued
+        else {
+            return
+                "Discontinuation details require a Discontinued Task."
+        }
+
+        let now =
+            Date()
+
+        guard discontinuedAt <= now
+        else {
+            return
+                "Discontinued date cannot be in the future."
+        }
+
+        if
+            let startedAt =
+                data.workItems[index]
+                    .startedAt,
+            discontinuedAt < startedAt
+        {
+            return
+                "Discontinued date cannot be earlier than Started."
+        }
+
+        let currentTimeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+        let normalizedTimeZoneID =
+            TestudoTime
+                .validTimeZoneIdentifier(
+                    discontinuedTimeZoneID
+                )
+            ?? data.workItems[index]
+                .discontinuedTimeZoneID
+            ?? currentTimeZoneID
+
+        let cleanedNote =
+            note
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        let previousDate =
+            data.workItems[index]
+                .discontinuedAt
+
+        let previousTimeZoneID =
+            data.workItems[index]
+                .discontinuedTimeZoneID
+
+        let previousReason =
+            data.workItems[index]
+                .discontinuationReason
+
+        let previousNote =
+            data.workItems[index]
+                .discontinuationNote
+
+        let normalizedNote =
+            cleanedNote.isEmpty
+            ? nil
+            : cleanedNote
+
+        let changed =
+            previousDate != discontinuedAt
+            || previousTimeZoneID
+                != normalizedTimeZoneID
+            || previousReason != reason
+            || previousNote != normalizedNote
+
+        data.workItems[index]
+            .discontinuedAt =
+            discontinuedAt
+
+        data.workItems[index]
+            .discontinuedTimeZoneID =
+            normalizedTimeZoneID
+
+        data.workItems[index]
+            .discontinuationReason =
+            reason
+
+        data.workItems[index]
+            .discontinuationNote =
+            normalizedNote
+
+        data.workItems[index]
+            .updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            currentTimeZoneID
+
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        // Replace only the lifecycle event representing the
+        // CURRENT discontinuation instance. Earlier discontinued
+        // -> reopened -> discontinued cycles remain in history.
+        if
+            let previousDate,
+            let eventIndex =
+                data.historyEvents
+                    .lastIndex(
+                        where: {
+                            $0.workItemID
+                                == workItemID
+                            && $0.kind
+                                == .discontinued
+                            && $0.timestamp
+                                == previousDate
+                        }
+                    )
+        {
+            data.historyEvents
+                .remove(
+                    at:
+                        eventIndex
+                )
+        }
+
+        let updatedTask =
+            data.workItems[index]
+
+        data.historyEvents.append(
+            HistoryEvent(
+                workItemID:
+                    workItemID,
+                kind:
+                    .discontinued,
+                timestamp:
+                    discontinuedAt,
+                text:
+                    "\(taskHistoryTitle(updatedTask)) discontinued — \(reason.displayName)",
+                newValue:
+                    normalizedNote,
+                actorMembershipID:
+                    currentEnvironmentMembership?
+                        .id,
+                timeZoneID:
+                    normalizedTimeZoneID,
+                valueTimeZoneID:
+                    normalizedTimeZoneID
+            )
+        )
+
+        if
+            recordAudit,
+            changed
+        {
+            data.historyEvents.append(
+                HistoryEvent(
+                    workItemID:
+                        workItemID,
+                    kind:
+                        .edited,
+                    timestamp:
+                        now,
+                    text:
+                        "Discontinuation details updated",
+                    previousValue:
+                        previousReason?
+                            .displayName,
+                    newValue:
+                        reason.displayName,
+                    actorMembershipID:
+                        currentEnvironmentMembership?
+                            .id,
+                    timeZoneID:
+                        currentTimeZoneID,
+                    valueTimeZoneID:
+                        normalizedTimeZoneID
+                )
+            )
+        }
+
+        save()
+
+        return nil
+    }
+
+
     func deleteWorkItem(
         id: UUID
     ) {
@@ -3092,7 +3484,7 @@ final class TestudoStore: ObservableObject {
     func tasks(
         with status: TaskStatus
     ) -> [WorkItem] {
-        data.workItems
+        activeWorkItems
             .filter {
                 $0.kind == .task
                 && $0.status == status
@@ -3106,7 +3498,7 @@ final class TestudoStore: ObservableObject {
         let calendar =
             Calendar.autoupdatingCurrent
 
-        return data.workItems
+        return activeWorkItems
             .filter { item in
                 if calendar.isDateInToday(
                     item.createdAt
@@ -3139,6 +3531,16 @@ final class TestudoStore: ObservableObject {
                         item.completedAt,
                     calendar.isDateInToday(
                         completedAt
+                    )
+                {
+                    return true
+                }
+
+                if
+                    let discontinuedAt =
+                        item.discontinuedAt,
+                    calendar.isDateInToday(
+                        discontinuedAt
                     )
                 {
                     return true
@@ -3644,12 +4046,32 @@ extension TestudoStore {
             return "Work item not found."
         }
 
-        if
-            status == .closed,
-            parentWorkItemID != nil
-        {
+        if status == .closed {
             return
-                "Only top-level Tasks can be Closed."
+                "Closed is an archive lifecycle state, not a Task status."
+        }
+
+        if
+            data.workItems[index]
+                .closedAt != nil
+        {
+            if
+                parentWorkItemID
+                    != data.workItems[index]
+                        .parentWorkItemID
+            {
+                return
+                    "Reopen this Task before changing its Parent Task."
+            }
+
+            if
+                status
+                    != data.workItems[index]
+                        .status
+            {
+                return
+                    "Reopen this Task before changing its workflow status."
+            }
         }
 
         if let themeID {
@@ -3832,8 +4254,6 @@ extension TestudoStore {
             if
                 newStatus
                     != .completed,
-                newStatus
-                    != .closed,
                 oldStatus
                     == .completed
             {
@@ -3843,6 +4263,56 @@ extension TestudoStore {
 
                 data.workItems[index]
                     .completedTimeZoneID =
+                    nil
+            }
+
+            if
+                newStatus
+                    == .discontinued,
+                oldStatus
+                    != .discontinued
+            {
+                data.workItems[index]
+                    .discontinuedAt =
+                    now
+
+                data.workItems[index]
+                    .discontinuedTimeZoneID =
+                    currentTimeZoneID
+
+                data.workItems[index]
+                    .discontinuationReason =
+                    nil
+
+                data.workItems[index]
+                    .discontinuationNote =
+                    nil
+            }
+
+            // Leaving Discontinued clears its current
+            // outcome metadata while historical lifecycle
+            // records remain intact.
+            if
+                newStatus
+                    != .discontinued,
+                data.workItems[index]
+                    .discontinuedAt
+                    != nil
+            {
+                data.workItems[index]
+                    .discontinuedAt =
+                    nil
+
+                data.workItems[index]
+                    .discontinuedTimeZoneID =
+                    nil
+
+                data.workItems[index]
+                    .discontinuationReason =
+                    nil
+
+                data.workItems[index]
+                    .discontinuationNote =
                     nil
             }
 
@@ -3990,6 +4460,53 @@ extension TestudoStore {
                         now,
                     text:
                         "\(historyTitle) completed"
+                )
+            }
+
+            if
+                updatedTask.status
+                    == .discontinued,
+                oldStatus
+                    != .discontinued
+            {
+                appendTaskLifecycleHistory(
+                    workItemID:
+                        updatedTask.id,
+                    kind:
+                        .discontinued,
+                    timestamp:
+                        now,
+                    text:
+                        "\(historyTitle) discontinued"
+                )
+            }
+
+            if
+                oldStatus
+                    != updatedTask.status
+            {
+                data.historyEvents.append(
+                    HistoryEvent(
+                        workItemID:
+                            updatedTask.id,
+                        kind:
+                            .statusChanged,
+                        timestamp:
+                            now,
+                        text:
+                            "Status changed to \(updatedTask.status?.displayName ?? "Unknown")",
+                        previousValue:
+                            oldStatus?
+                                .rawValue,
+                        newValue:
+                            updatedTask.status?
+                                .rawValue,
+                        actorMembershipID:
+                            currentEnvironmentMembership?
+                                .id,
+                        timeZoneID:
+                            currentTimeZoneID
+                    )
                 )
             }
         }
@@ -4500,6 +5017,17 @@ extension TestudoStore {
             return (
                 nil,
                 "Only Tasks can contain child items."
+            )
+        }
+
+        guard
+            !isArchivedWorkItem(
+                parent
+            )
+        else {
+            return (
+                nil,
+                "Reopen the Parent Task before adding child work."
             )
         }
 
@@ -7786,6 +8314,195 @@ extension TestudoStore {
 
 extension TestudoStore {
 
+    @discardableResult
+    func closeTopLevelTask(
+        workItemID:
+            UUID
+    ) -> String? {
+
+        guard
+            let index =
+                data.workItems
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == workItemID
+                        }
+                    ),
+            data.workItems[index].kind
+                == .task
+        else {
+            return
+                "Task not found."
+        }
+
+        guard
+            data.workItems[index]
+                .parentWorkItemID == nil
+        else {
+            return
+                "Only top-level Tasks can be Closed."
+        }
+
+        guard
+            data.workItems[index]
+                .closedAt == nil
+        else {
+            return
+                "This Task is already Closed."
+        }
+
+        guard
+            data.workItems[index].status
+                == .completed
+            || data.workItems[index].status
+                == .discontinued
+        else {
+            return
+                "Complete or Discontinue this Task before closing it."
+        }
+
+        let now =
+            Date()
+
+        let timeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+        data.workItems[index]
+            .closedAt =
+            now
+
+        data.workItems[index]
+            .closedTimeZoneID =
+            timeZoneID
+
+        data.workItems[index]
+            .updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            timeZoneID
+
+        let task =
+            data.workItems[index]
+
+        appendTaskLifecycleHistory(
+            workItemID:
+                workItemID,
+            kind:
+                .closed,
+            timestamp:
+                now,
+            text:
+                "\(taskHistoryTitle(task)) closed and moved to Archive",
+            newValue:
+                "closed",
+            valueTimeZoneID:
+                timeZoneID
+        )
+
+        save()
+
+        return nil
+    }
+
+
+    @discardableResult
+    func reopenTopLevelTask(
+        workItemID:
+            UUID
+    ) -> String? {
+
+        guard
+            let index =
+                data.workItems
+                    .firstIndex(
+                        where: {
+                            $0.id
+                                == workItemID
+                        }
+                    ),
+            data.workItems[index].kind
+                == .task,
+            data.workItems[index]
+                .parentWorkItemID == nil
+        else {
+            return
+                "Only a top-level Task can be reopened."
+        }
+
+        guard
+            data.workItems[index]
+                .closedAt != nil
+        else {
+            return
+                "This Task is not Closed."
+        }
+
+        let now =
+            Date()
+
+        let timeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+        let retainedStatus =
+            data.workItems[index]
+                .status
+
+        data.workItems[index]
+            .closedAt =
+            nil
+
+        data.workItems[index]
+            .closedTimeZoneID =
+            nil
+
+        data.workItems[index]
+            .updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            timeZoneID
+
+        let task =
+            data.workItems[index]
+
+        appendTaskLifecycleHistory(
+            workItemID:
+                workItemID,
+            kind:
+                .reopened,
+            timestamp:
+                now,
+            text:
+                "\(taskHistoryTitle(task)) reopened from Archive",
+            previousValue:
+                "closed",
+            newValue:
+                retainedStatus?
+                    .rawValue
+        )
+
+        save()
+
+        return nil
+    }
+
+
     func archivedRootTasks()
         -> [WorkItem]
     {
@@ -7793,25 +8510,36 @@ extension TestudoStore {
             .filter {
                 $0.kind == .task
                 && $0.parentWorkItemID == nil
-                && $0.status == .closed
+                && $0.closedAt != nil
             }
             .sorted {
-                $0.updatedAt
-                    > $1.updatedAt
+                (
+                    $0.closedAt
+                    ?? .distantPast
+                )
+                >
+                (
+                    $1.closedAt
+                    ?? .distantPast
+                )
             }
     }
 
 
     func archivedRootID(
-        for item: WorkItem
+        for item:
+            WorkItem
     ) -> UUID? {
+
         var current:
-            WorkItem? = item
+            WorkItem? =
+            item
 
         var visited =
             Set<UUID>()
 
         while let work = current {
+
             guard
                 !visited.contains(
                     work.id
@@ -7827,9 +8555,10 @@ extension TestudoStore {
             if
                 work.kind == .task,
                 work.parentWorkItemID == nil,
-                work.status == .closed
+                work.closedAt != nil
             {
-                return work.id
+                return
+                    work.id
             }
 
             guard
@@ -7851,8 +8580,10 @@ extension TestudoStore {
 
 
     func isArchivedWorkItem(
-        _ item: WorkItem
+        _ item:
+            WorkItem
     ) -> Bool {
+
         archivedRootID(
             for:
                 item

@@ -26,6 +26,9 @@ extension TaskStatus {
         case .completed:
             return .green
 
+        case .discontinued:
+            return .secondary
+
         case .closed:
             return .secondary
         }
@@ -70,6 +73,12 @@ extension View {
             self
                 .foregroundStyle(
                     Color.green
+                )
+
+        case "xmark.circle":
+            self
+                .foregroundStyle(
+                    Color.secondary
                 )
 
         default:

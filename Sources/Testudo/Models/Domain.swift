@@ -23,7 +23,26 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
     case todo
     case inProgress
     case completed
+    case discontinued
+
+    // Persistence compatibility only.
+    //
+    // Testudo <= 0.1.6 represented archive state as a Task
+    // status. New code must never assign this value.
+    //
+    // It remains decodable so historical Environment files
+    // containing "status": "closed" can still be opened and
+    // migrated to the separate closedAt lifecycle field.
     case closed
+
+    static var allCases: [TaskStatus] {
+        [
+            .todo,
+            .inProgress,
+            .completed,
+            .discontinued,
+        ]
+    }
 
     var id: String { rawValue }
 
@@ -31,13 +50,57 @@ enum TaskStatus: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .todo:
             return "To Do"
+
         case .inProgress:
             return "In Progress"
+
         case .completed:
             return "Completed"
 
+        case .discontinued:
+            return "Discontinued"
+
         case .closed:
-            return "Closed"
+            // Legacy fallback only. Migrated WorkItems never
+            // expose this value to the current UI.
+            return "Completed"
+        }
+    }
+}
+
+
+enum TaskDiscontinuationReason:
+    String,
+    Codable,
+    CaseIterable,
+    Identifiable
+{
+    case failed
+    case superseded
+    case noLongerNeeded
+    case notFeasible
+    case other
+
+    var id: String {
+        rawValue
+    }
+
+    var displayName: String {
+        switch self {
+        case .failed:
+            return "Failed"
+
+        case .superseded:
+            return "Superseded"
+
+        case .noLongerNeeded:
+            return "No longer needed"
+
+        case .notFeasible:
+            return "Not feasible"
+
+        case .other:
+            return "Other"
         }
     }
 }
@@ -165,6 +228,25 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var reminderAt: Date? = nil
     var startedAt: Date?
     var completedAt: Date?
+
+    // A discontinued Task is a terminal work outcome that did
+    // not end in successful completion.
+    //
+    // These fields are optional so older Environment files
+    // remain decoding-compatible without a schema migration.
+    var discontinuedAt: Date? = nil
+    var discontinuationReason:
+        TaskDiscontinuationReason? = nil
+    var discontinuationNote: String? = nil
+
+    // Archive lifecycle.
+    //
+    // nil means the top-level Task participates normally in
+    // active workflow. A value means the complete Task tree is
+    // retained in Archive while the Task keeps its real
+    // workflow status (Completed or Discontinued).
+    var closedAt: Date? = nil
+
     var loggedAt: Date?
 
     // Environment-scoped audit identity.
@@ -185,6 +267,8 @@ struct WorkItem: Identifiable, Codable, Hashable {
 
     var startedTimeZoneID: String? = nil
     var completedTimeZoneID: String? = nil
+    var discontinuedTimeZoneID: String? = nil
+    var closedTimeZoneID: String? = nil
     var loggedTimeZoneID: String? = nil
 }
 
@@ -317,6 +401,9 @@ enum HistoryEventKind: String, Codable, CaseIterable {
     case scheduled
     case started
     case completed
+    case discontinued
+    case closed
+    case reopened
     case activityLogged
     case relationshipAdded
     case relationshipRemoved

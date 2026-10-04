@@ -5,6 +5,7 @@ enum WorkListMode {
     case todo
     case inProgress
     case completed
+    case discontinued
     case timeline
 }
 
@@ -102,6 +103,12 @@ struct TodayDashboardView: View {
                     )
 
                     dashboardSection(
+                        "Discontinued Today",
+                        items:
+                            discontinuedToday
+                    )
+
+                    dashboardSection(
                         "Today's Log",
                         items:
                             todaysLog
@@ -171,7 +178,10 @@ struct TodayDashboardView: View {
             .filter { item in
                 if
                     item.kind == .task,
-                    item.status != .completed,
+                    (
+                        item.status == .todo
+                        || item.status == .inProgress
+                    ),
                     let deadline =
                         item.deadlineAt,
                     deadline < startOfToday
@@ -213,7 +223,10 @@ struct TodayDashboardView: View {
 
                 if
                     item.kind == .task,
-                    item.status != .completed,
+                    (
+                        item.status == .todo
+                        || item.status == .inProgress
+                    ),
                     let deadline =
                         item.deadlineAt,
                     isToday(deadline)
@@ -296,7 +309,10 @@ struct TodayDashboardView: View {
 
                 if
                     item.kind == .task,
-                    item.status != .completed,
+                    (
+                        item.status == .todo
+                        || item.status == .inProgress
+                    ),
                     let deadline =
                         item.deadlineAt
                 {
@@ -365,6 +381,34 @@ struct TodayDashboardView: View {
             }
     }
 
+    private var discontinuedToday:
+        [WorkItem]
+    {
+        store.data.workItems
+            .filter {
+                $0.kind == .task
+                && $0.status
+                    == .discontinued
+                && (
+                    $0.discontinuedAt
+                        .map(isToday)
+                    ?? false
+                )
+            }
+            .sorted {
+                (
+                    $0.discontinuedAt
+                    ?? $0.updatedAt
+                )
+                >
+                (
+                    $1.discontinuedAt
+                    ?? $1.updatedAt
+                )
+            }
+    }
+
+
     private var todaysLog:
         [WorkItem]
     {
@@ -416,6 +460,7 @@ struct TodayDashboardView: View {
         + inProgress
         + upcoming
         + doneToday
+        + discontinuedToday
         + todaysLog
     }
 
@@ -958,6 +1003,11 @@ struct WorkListView: View {
                 with: .completed
             )
 
+        case .discontinued:
+            return tasks(
+                with: .discontinued
+            )
+
         case .timeline:
             return store.data.workItems
                 .sorted {
@@ -985,6 +1035,7 @@ struct WorkListView: View {
         _ item: WorkItem
     ) -> Date {
         item.loggedAt
+        ?? item.discontinuedAt
         ?? item.completedAt
         ?? item.startedAt
         ?? item.scheduledAt
@@ -1001,6 +1052,8 @@ struct WorkListView: View {
             return "In Progress"
         case .completed:
             return "Completed"
+        case .discontinued:
+            return "Discontinued"
         case .timeline:
             return "Timeline"
         }
@@ -1016,6 +1069,8 @@ struct WorkListView: View {
             return "Nothing In Progress"
         case .completed:
             return "No Completed Tasks"
+        case .discontinued:
+            return "No Discontinued Tasks"
         case .timeline:
             return "No Activity Yet"
         }
@@ -1031,6 +1086,8 @@ struct WorkListView: View {
             return "clock"
         case .completed:
             return "checkmark.circle"
+        case .discontinued:
+            return "xmark.circle"
         case .timeline:
             return "list.bullet.rectangle"
         }
@@ -1039,6 +1096,20 @@ struct WorkListView: View {
     private func genericContext(
         _ item: WorkItem
     ) -> String? {
+        if
+            item.kind == .task,
+            item.status == .discontinued
+        {
+            if
+                let reason =
+                    item.discontinuationReason
+            {
+                return reason.displayName
+            }
+
+            return "Discontinued"
+        }
+
         if
             item.kind == .task,
             let deadline =
@@ -1255,6 +1326,9 @@ struct WorkGuideRow: View {
             switch item.status {
             case .completed:
                 return "checkmark.circle"
+
+            case .discontinued:
+                return "xmark.circle"
 
             case .closed:
                 return "archivebox"
@@ -1731,6 +1805,46 @@ struct WorkItemDetailView: View {
 
             Spacer()
 
+            if
+                item.kind == .task,
+                item.parentWorkItemID == nil
+            {
+                if item.closedAt != nil {
+
+                    Button {
+                        errorMessage =
+                            store.reopenTopLevelTask(
+                                workItemID:
+                                    item.id
+                            )
+                    } label: {
+                        Label(
+                            "Reopen",
+                            systemImage:
+                                "arrow.uturn.backward.circle"
+                        )
+                    }
+
+                } else if
+                    item.status == .completed
+                    || item.status == .discontinued
+                {
+                    Button {
+                        errorMessage =
+                            store.closeTopLevelTask(
+                                workItemID:
+                                    item.id
+                            )
+                    } label: {
+                        Label(
+                            "Close",
+                            systemImage:
+                                "archivebox"
+                        )
+                    }
+                }
+            }
+
             Button {
                 showingEditor =
                     true
@@ -1834,6 +1948,49 @@ struct WorkItemDetailView: View {
                                 }
                             ?? "None"
                     )
+
+                    if
+                        item.status == .discontinued
+                    {
+                        ReadOnlyInspectorRow(
+                            label:
+                                "Discontinued",
+                            value:
+                                item.discontinuedAt
+                                    .map {
+                                        TestudoTime
+                                            .displayDateTime(
+                                                $0,
+                                                sourceTimeZoneID:
+                                                    item
+                                                        .discontinuedTimeZoneID
+                                            )
+                                    }
+                                ?? "Unknown"
+                        )
+
+                        ReadOnlyInspectorRow(
+                            label:
+                                "Reason",
+                            value:
+                                item.discontinuationReason?
+                                    .displayName
+                                ?? "Unknown"
+                        )
+
+                        if
+                            let note =
+                                item.discontinuationNote,
+                            !note.isEmpty
+                        {
+                            ReadOnlyInspectorRow(
+                                label:
+                                    "Outcome",
+                                value:
+                                    note
+                            )
+                        }
+                    }
 
                     ReadOnlyInspectorRow(
                         label:
@@ -2219,9 +2376,6 @@ struct WorkItemDetailView: View {
             status:
                 item.status
                 ?? .todo,
-            allowsClosed:
-                item.parentWorkItemID
-                    == nil,
             onSave: {
                 selectedStatus in
 
@@ -3501,6 +3655,9 @@ struct WorkItemDetailView: View {
             case .completed:
                 return "checkmark.circle"
 
+            case .discontinued:
+                return "xmark.circle"
+
             case .closed:
                 return "archivebox"
 
@@ -4451,6 +4608,24 @@ struct WorkItemDetailView: View {
                 }
 
                 if
+                    let discontinued =
+                        item.discontinuedAt
+                {
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Discontinued",
+                        value:
+                            TestudoTime
+                                .displayDateTime(
+                                    discontinued,
+                                    sourceTimeZoneID:
+                                        item
+                                            .discontinuedTimeZoneID
+                                )
+                    )
+                }
+
+                if
                     item.kind
                         == .activity,
                     let logged =
@@ -4669,6 +4844,11 @@ struct WorkItemDetailView: View {
                         == TaskStatus
                             .completed
                             .rawValue
+                    ||
+                    event.newValue
+                        == TaskStatus
+                            .discontinued
+                            .rawValue
                 )
             {
                 continue
@@ -4761,6 +4941,45 @@ struct WorkItemDetailView: View {
                             "checkmark.circle",
                         timeZoneID:
                             work.completedTimeZoneID
+                    )
+                )
+            }
+
+            let hasDiscontinuedEvent =
+                storedEvents.contains {
+                    $0.workItemID
+                        == work.id
+                    &&
+                    $0.kind
+                        == .discontinued
+                }
+
+            if
+                !hasDiscontinuedEvent,
+                let discontinuedAt =
+                    work.discontinuedAt
+            {
+                entries.append(
+                    TaskLogEntry(
+                        id:
+                            "legacy-discontinued-\(work.id.uuidString)",
+                        timestamp:
+                            discontinuedAt,
+                        text:
+                            "\(logTitle(work)) discontinued"
+                            + (
+                                work.discontinuationReason
+                                    .map {
+                                        " — \($0.displayName)"
+                                    }
+                                ?? ""
+                            ),
+                        detail:
+                            work.discontinuationNote,
+                        icon:
+                            "xmark.circle",
+                        timeZoneID:
+                            work.discontinuedTimeZoneID
                     )
                 )
             }
@@ -4880,6 +5099,21 @@ struct WorkItemDetailView: View {
                 event.text
                 ?? "\(title) completed"
 
+        case .discontinued:
+            return
+                event.text
+                ?? "\(title) discontinued"
+
+        case .closed:
+            return
+                event.text
+                ?? "\(title) closed and moved to Archive"
+
+        case .reopened:
+            return
+                event.text
+                ?? "\(title) reopened from Archive"
+
         case .activityLogged:
             return
                 event.text
@@ -4905,6 +5139,12 @@ struct WorkItemDetailView: View {
     private func historyDetail(
         _ event: HistoryEvent
     ) -> String? {
+        if
+            event.kind == .discontinued
+        {
+            return event.newValue
+        }
+
         if
             event.kind == .scheduled,
             let newValue =
@@ -4947,6 +5187,15 @@ struct WorkItemDetailView: View {
 
         case .completed:
             return "checkmark.circle"
+
+        case .discontinued:
+            return "xmark.circle"
+
+        case .closed:
+            return "archivebox"
+
+        case .reopened:
+            return "arrow.uturn.backward.circle"
 
         case .activityLogged:
             return "clock.arrow.circlepath"
@@ -5535,6 +5784,9 @@ struct WorkItemDetailView: View {
             switch item.status {
             case .completed:
                 return "checkmark.circle"
+
+            case .discontinued:
+                return "xmark.circle"
 
             case .closed:
                 return "archivebox"
@@ -6979,6 +7231,7 @@ struct WorkDetailRouterView: View {
              .todo,
              .inProgress,
              .completed,
+             .archive,
              .timeline:
             return true
 

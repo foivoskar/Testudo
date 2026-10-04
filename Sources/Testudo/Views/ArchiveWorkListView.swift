@@ -414,9 +414,12 @@ struct ArchiveWorkListView:
         if
             item.kind == .task,
             item.parentWorkItemID == nil,
-            item.status == .closed
+            item.closedAt != nil
         {
-            return "Closed"
+            return
+                item.status?
+                    .displayName
+                ?? "Task"
         }
 
         switch item.kind {
@@ -444,6 +447,9 @@ struct ArchiveWorkListView:
             case .completed:
                 return "checkmark.circle"
 
+            case .discontinued:
+                return "xmark.circle"
+
             case .inProgress:
                 return "clock"
 
@@ -466,10 +472,17 @@ struct ArchiveWorkListView:
     ) -> String? {
         if
             item.kind == .task,
-            item.status == .closed
+            let closedAt =
+                item.closedAt
         {
             return
-                "Archived \(item.updatedAt.formatted(date: .abbreviated, time: .shortened))"
+                "Closed "
+                + TestudoTime
+                    .displayDateTime(
+                        closedAt,
+                        sourceTimeZoneID:
+                            item.closedTimeZoneID
+                    )
         }
 
         if

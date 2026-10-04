@@ -154,6 +154,23 @@ struct WorkEntryEditorView:
         TestudoTime
             .deviceTimeZoneID
 
+    @State
+    private var discontinuedAt =
+        Date()
+
+    @State
+    private var discontinuedTimeZoneID =
+        TestudoTime
+            .deviceTimeZoneID
+
+    @State
+    private var discontinuationReason:
+        TaskDiscontinuationReason?
+
+    @State
+    private var discontinuationNote =
+        ""
+
 
     // --------------------------------------------------------
     // Note
@@ -949,14 +966,6 @@ struct WorkEntryEditorView:
                             ForEach(
                                 TaskStatus
                                     .allCases
-                                    .filter {
-                                        candidate in
-
-                                        candidate
-                                            != .closed
-                                        || parentWorkItemID
-                                            == nil
-                                    }
                             ) {
                                 candidate in
 
@@ -974,6 +983,83 @@ struct WorkEntryEditorView:
                             maxWidth:
                                 240
                         )
+                    }
+
+                    if status == .discontinued {
+                        VStack(
+                            alignment:
+                                .leading,
+                            spacing:
+                                12
+                        ) {
+                            LabeledContent(
+                                "Reason"
+                            ) {
+                                Picker(
+                                    "",
+                                    selection:
+                                        $discontinuationReason
+                                ) {
+                                    Text(
+                                        "Choose…"
+                                    )
+                                    .tag(
+                                        Optional<
+                                            TaskDiscontinuationReason
+                                        >
+                                        .none
+                                    )
+
+                                    ForEach(
+                                        TaskDiscontinuationReason
+                                            .allCases
+                                    ) {
+                                        reason in
+
+                                        Text(
+                                            reason
+                                                .displayName
+                                        )
+                                        .tag(
+                                            Optional(
+                                                reason
+                                            )
+                                        )
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(
+                                    maxWidth:
+                                        260
+                                )
+                            }
+
+                            TimeZoneAwareDateEditor(
+                                label:
+                                    "Discontinued",
+                                date:
+                                    $discontinuedAt,
+                                timeZoneID:
+                                    $discontinuedTimeZoneID
+                            )
+
+                            LabeledContent(
+                                "Outcome / note"
+                            ) {
+                                TextField(
+                                    "Optional explanation",
+                                    text:
+                                        $discontinuationNote
+                                )
+                                .textFieldStyle(
+                                    .roundedBorder
+                                )
+                                .frame(
+                                    maxWidth:
+                                        420
+                                )
+                            }
+                        }
                     }
 
                     Toggle(
@@ -1435,6 +1521,26 @@ struct WorkEntryEditorView:
                 ?? TestudoTime
                     .deviceTimeZoneID
 
+            discontinuedAt =
+                item.discontinuedAt
+                ?? Date()
+
+            discontinuedTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .discontinuedTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
+            discontinuationReason =
+                item.discontinuationReason
+
+            discontinuationNote =
+                item.discontinuationNote
+                ?? ""
+
             hasReminder =
                 item.reminderAt
                 != nil
@@ -1788,6 +1894,39 @@ struct WorkEntryEditorView:
         }
 
         if
+            kind == .task,
+            status == .discontinued,
+            let discontinuationReason
+        {
+            if
+                let discontinuedError =
+                    store
+                        .updateTaskDiscontinuationDetails(
+                            workItemID:
+                                newID,
+                            discontinuedAt:
+                                discontinuedAt,
+                            discontinuedTimeZoneID:
+                                discontinuedTimeZoneID,
+                            reason:
+                                discontinuationReason,
+                            note:
+                                discontinuationNote,
+                            recordAudit:
+                                false
+                        )
+            {
+                failNewItem(
+                    newID,
+                    error:
+                        discontinuedError
+                )
+
+                return
+            }
+        }
+
+        if
             let relationshipError =
                 addNewRelationships(
                     to:
@@ -1972,6 +2111,34 @@ struct WorkEntryEditorView:
 
                     return
                 }
+            }
+        }
+
+        if
+            kind == .task,
+            status == .discontinued,
+            let discontinuationReason
+        {
+            if
+                let discontinuedError =
+                    store
+                        .updateTaskDiscontinuationDetails(
+                            workItemID:
+                                item.id,
+                            discontinuedAt:
+                                discontinuedAt,
+                            discontinuedTimeZoneID:
+                                discontinuedTimeZoneID,
+                            reason:
+                                discontinuationReason,
+                            note:
+                                discontinuationNote
+                        )
+            {
+                errorMessage =
+                    discontinuedError
+
+                return
             }
         }
 
@@ -2211,6 +2378,32 @@ struct WorkEntryEditorView:
         {
             return
                 "Started date cannot be in the future."
+        }
+
+        if
+            kind == .task,
+            status == .discontinued
+        {
+            guard
+                discontinuationReason
+                    != nil
+            else {
+                return
+                    "Choose a reason for discontinuing this Task."
+            }
+
+            if discontinuedAt > Date() {
+                return
+                    "Discontinued date cannot be in the future."
+            }
+
+            if
+                hasStarted,
+                discontinuedAt < startedAt
+            {
+                return
+                    "Discontinued date cannot be earlier than Started."
+            }
         }
 
         var relationshipKeys =

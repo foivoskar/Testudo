@@ -7,9 +7,6 @@ struct TaskStatusSelectorRow:
     let status:
         TaskStatus
 
-    let allowsClosed:
-        Bool
-
     let onSave:
         (TaskStatus) -> String?
 
@@ -20,14 +17,12 @@ struct TaskStatusSelectorRow:
                 "Status",
             selectedTitles:
                 [
-                    status.displayName
+                    normalizedStatus.displayName
                 ],
             selectorTitle:
                 "Task Status",
             selectorMessage:
-                allowsClosed
-                ? "Choose the current state of this Task. Closed archives the complete top-level Task tree."
-                : "Choose the current state of this Sub-task.",
+                "Choose the current workflow state of this Task.",
             nodes:
                 statusNodes,
             initialSelection:
@@ -35,7 +30,7 @@ struct TaskStatusSelectorRow:
                     [
                         selectionID(
                             for:
-                                status
+                                normalizedStatus
                         )
                     ]
                 ),
@@ -67,14 +62,19 @@ struct TaskStatusSelectorRow:
     }
 
 
+    private var normalizedStatus:
+        TaskStatus
+    {
+        status == .closed
+        ? .completed
+        : status
+    }
+
+
     private var availableStatuses:
         [TaskStatus]
     {
         TaskStatus.allCases
-            .filter {
-                $0 != .closed
-                || allowsClosed
-            }
     }
 
 
@@ -107,7 +107,6 @@ struct TaskStatusSelectorRow:
                 systemImageColor:
                     value
                         .testudoStatusIconColor,
-
                 depth:
                     0,
                 searchText:
@@ -127,7 +126,8 @@ struct TaskStatusSelectorRow:
 
 
     private func selectionID(
-        for status: TaskStatus
+        for status:
+            TaskStatus
     ) -> UUID {
         switch status {
         case .todo:
@@ -142,23 +142,25 @@ struct TaskStatusSelectorRow:
                     "10000000-0000-0000-0000-000000000002"
             )!
 
-        case .completed:
+        case .completed,
+             .closed:
             return UUID(
                 uuidString:
                     "10000000-0000-0000-0000-000000000003"
             )!
 
-        case .closed:
+        case .discontinued:
             return UUID(
                 uuidString:
-                    "10000000-0000-0000-0000-000000000004"
+                    "10000000-0000-0000-0000-000000000005"
             )!
         }
     }
 
 
     private func status(
-        for id: UUID
+        for id:
+            UUID
     ) -> TaskStatus? {
         availableStatuses.first {
             selectionID(
@@ -171,7 +173,8 @@ struct TaskStatusSelectorRow:
 
 
     private func statusIcon(
-        _ status: TaskStatus
+        _ status:
+            TaskStatus
     ) -> String {
         switch status {
         case .todo:
@@ -180,17 +183,19 @@ struct TaskStatusSelectorRow:
         case .inProgress:
             return "clock"
 
-        case .completed:
+        case .completed,
+             .closed:
             return "checkmark.circle"
 
-        case .closed:
-            return "archivebox"
+        case .discontinued:
+            return "xmark.circle"
         }
     }
 
 
     private func statusDescription(
-        _ status: TaskStatus
+        _ status:
+            TaskStatus
     ) -> String {
         switch status {
         case .todo:
@@ -201,13 +206,14 @@ struct TaskStatusSelectorRow:
             return
                 "Work currently being carried out."
 
-        case .completed:
+        case .completed,
+             .closed:
             return
-                "Finished work that remains active."
+                "Work that was completed successfully."
 
-        case .closed:
+        case .discontinued:
             return
-                "Archive this top-level Task and its complete subtree."
+                "Work that ended without successful completion."
         }
     }
 }

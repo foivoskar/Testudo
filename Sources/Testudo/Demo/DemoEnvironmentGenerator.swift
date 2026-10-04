@@ -3004,7 +3004,7 @@ enum DemoEnvironmentGenerator
                     secondaryTheme: "rse",
                     title: "Submit cross-facility research software proposal",
                     summary: "Coordinate a multi-institution proposal for sustainable scientific software infrastructure.",
-                    status: .closed,
+                    status: .completed,
                     created: -22,
                     deadline: -5,
                     assignedPerson: "sarah",
@@ -3149,6 +3149,11 @@ enum DemoEnvironmentGenerator
                         ?? -1
                     )
 
+            case .discontinued:
+                preconditionFailure(
+                    "DemoProjectSeed with Discontinued status requires explicit discontinuation metadata."
+                )
+
             case .todo:
                 started =
                     nil
@@ -3194,6 +3199,52 @@ enum DemoEnvironmentGenerator
 
             projects[seed.key] =
                 root
+
+            // Demonstrate archive lifecycle independently from
+            // the Task's workflow status.
+            if
+                seed.key == "proposal",
+                let rootIndex =
+                    data.workItems
+                        .firstIndex(
+                            where: {
+                                $0.id
+                                    == root
+                            }
+                        )
+            {
+                let closedAt =
+                    clock.date(
+                        -4,
+                        hour:
+                            16
+                    )
+
+                data.workItems[rootIndex]
+                    .closedAt =
+                    closedAt
+
+                data.workItems[rootIndex]
+                    .closedTimeZoneID =
+                    timeZoneID
+
+                data.workItems[rootIndex]
+                    .updatedAt =
+                    closedAt
+
+                addHistory(
+                    workItemID:
+                        root,
+                    kind:
+                        .closed,
+                    timestamp:
+                        closedAt,
+                    actorMembershipID:
+                        administratorMembership.id,
+                    text:
+                        "Task closed and moved to Archive."
+                )
+            }
 
 
             for
@@ -3277,6 +3328,11 @@ enum DemoEnvironmentGenerator
                         childCompleted =
                             nil
                     }
+
+                case .discontinued:
+                    preconditionFailure(
+                        "DemoProjectSeed with Discontinued status requires explicit discontinuation metadata."
+                    )
 
                 case .todo:
 
