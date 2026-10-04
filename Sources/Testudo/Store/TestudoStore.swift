@@ -10631,11 +10631,22 @@ extension TestudoStore {
                 == environmentID
 
 
-        // If an Environment is genuinely open, persist its current
-        // state before forgetting the local registration.
+        // ----------------------------------------------------
+        // Only Testudo-managed Demo packages are disposable.
         //
-        // This writes to the existing Environment package but does
-        // not move, rename or delete it.
+        // For every ordinary Work Environment this value is nil
+        // and the established registry-only behaviour remains
+        // unchanged.
+        // ----------------------------------------------------
+
+        let demoPackageURL =
+            managedDemoPackageURL(
+                for:
+                    environmentID
+            )
+
+
+        // Persist the active Environment before removal.
         if
             removingActiveEnvironment,
             environmentSessionIsOpen
@@ -10643,6 +10654,115 @@ extension TestudoStore {
             save()
         }
 
+
+        // ----------------------------------------------------
+        // Collect Demo-owned Keychain references before the
+        // package itself is deleted.
+        //
+        // This works even when the Demo being removed is not
+        // currently the active in-memory Environment.
+        // ----------------------------------------------------
+
+        var demoICalSecretAccounts:
+            Set<String> =
+            []
+
+
+        if
+            let demoPackageURL
+        {
+            let demoDataURL =
+                demoPackageURL
+                    .appendingPathComponent(
+                        "EnvironmentData.json"
+                    )
+
+
+            if
+                let rawData =
+                    try?
+                        Data(
+                            contentsOf:
+                                demoDataURL
+                        ),
+                let demoData =
+                    Self.decode(
+                        rawData
+                    )
+            {
+                for calendar in
+                    demoData.calendars
+                {
+                    guard
+                        calendar.sourceKind
+                            == .iCalSubscription,
+                        let account =
+                            calendar
+                                .secretURLKeychainAccount
+                    else {
+                        continue
+                    }
+
+
+                    demoICalSecretAccounts
+                        .insert(
+                            account
+                        )
+                }
+            }
+
+
+            // ------------------------------------------------
+            // Delete first.
+            //
+            // If deletion fails we leave the Environment
+            // registered instead of creating an inaccessible
+            // orphan package with no registry entry.
+            // ------------------------------------------------
+
+            do {
+
+                if
+                    FileManager
+                        .default
+                        .fileExists(
+                            atPath:
+                                demoPackageURL.path
+                        )
+                {
+                    try FileManager
+                        .default
+                        .removeItem(
+                            at:
+                                demoPackageURL
+                        )
+                }
+
+            } catch {
+
+                return
+                    "The Demo Environment could not be deleted: \(error.localizedDescription)"
+            }
+
+
+            for account in
+                demoICalSecretAccounts
+            {
+                CalendarSecretStore
+                    .delete(
+                        account:
+                            account
+                    )
+            }
+
+
+            removeManagedDemoDirectoryIfEmpty()
+        }
+
+
+        // ----------------------------------------------------
+        // Remove this installation's Environment registration.
+        // ----------------------------------------------------
 
         applicationData
             .workEnvironments
@@ -10669,10 +10789,28 @@ extension TestudoStore {
             environmentSessionIsOpen =
                 false
 
+
             // Do not retain Environment-owned data as the active
-            // in-memory model after the local registration is gone.
+            // in-memory model after its registration is gone.
             data =
                 TestudoData()
+
+
+            // A normal Environment package remains on disk, so
+            // retaining the old transient URL is harmless.
+            //
+            // A managed Demo package has just been deleted, so
+            // reset the pointer away from the deleted package.
+
+            if demoPackageURL != nil {
+
+                fileURL =
+                    applicationFileURL
+                        .deletingLastPathComponent()
+                        .appendingPathComponent(
+                            "TestudoData.json"
+                        )
+            }
         }
 
 
@@ -10681,6 +10819,7 @@ extension TestudoStore {
 
         return nil
     }
+
 }
 
 
@@ -12991,6 +13130,196 @@ extension TestudoStore {
                 isDirectory:
                     true
             )
+    }
+
+
+    // --------------------------------------------------------
+    // Managed Demo identification
+    //
+    // A Work Environment is disposable Demo data only when:
+    //
+    // • it is a .testudoenv package registered by Testudo,
+    // • it lives directly inside Testudo's private
+    //   "Demo Environments" Application Support directory,
+    // • it contains a valid DemoEnvironment.json marker,
+    // • its EnvironmentManifest.json matches the registered
+    //   Environment ID.
+    //
+    // Name alone is never used to identify a Demo.
+    // --------------------------------------------------------
+
+    private func managedDemoPackageURL(
+        for environmentID:
+            UUID
+    ) -> URL? {
+
+        guard
+            let environment =
+                applicationData
+                    .workEnvironments
+                    .first(
+                        where: {
+                            $0.id
+                                == environmentID
+                        }
+                    ),
+            environment
+                .storage?
+                .kind
+                == .testudoPackage,
+            let packageURL =
+                resolvedStorageURL(
+                    for:
+                        environment
+                )
+        else {
+            return nil
+        }
+
+
+        let normalizedPackage =
+            packageURL
+                .standardizedFileURL
+
+        let normalizedRoot =
+            managedDemoEnvironmentDirectory
+                .standardizedFileURL
+
+
+        guard
+            normalizedPackage
+                .deletingLastPathComponent()
+                == normalizedRoot,
+            normalizedPackage
+                .pathExtension
+                .caseInsensitiveCompare(
+                    TestudoEnvironmentPackage
+                        .filenameExtension
+                )
+                == .orderedSame
+        else {
+            return nil
+        }
+
+
+        let markerURL =
+            normalizedPackage
+                .appendingPathComponent(
+                    "DemoEnvironment.json"
+                )
+
+        let manifestURL =
+            normalizedPackage
+                .appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+
+        guard
+            let markerData =
+                try?
+                    Data(
+                        contentsOf:
+                            markerURL
+                    ),
+            let manifestData =
+                try?
+                    Data(
+                        contentsOf:
+                            manifestURL
+                    )
+        else {
+            return nil
+        }
+
+
+        let decoder =
+            JSONDecoder()
+
+        decoder.dateDecodingStrategy =
+            .iso8601
+
+
+        guard
+            (
+                try?
+                    decoder.decode(
+                        DemoEnvironmentMarker.self,
+                        from:
+                            markerData
+                    )
+            )
+            != nil,
+            let manifest =
+                try?
+                    decoder.decode(
+                        EnvironmentManifest.self,
+                        from:
+                            manifestData
+                    ),
+            manifest.environmentID
+                == environmentID
+        else {
+            return nil
+        }
+
+
+        return
+            normalizedPackage
+    }
+
+
+    func isManagedDemoEnvironment(
+        id environmentID:
+            UUID
+    ) -> Bool {
+
+        managedDemoPackageURL(
+            for:
+                environmentID
+        )
+        != nil
+    }
+
+
+    private func removeManagedDemoDirectoryIfEmpty() {
+
+        let fileManager =
+            FileManager.default
+
+        let directory =
+            managedDemoEnvironmentDirectory
+
+
+        guard
+            fileManager
+                .fileExists(
+                    atPath:
+                        directory.path
+                ),
+            let contents =
+                try?
+                    fileManager
+                        .contentsOfDirectory(
+                            at:
+                                directory,
+                            includingPropertiesForKeys:
+                                nil,
+                            options:
+                                []
+                        ),
+            contents.isEmpty
+        else {
+            return
+        }
+
+
+        try?
+            fileManager
+                .removeItem(
+                    at:
+                        directory
+                )
     }
 
 

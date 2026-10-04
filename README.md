@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.1.7 · build 8 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.1.8 · build 9 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,51 +38,60 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.1.7
-Build 8
+Testudo 0.1.8
+Build 9
 ```
 
-### What changed in 0.1.7
+### What changed in 0.1.8
 
-Testudo 0.1.7 introduces a clearer Task lifecycle.
+Testudo 0.1.8 improves application identity, external calendars, managed Demo environments and application information.
 
-A Task now has one of four workflow statuses:
+#### Complete My Profile and `.testudouser`
 
-- **To Do**
-- **In Progress**
-- **Completed**
-- **Discontinued**
+**My Profile** now exposes the complete application-level Testudo user profile, including identity, professional contact details, workplace information, research identifiers, online profiles, preferences, notes, tags and avatar.
 
-`Discontinued` represents work that reached a terminal outcome without successful completion.
+The complete profile is preserved when exporting and importing a `.testudouser` file.
 
-A Discontinued Task records:
+When the active Work Environment membership is linked to a Person, Testudo can perform an explicit one-time **Environment Profile → My Profile** copy. The user chooses which populated fields to import.
 
-- a discontinuation date and time;
-- a required reason;
-- an optional outcome or explanatory note.
+Application and Environment profiles remain independent. This is an explicit copy operation, not live synchronization.
 
-Available reasons are:
+#### Managed Demo Environment removal
 
-- Failed
-- Superseded
-- No longer needed
-- Not feasible
-- Other
+Removing an ordinary registered Work Environment continues to forget only its local registration and does not delete its `.testudoenv` package.
 
-`Closed` is no longer a workflow status.
+The Testudo-managed Demo Environment is disposable. Choosing **Remove Environment** for that managed Demo now permanently deletes the Demo package and its associated Demo iCal credentials.
 
-Instead, closing is a separate archival action available for **top-level Tasks** that are already either Completed or Discontinued.
+Environment sign-out and environment switching remain non-destructive.
 
-Closing a Task:
+#### Recurring external calendar events
 
-- keeps its actual workflow status;
-- records a separate Closed lifecycle event;
-- moves the complete Task tree into Archive;
-- preserves its history and descendants.
+iCal subscriptions now expand recurring calendar series into concrete Calendar Events instead of storing only the original recurrence master.
 
-A Closed Task can later be **Reopened** without losing its Completed or Discontinued outcome.
+The recurrence importer supports common RFC 5545 recurrence components, including:
 
-Existing Environment data from Testudo 0.1.6 and earlier remains persistence-compatible. Legacy Tasks stored with the old `Closed` status are migrated into the separate archive lifecycle when the Environment is decoded.
+- daily, weekly, monthly and yearly recurrence;
+- `INTERVAL`, `COUNT` and `UNTIL`;
+- `BYDAY`, `BYMONTHDAY`, `BYMONTH` and `BYSETPOS`;
+- `WKST`;
+- `RDATE` and `EXDATE`;
+- explicit `RECURRENCE-ID` exceptions.
+
+Generated occurrences receive stable external identities so subsequent synchronizations can update them correctly.
+
+Calendar synchronization failures are also surfaced to the user rather than failing silently.
+
+#### About Testudo
+
+**About Testudo** now uses a dedicated native window showing:
+
+- the Testudo application icon;
+- dynamic Version and Build information;
+- a concise description of Testudo;
+- creator and copyright information;
+- links to the GitHub repository and MIT License.
+
+The complete About content is visible directly without a scrollable text block.
 
 ---
 
@@ -162,7 +171,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.1.7-macOS-arm64.dmg
+dist/Testudo-0.1.8-macOS-arm64.dmg
 ```
 
 ### Updating

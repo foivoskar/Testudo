@@ -45,7 +45,7 @@ struct WorkEnvironmentSettingsManagementView:
 
 
             Text(
-                "Removing an Environment here only forgets it on this Mac. Its .testudoenv package and all of its data remain untouched and can be opened again later."
+                "Removing a normal Work Environment here only forgets it on this Mac; its .testudoenv package remains untouched. Testudo-managed Demo Environments are disposable and are permanently deleted when removed."
             )
             .font(
                 .callout
@@ -123,28 +123,43 @@ struct WorkEnvironmentSettingsManagementView:
         ) {
             environment in
 
-            Alert(
-                title:
-                    Text(
-                        "Remove Work Environment?"
-                    ),
-                message:
-                    Text(
-                        "“\(environment.name)” will be removed only from this installation of Testudo. Its .testudoenv package and all Environment data will remain untouched at its current storage location."
-                    ),
-                primaryButton:
-                    .destructive(
+            let isManagedDemo =
+                store
+                    .isManagedDemoEnvironment(
+                        id:
+                            environment.id
+                    )
+
+
+            return
+                Alert(
+                    title:
                         Text(
-                            "Remove from Testudo"
-                        )
-                    ) {
-                        remove(
-                            environment
-                        )
-                    },
-                secondaryButton:
-                    .cancel()
-            )
+                            isManagedDemo
+                            ? "Delete Demo Environment?"
+                            : "Remove Work Environment?"
+                        ),
+                    message:
+                        Text(
+                            isManagedDemo
+                            ? "“\(environment.name)” is a disposable Testudo Demo Environment. Its local .testudoenv package and Demo data will be permanently deleted from this Mac."
+                            : "“\(environment.name)” will be removed only from this installation of Testudo. Its .testudoenv package and all Environment data will remain untouched at its current storage location."
+                        ),
+                    primaryButton:
+                        .destructive(
+                            Text(
+                                isManagedDemo
+                                ? "Delete Demo"
+                                : "Remove from Testudo"
+                            )
+                        ) {
+                            remove(
+                                environment
+                            )
+                        },
+                    secondaryButton:
+                        .cancel()
+                )
         }
     }
 

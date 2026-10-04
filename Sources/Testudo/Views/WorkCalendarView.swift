@@ -138,6 +138,36 @@ struct WorkCalendarView: View {
                     store
                 )
         }
+        .alert(
+            "Calendar Sync Failed",
+            isPresented:
+                Binding(
+                    get: {
+                        iCalSyncError
+                            != nil
+                    },
+                    set: {
+                        presented in
+
+                        if !presented {
+                            iCalSyncError =
+                                nil
+                        }
+                    }
+                )
+        ) {
+            Button(
+                "OK"
+            ) {
+                iCalSyncError =
+                    nil
+            }
+        } message: {
+            Text(
+                iCalSyncError
+                ?? "The external calendar could not be synchronized."
+            )
+        }
     }
 
     private var calendarHeader:

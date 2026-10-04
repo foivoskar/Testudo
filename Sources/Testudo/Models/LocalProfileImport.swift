@@ -2,14 +2,15 @@ import Foundation
 
 
 // ============================================================
-// MARK: - Local Profile → Environment Person import
+// MARK: - Application Profile ↔ Environment Person copy
 //
-// Import is deliberately COPY-ONLY.
+// Profile transfer is deliberately EXPLICIT and COPY-ONLY.
 //
 // LocalUserProfile remains application-local.
 // PersonProfile remains Environment-local.
 //
-// There is no live synchronization between the two.
+// Values may be copied in either direction at the user's request,
+// but there is no live synchronization between the two.
 // ============================================================
 
 enum LocalProfileImportSection:
@@ -373,5 +374,286 @@ enum LocalProfileImportField:
                 .whitespacesAndNewlines
         )
         .isEmpty
+    }
+}
+
+
+// ============================================================
+// MARK: - Environment Person → Local Application Profile
+//
+// These overloads use the exact same field vocabulary as the
+// existing Local Profile → Environment Person import.
+//
+// Copying remains explicit and one-time.
+// ============================================================
+
+extension LocalProfileImportField {
+
+    func displayValue(
+        from profile:
+            PersonProfile
+    ) -> String {
+
+        switch self {
+
+        case .avatar:
+            return
+                profile.avatarData == nil
+                ? ""
+                : "Profile photo"
+
+        case .firstName:
+            return profile.firstName
+
+        case .middleName:
+            return profile.middleName
+
+        case .lastName:
+            return profile.lastName
+
+        case .preferredName:
+            return profile.preferredName
+
+        case .academicTitle:
+            return profile.academicTitle ?? ""
+
+        case .jobTitle:
+            return profile.jobTitle
+
+        case .professionalEmail:
+            return profile.professionalEmail
+
+        case .secondaryProfessionalEmail:
+            return profile.secondaryProfessionalEmail
+
+        case .professionalPhone:
+            return profile.professionalPhone
+
+        case .secondaryPhone:
+            return profile.secondaryPhone ?? ""
+
+        case .office:
+            return profile.office
+
+        case .employeeID:
+            return profile.employeeID
+
+        case .assistantContact:
+            return profile.assistantContact ?? ""
+
+        case .website:
+            return profile.website
+
+        case .orcid:
+            return profile.orcid
+
+        case .linkedIn:
+            return profile.linkedIn
+
+        case .github:
+            return profile.github
+
+        case .researcherID:
+            return profile.researcherID ?? ""
+
+        case .scopusAuthorID:
+            return profile.scopusAuthorID ?? ""
+
+        case .googleScholarURL:
+            return profile.googleScholarURL ?? ""
+
+        case .professionalAddress:
+            return profile.professionalAddress ?? ""
+
+        case .city:
+            return profile.city ?? ""
+
+        case .postalCode:
+            return profile.postalCode ?? ""
+
+        case .country:
+            return profile.country ?? ""
+
+        case .professionalFields:
+            return profile.professionalFields
+
+        case .responsibilities:
+            return profile.responsibilities
+
+        case .preferredLanguage:
+            return profile.preferredLanguage ?? ""
+
+        case .timeZone:
+            return profile.timeZone ?? ""
+
+        case .tags:
+            return profile.tags ?? ""
+
+        case .notes:
+            return profile.notes
+        }
+    }
+
+
+    func hasValue(
+        in profile:
+            PersonProfile
+    ) -> Bool {
+
+        if
+            self == .avatar
+        {
+            return
+                profile.avatarData
+                    != nil
+        }
+
+
+        return
+            !displayValue(
+                from:
+                    profile
+            )
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .isEmpty
+    }
+
+
+    func copyValue(
+        from source:
+            PersonProfile,
+        to target:
+            inout LocalUserProfile
+    ) {
+
+        switch self {
+
+        case .avatar:
+            target.avatarData =
+                source.avatarData
+
+        case .firstName:
+            target.firstName =
+                source.firstName
+
+        case .middleName:
+            target.middleName =
+                source.middleName
+
+        case .lastName:
+            target.lastName =
+                source.lastName
+
+        case .preferredName:
+            target.preferredName =
+                source.preferredName
+
+        case .academicTitle:
+            target.academicTitle =
+                source.academicTitle
+
+        case .jobTitle:
+            target.jobTitle =
+                source.jobTitle
+
+        case .professionalEmail:
+            target.professionalEmail =
+                source.professionalEmail
+
+        case .secondaryProfessionalEmail:
+            target.secondaryProfessionalEmail =
+                source.secondaryProfessionalEmail
+
+        case .professionalPhone:
+            target.professionalPhone =
+                source.professionalPhone
+
+        case .secondaryPhone:
+            target.secondaryPhone =
+                source.secondaryPhone
+
+        case .office:
+            target.office =
+                source.office
+
+        case .employeeID:
+            target.employeeID =
+                source.employeeID
+
+        case .assistantContact:
+            target.assistantContact =
+                source.assistantContact
+
+        case .website:
+            target.website =
+                source.website
+
+        case .orcid:
+            target.orcid =
+                source.orcid
+
+        case .linkedIn:
+            target.linkedIn =
+                source.linkedIn
+
+        case .github:
+            target.github =
+                source.github
+
+        case .researcherID:
+            target.researcherID =
+                source.researcherID
+
+        case .scopusAuthorID:
+            target.scopusAuthorID =
+                source.scopusAuthorID
+
+        case .googleScholarURL:
+            target.googleScholarURL =
+                source.googleScholarURL
+
+        case .professionalAddress:
+            target.professionalAddress =
+                source.professionalAddress
+
+        case .city:
+            target.city =
+                source.city
+
+        case .postalCode:
+            target.postalCode =
+                source.postalCode
+
+        case .country:
+            target.country =
+                source.country
+
+        case .professionalFields:
+            target.professionalFields =
+                source.professionalFields
+
+        case .responsibilities:
+            target.responsibilities =
+                source.responsibilities
+
+        case .preferredLanguage:
+            target.preferredLanguage =
+                source.preferredLanguage
+
+        case .timeZone:
+            target.timeZone =
+                source.timeZone
+
+        case .tags:
+            target.tags =
+                source.tags
+
+        case .notes:
+            target.notes =
+                source.notes
+        }
     }
 }
