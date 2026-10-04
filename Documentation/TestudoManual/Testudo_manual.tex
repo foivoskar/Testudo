@@ -1,13 +1,18 @@
 \documentclass{testudomanual}
 
-\newcommand{\ManualVersion}{1.2}
-\newcommand{\DocumentedTestudoVersion}{0.1.6}
-\newcommand{\DocumentedTestudoBuild}{7}
-\newcommand{\ManualDate}{October 2026}
-
-\newcommand{\TestudoIconPath}{
-    ../../Sources/Testudo/Resources/testudo_icon_blue.png
+% Compile-time fallback for non-macOS build environments only.
+% On macOS the class keeps using Avenir Next / Helvetica Neue / Menlo.
+\IfFontExistsTF{Helvetica Neue}{}{%
+    \setmainfont{DejaVu Sans}%
+    \setsansfont{DejaVu Sans}%
+    \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
+
+\newcommand{\ManualVersion}{1.3}
+\newcommand{\DocumentedTestudoVersion}{0.1.7}
+\newcommand{\DocumentedTestudoBuild}{8}
+\newcommand{\ManualDate}{October 2026}
+\newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
 \title{Testudo User Manual}
 \author{Foivos Karakostas}
@@ -18,345 +23,155 @@
 % ============================================================
 % TITLE PAGE
 % ============================================================
-
 \begin{titlepage}
+\centering
+\vspace*{16mm}
+\includegraphics[width=0.22\textwidth]{\TestudoIconPath}
+\vspace{13mm}
 
-    \centering
+{\Huge\bfseries\color{TestudoDarkBlue}Testudo\par}
+\vspace{4mm}
+{\LARGE User Manual\par}
+\vspace{7mm}
+{\large A native, local-first macOS environment for structured professional and research work\par}
 
-    \vspace*{18mm}
+\vfill
+\begin{tabular}{rl}
+Manual version: & \ManualVersion \\
+Application version: & \DocumentedTestudoVersion\ (build \DocumentedTestudoBuild) \\
+Platform: & macOS 26+, Apple Silicon \\
+Date: & \ManualDate
+\end{tabular}
 
-    \includegraphics[
-        width=0.24\textwidth
-    ]{\TestudoIconPath}
-
-    \vspace{16mm}
-
-    {\Huge\bfseries\color{TestudoDarkBlue}
-        Testudo
-        \par
-    }
-
-    \vspace{5mm}
-
-    {\LARGE
-        User Manual
-        \par
-    }
-
-    \vspace{8mm}
-
-    {\large
-        A native local-first macOS environment for
-        structured professional and research work
-        \par
-    }
-
-    \vfill
-
-    \begin{tabular}{rl}
-        Manual version: &
-        \ManualVersion
-        \\[3pt]
-
-        Application version documented: &
-        \DocumentedTestudoVersion\
-        (build \DocumentedTestudoBuild)
-        \\[3pt]
-
-        Platform: &
-        macOS, Apple Silicon
-        \\[3pt]
-
-        Date: &
-        \ManualDate
-    \end{tabular}
-
-    \vfill
-
-    {\small
-        Foivos Karakostas
-        \par
-    }
-
-    \vspace{8mm}
-
+\vfill
+{\small Foivos Karakostas\par}
+\vspace{8mm}
 \end{titlepage}
-
-
-% ============================================================
-% FRONT MATTER
-% ============================================================
 
 \pagenumbering{roman}
 
 \chapter*{About this manual}
+\addcontentsline{toc}{chapter}{About this manual}
 
-\addcontentsline{
-    toc
-}{
-    chapter
-}{
-    About this manual
+This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoVersion\ (build \DocumentedTestudoBuild). It is intentionally more than a feature list. It is written so that a new user can understand the data model, perform ordinary work, and actively verify that the application behaves as expected.
+
+Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
+
+\manualnote{Version covered}{
+This edition is aligned with Testudo 0.1.7. The most important change from 0.1.6 is the separation between Task workflow status and archival lifecycle: \term{Discontinued} is now a real Task status, while \term{Closed} is an archive action for terminal top-level Tasks rather than a workflow status.
 }
 
-This manual documents the current implemented form of \Testudo,
-a native macOS application for organising complex professional,
-technical, academic and research work.
-
-This edition documents Testudo
-\DocumentedTestudoVersion\
-(build \DocumentedTestudoBuild).
-
-Manual version 1.2 reflects the current macOS 26 application baseline,
-the modern SwiftUI interface, reliable global New Entry routing,
-native sidebar behaviour, Liquid Glass Back and Forward detail
-navigation, the unified structural detail inspectors, and the current
-warning-free SwiftPM build workflow.
-
-The manual focuses on the user-facing concepts and workflows of the
-application. It also explains the local-first storage model,
-authentication architecture, calendar integration, portability and
-installation process.
-
-\Testudo\ is under active development. Screens, labels and individual
-workflows may evolve between versions. Where the data model provides
-a stable conceptual distinction, this manual explains that distinction
-explicitly.
+\manualwarning{Early-release software}{
+Testudo is an early public release. Keep independent backups of important \fileext{.testudoenv} packages. When experimenting with unfamiliar operations, prefer the Demo Environment first.
+}
 
 \manualnote{Terminology}{
-In the current implementation, a chronological work-log entry inside
-the Work hierarchy is called an \term{Activity}. A scheduled
-\term{Calendar Event} is a separate object. The two concepts should
-not be confused.
-}
-
-\manualnote{Image used in this manual}{
-The visual mark used on the cover is
-\filepath{Sources/Testudo/Resources/testudo\_icon\_blue.png}.
-This is also the default visual used for newly created Work
-Environments.
+An \term{Activity} is a chronological Work item that records something that happened. A \term{Calendar Event} is a separate scheduled object. The two concepts are deliberately different even when they refer to the same real-world work.
 }
 
 \clearpage
-
 \tableofcontents
-
 \clearpage
-
 \pagenumbering{arabic}
-
 
 % ============================================================
 % CHAPTER 1
 % ============================================================
+\chapter{What Testudo Is}
 
-\chapter{Introduction}
+\section{Purpose}
 
-\section{What Testudo is}
+Testudo is a native macOS application for work that is difficult to represent with a flat task list. It combines actionable work, durable context, a chronological work log, professional entities, semantic classification, calendars, and local portable storage.
 
-\Testudo\ is a native macOS application designed to bring several
-normally separate aspects of professional work into one structured
-environment.
-
-Its core model combines:
-
+Typical use cases include:
 \begin{itemize}
-    \item hierarchical Tasks and sub-tasks;
-    \item Notes and chronological Activities;
-    \item scheduled Calendar Events;
-    \item People;
-    \item Groups;
-    \item Organizations;
-    \item thematic classification through Themes;
-    \item relationships between work and real-world entities;
-    \item chronological history and audit information;
-    \item portable, independent Work Environments.
-\end{itemize}
-
-The application is particularly suitable for situations in which work
-cannot be represented adequately by a flat task list.
-
-Examples include:
-
-\begin{itemize}
-    \item scientific research;
+    \item scientific research and laboratory work;
     \item research software engineering;
-    \item laboratory and technical operations;
-    \item academic collaborations;
-    \item multi-institution projects;
-    \item infrastructure administration;
-    \item project coordination;
-    \item seminar or working-group organisation;
-    \item long-running professional activities with extensive history.
+    \item technical and infrastructure operations;
+    \item academic collaborations and committees;
+    \item long-running projects with many sub-problems;
+    \item work involving multiple institutions, teams or people;
+    \item activity where preserving the history of decisions and outcomes is important.
 \end{itemize}
 
+The core design principle is that \term{structure} and \term{chronology} are both first-class. A Task can have children and Themes, but Testudo also preserves when the work started, completed, was discontinued, was closed, or was reopened.
 
-\section{Local-first design}
+\section{The main domains}
 
-\Testudo\ is designed as a local-first application.
+Testudo connects several domains that are often kept in separate applications:
 
-There is no mandatory Testudo cloud service. The primary data of a
-Work Environment is stored in a portable
-\fileext{.testudoenv} package chosen by the user.
-
-The package may be placed:
-
-\begin{itemize}
-    \item on local storage;
-    \item in iCloud Drive;
-    \item in Dropbox;
-    \item in OneDrive;
-    \item or in another filesystem location available to macOS.
-\end{itemize}
-
-\Testudo\ works with the selected package instead of importing its
-contents into a proprietary remote service.
-
-\manualwarning{Synchronised folders}{
-A cloud-synchronised filesystem can transport a Work Environment
-between computers, but it is still a filesystem synchronisation
-mechanism. Avoid simultaneous conflicting edits from multiple
-computers unless you are certain the synchronisation system has
-completed.
-}
-
-
-\section{The principal data domains}
-
-The application can be understood as several connected domains.
-
-\begin{longtable}{L{0.23\textwidth} L{0.69\textwidth}}
+\begin{longtable}{L{0.25\textwidth} L{0.65\textwidth}}
 \toprule
-\textbf{Domain} &
-\textbf{Purpose}
-\\
+\textbf{Domain} & \textbf{Purpose} \\
 \midrule
 \endhead
-
-Work &
-Tasks, sub-tasks, Notes and Activities.
-\\
-
-Calendar &
-Scheduled Calendar Events from Testudo or connected external
-calendars.
-\\
-
-Themes &
-Hierarchical semantic classification of work and entities.
-\\
-
-People &
-Individuals, profiles and professional affiliations.
-\\
-
-Groups &
-Teams, laboratories, committees and other group structures.
-\\
-
-Organizations &
-Institutions and organizational hierarchies.
-\\
-
-History &
-Chronological record of important work-related changes.
-\\
-
-Work Environments &
-Independent portable collections of data, membership and
-configuration.
-\\
-
+Work & Tasks, Notes and Activities, including unlimited Task nesting. \\
+Themes & Hierarchical semantic classification, independent from Task hierarchy. \\
+Entities & People, Groups and Organizations describing professional context. \\
+Relationships & Semantic links such as For, Requested by, With, Assigned to and Related to. \\
+Calendar & Testudo events plus read-only external calendar sources. \\
+History & Significant lifecycle and relationship events. \\
+Work Environments & Portable, independent \fileext{.testudoenv} packages. \\
+Identity & A local Testudo profile plus separate Environment memberships. \\
 \bottomrule
 \end{longtable}
 
+\section{Local-first architecture}
+
+Testudo does not require a Testudo cloud service. Work data lives in the selected \fileext{.testudoenv} package. The application also stores installation-level information such as the local user profile, registered Environment locations, filesystem bookmarks and remembered sign-ins.
+
+This separation matters:
+\begin{itemize}
+    \item copying a \fileext{.testudoenv} package copies the Work Environment;
+    \item signing out from the local Testudo installation does not delete the Environment package;
+    \item forgetting an Environment from one Mac does not delete its package;
+    \item a cloud-synchronised folder can transport the package, but Testudo is still operating on files rather than a central multi-user server.
+\end{itemize}
+
+\manualtip{Try it: identify the three layers}{
+After opening Testudo, identify: (1) your local Testudo user, (2) the active Work Environment, and (3) your Environment membership. These are related but separate identities.
+}
 
 % ============================================================
 % CHAPTER 2
 % ============================================================
+\chapter{Requirements, Installation and Updating}
 
-\chapter{Installation}
+\section{Supported baseline}
 
-\section{System requirements}
-
-The current public Testudo source targets the modern Apple development
-platform.
-
-It requires:
-
+The current source targets:
 \begin{itemize}
     \item macOS 26 or later;
-    \item an Apple Silicon Mac;
-    \item Xcode 27 or an equivalent Apple developer toolchain;
-    \item Apple Swift 6.4 or later;
-    \item Git for the normal source-based installation workflow.
+    \item Apple Silicon;
+    \item an Apple developer toolchain with Swift 6 or later;
+    \item Git.
 \end{itemize}
 
-Older macOS and Xcode releases are not maintained as compatibility
-targets for the current source tree.
+The repository uses a source-first installation model. The application is compiled on the Mac where it is used and is ad-hoc signed by the local build script.
 
-Testudo uses current native SwiftUI functionality, including the
-modern macOS Liquid Glass interface.
+\section{Quick installation}
 
-The current distribution model intentionally builds the application
-locally from source.
-
-A paid Apple Developer Program membership is not required for this
-local-build installation workflow.
-
-
-\section{Quick local installation}
-
-The simplest installation workflow is:
-
-\begin{lstlisting}
-curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh | bash
-\end{lstlisting}
-
-The installer:
-
-\begin{enumerate}
-    \item verifies that the computer is running macOS;
-    \item verifies that it is an Apple Silicon Mac;
-    \item checks the Apple developer tools;
-    \item checks the Swift version;
-    \item obtains the public Testudo source code;
-    \item builds the application locally;
-    \item ad-hoc signs the locally compiled application;
-    \item creates a local DMG installer;
-    \item verifies the DMG;
-    \item opens the finished installer.
-\end{enumerate}
-
-The Testudo executable itself is therefore compiled on the user's Mac
-rather than downloaded as a prebuilt application binary.
-
-Before installing the current source, update macOS and Xcode to the
-supported versions above. An older SDK or Swift toolchain is not a
-supported build environment.
-
-
-\section{Inspecting the installer first}
-
-Users who do not wish to pipe a remote script directly to a shell can
-download and inspect it first:
-
+Run:
 \begin{lstlisting}
 curl -fsSL \
   https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
-  -o testudo-install.sh
+  | bash
 \end{lstlisting}
 
-Inspect the file and then run:
+The installer checks the machine, clones or updates the repository, refuses to overwrite a checkout with local modifications, builds Testudo, creates a DMG, verifies it and opens the finished installer.
 
+When the DMG opens, drag \filepath{Testudo.app} into \filepath{/Applications}.
+
+\section{Compatibility check only}
+
+To test the toolchain without cloning or building:
 \begin{lstlisting}
-bash testudo-install.sh
+curl -fsSL \
+  https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
+  | bash -s -- --check
 \end{lstlisting}
 
-
-\section{Manual local build}
-
-The equivalent manual procedure is:
+\section{Manual source build}
 
 \begin{lstlisting}
 git clone https://github.com/foivoskar/Testudo.git
@@ -364,353 +179,214 @@ cd Testudo
 ./Scripts/build-local-dmg.sh
 \end{lstlisting}
 
-After a successful build, the installer is written to the
-\filepath{dist} directory.
-
-For example:
-
+The resulting DMG is written under \filepath{dist/}. For this release the expected name is normally:
 \begin{lstlisting}
-dist/Testudo-0.1.4-macOS-arm64.dmg
+dist/Testudo-0.1.7-macOS-arm64.dmg
 \end{lstlisting}
 
-Open the resulting DMG and drag \filepath{Testudo.app} into
-\filepath{Applications}.
+\section{Updating}
 
-
-\section{Installing Apple developer tools}
-
-If the Command Line Tools are missing, macOS can request their
-installation with:
-
-\begin{lstlisting}
-xcode-select --install
-\end{lstlisting}
-
-After the installation completes, repeat the Testudo installation
-command.
-
-
-\section{Updating Testudo}
-
-If the one-line installer was used, it can be run again.
-
-For a manual Git checkout:
-
+If the source checkout is clean:
 \begin{lstlisting}
 cd ~/Testudo
 git pull --ff-only
 ./Scripts/build-local-dmg.sh
 \end{lstlisting}
 
-A new locally built DMG is produced.
+Replace the previous copy in \filepath{/Applications} with the newly built application.
 
-Replace the older copy of \filepath{Testudo.app} in
-\filepath{/Applications} with the newly built application.
-
-
-\section{Why Testudo currently uses local compilation}
-
-Current Testudo distribution is source-first.
-
-The project does not depend on distribution of a prebuilt,
-Developer-ID-signed application. This allows users to obtain the
-public source and compile the executable directly on their own Mac.
-
-Git tags may be used to identify historical source versions without
-requiring downloadable application binaries.
-
+\manualtip{Try it: verify the installed version}{
+Build and install Testudo, then confirm that the application identifies itself as 0.1.7 build 8. If you maintain a development checkout, also inspect \filepath{Scripts/version.sh} and confirm that it contains the same version and build number.
+}
 
 % ============================================================
 % CHAPTER 3
 % ============================================================
+\chapter{First Launch and the Local Testudo Profile}
 
-\chapter{First Launch and the Local User}
+\section{Create or restore a profile}
 
-\section{The local Testudo profile}
+On first use, Testudo presents \menu{Create or Restore Your Profile}. The local profile belongs to this installation, not to a Work Environment.
 
-A Testudo installation has a local application user profile.
-
-The local profile describes the person using this installation and
-may include professional information such as:
-
+The setup interface can record professional information including:
 \begin{itemize}
-    \item first, middle and last name;
-    \item preferred name;
-    \item academic title;
-    \item job title;
-    \item professional e-mail addresses;
-    \item telephone numbers;
-    \item office;
-    \item employee identifier;
-    \item professional address;
-    \item website;
-    \item ORCID;
-    \item GitHub;
-    \item LinkedIn;
-    \item ResearcherID;
-    \item Scopus Author ID;
-    \item Google Scholar URL;
-    \item professional fields;
-    \item responsibilities;
-    \item preferred language;
-    \item preferred time zone;
-    \item tags and notes;
-    \item profile image.
+    \item first, middle, last and preferred name;
+    \item academic title and job title;
+    \item professional email, phone and office;
+    \item website, ORCID, LinkedIn and GitHub;
+    \item professional address, city, postal code and country;
+    \item professional fields, responsibilities and notes.
 \end{itemize}
 
-This profile belongs to the application installation.
+Only enter fields that are useful to you. The profile can later be edited from the application settings.
 
-It is conceptually separate from a Person object inside a particular
-Work Environment.
+\section{Importing a portable profile}
 
+If you previously exported a \fileext{.testudouser} file, you can import it instead of re-entering profile data.
 
-\section{Local user versus Environment member}
-
-This distinction is important.
-
-The local application user represents the person operating this
-installation of Testudo.
-
-An Environment membership represents an identity \emph{inside a
-specific Work Environment}.
-
-The same local user may therefore have different roles in different
-Environments.
-
-For example:
-
+A \fileext{.testudouser} file restores profile information and avatar data. It does \emph{not} restore:
 \begin{itemize}
-    \item Environment A: Administrator;
-    \item Environment B: User;
-    \item Environment C: no membership yet.
+    \item the application password;
+    \item registered Work Environment locations;
+    \item Environment passwords;
+    \item remembered Environment sign-ins.
 \end{itemize}
 
+\section{Application password and recovery}
 
-\section{Portable user profile}
+After creating the profile, Testudo can protect the installation with an application password. The setup explicitly states that this password is separate from every Work Environment password.
 
-Testudo supports portable profile files with the extension:
+The application password must contain at least eight characters. Recovery uses three user-defined security questions.
 
-\begin{center}
-\fileext{.testudouser}
-\end{center}
+Security-question answers are stored as salted hashes. Matching normalises capitalization, accents and repeated spaces.
 
-A Testudo user profile can be exported and later imported.
-
-This is intended to make restoration of personal profile information
-easier after a complete local sign-out or when configuring another
-installation.
-
-\manualnote{What a portable profile does not contain}{
-Environment registrations, Environment passwords and local
-authentication credentials are intentionally separate from the
-portable user profile.
+\manualtip{Try it: profile and lock flow}{
+Create a disposable local profile, configure the application password and three recovery questions, use \menu{Log Out of Testudo}, and log back in. Confirm that your registered Environment list is still present. Then compare this with \menu{Sign Out from Testudo...}, which is intentionally much more destructive to local installation state.
 }
-
 
 % ============================================================
 % CHAPTER 4
 % ============================================================
+\chapter{Local Log Out, Local Sign Out and Environment Sign Out}
 
+Testudo exposes several actions that sound similar but have different scopes.
+
+\section{Log Out of Testudo}
+
+Logging out locks the application. Your local profile, registered Work Environments and remembered state remain available after the next login.
+
+Use this when you simply want to protect the application while keeping the current installation configured.
+
+\section{Sign Out from Testudo}
+
+This is an installation-level reset for the local Testudo identity. The confirmation screen requires typing \texttt{SIGN OUT}.
+
+It removes local information from this Mac, including the local profile, application password, registered Work Environments, local bookmarks, Environment identity mappings and remembered sign-ins.
+
+It does \textbf{not} delete or modify the actual \fileext{.testudoenv} packages.
+
+Before signing out, Testudo offers \button{Export My Profile Before Signing Out...}.
+
+\section{Sign Out of Environment}
+
+This action affects the active Work Environment session rather than the local application account. It is useful when the same local Testudo installation is used to enter an Environment with different credentials.
+
+\manualwarning{Do not confuse the scopes}{
+If you only want to lock the application, use \menu{Log Out of Testudo}. If you want to remove local Testudo-user state from the Mac, use \menu{Sign Out from Testudo...}. If you only want to end the current Environment session, use \menu{Sign Out of Environment}.
+}
+
+% ============================================================
+% CHAPTER 5
+% ============================================================
 \chapter{Work Environments}
 
-\section{Concept}
+\section{The Work Environments screen}
 
-A \term{Work Environment} is an independent Testudo workspace.
+After local authentication, Testudo shows \menu{Work Environments} with the message \emph{Choose where you want to work}. Registered Environments appear as cards showing their name and storage path.
 
-It contains the work, people, themes, structures, calendar
-relationships, membership information and history belonging to one
-logical environment.
+Available actions are:
+\begin{itemize}
+    \item \button{Create New Environment};
+    \item \button{Open Existing Environment...};
+    \item \button{Load Demo Environment}.
+\end{itemize}
 
-Different Environments are isolated from one another.
+\section{Creating an Environment}
 
+The creation sheet asks for:
+\begin{itemize}
+    \item Environment name;
+    \item initial Administrator username;
+    \item Administrator password;
+    \item password confirmation.
+\end{itemize}
 
-\section{The \texorpdfstring{\fileext{.testudoenv}}{.testudoenv} package}
+The first account belongs to the Work Environment and is separate from the local Testudo profile.
 
-A Work Environment is stored as a portable package whose filename
-ends in:
+The Environment is saved as a portable \fileext{.testudoenv} package. You can choose a local, cloud-synchronised or external storage location.
 
-\begin{center}
-\fileext{.testudoenv}
-\end{center}
-
-A typical package contains files such as:
-
+Internally, a normal package contains files such as:
 \begin{lstlisting}
 Example.testudoenv/
 |-- EnvironmentManifest.json
 |-- EnvironmentData.json
 |-- EnvironmentCredentials.json
-`-- EnvironmentIcon.png
+`-- EnvironmentIcon.png        # optional
 \end{lstlisting}
 
-The Environment icon is optional.
+\section{Opening an existing Environment}
 
+Use \button{Open Existing Environment...} and select a \fileext{.testudoenv} package. Testudo validates the package and registers its location with the current installation.
 
-\section{Environment manifest}
+If the Environment requires identity selection, Testudo presents the Environment login flow.
 
-The manifest makes a Work Environment self-identifying.
+\section{Environment login}
 
-It contains information such as:
+The entry sheet contains a username, password and \menu{Stay signed in} option.
 
-\begin{itemize}
-    \item the Environment identifier;
-    \item the Environment name;
-    \item schema information;
-    \item identity-provider information;
-    \item creation and update timestamps.
-\end{itemize}
+When \menu{Stay signed in} is enabled, this Mac can reopen the Environment without asking for those credentials until the user explicitly signs out of the Environment.
 
+\section{Forgetting an Environment from one Mac}
 
-\section{Environment storage location}
+In Environment settings, removing an Environment from Testudo only forgets its registration on that installation. The \fileext{.testudoenv} package and all Environment data remain at the storage location and can be reopened later.
 
-The application stores local knowledge of where each registered
-Environment package can be found.
-
-macOS persistent file-access bookmarks are used so that Testudo can
-continue to access a user-selected package where permitted by the
-operating system.
-
-This local registration is different from the portable Environment
-data itself.
-
-
-\section{Creating or registering an Environment}
-
-A user may create a new Work Environment or register an existing
-\fileext{.testudoenv} package.
-
-When moving an Environment between folders or computers, the new
-Testudo installation may need to be shown the new package location.
-
-
-\section{Environment icon}
-
-Each Work Environment may have its own icon.
-
-If no custom Environment icon exists, Testudo uses its standard
-default Environment visual.
-
-Environment Administrators can change or restore the Environment icon
-through the Environment administration tools.
-
-
-\section{Backing up an Environment}
-
-Backing up a Work Environment normally means backing up its complete
-\fileext{.testudoenv} package.
-
-Do not back up only one JSON file unless you understand exactly which
-parts of the Environment you intend to preserve.
-
-\manualtip{Recommended backup practice}{
-Keep independent backups of important Work Environment packages,
-especially while using early Testudo releases. A synchronised cloud
-folder is useful for replication, but it should not be your only
-backup.
+\manualtip{Try it: create and reopen}{
+Create a disposable Environment called \emph{Manual Test}. Close it, return to Work Environments, and reopen it. Then remove its registration from Testudo and use \button{Open Existing Environment...} to register the same package again. Verify that the Work data is still present.
 }
-
-
-% ============================================================
-% CHAPTER 5
-% ============================================================
-
-\chapter{Authentication and Roles}
-
-\section{Two authentication layers}
-
-Testudo distinguishes between:
-
-\begin{enumerate}
-    \item application-level identity and authentication;
-    \item Work Environment identity and authentication.
-\end{enumerate}
-
-These layers serve different purposes.
-
-
-\section{Environment roles}
-
-The current Environment role model contains two principal roles:
-
-\begin{description}
-    \item[Administrator]
-    Can perform Environment administration operations.
-
-    \item[User]
-    Standard Environment member.
-\end{description}
-
-A person's role belongs to the Environment, not to the application as
-a whole.
-
-
-\section{Environment passwords}
-
-Environment users can authenticate using Environment-local accounts.
-
-Users can change their own Environment password.
-
-Environment Administrators can assign a new password to another
-Environment member without knowing that person's existing password.
-
-
-\section{Security questions and password recovery}
-
-Testudo supports recovery through security questions.
-
-The current design uses three security questions for account recovery.
-
-Users should choose answers that they can reproduce reliably.
-
-
-\section{Stay signed in}
-
-A local installation may remember that a user wishes to stay signed
-in to an Environment.
-
-This remembered local state belongs to the application installation
-and is not stored as the user's plaintext password inside the portable
-Environment.
-
-
-\section{Log Out and Sign Out}
-
-The application distinguishes between leaving an authenticated
-session and removing broader local application state.
-
-A normal logout should not be confused with complete local sign-out
-or removal of local profile information.
-
-Before performing a complete sign-out, consider exporting the
-\fileext{.testudouser} profile if you want an easy way to restore
-profile information later.
-
 
 % ============================================================
 % CHAPTER 6
 % ============================================================
+\chapter{Environment Membership and Administration}
 
-\chapter{The Testudo Interface}
+\section{Environment roles}
 
-\section{Three-column navigation}
+Environment memberships currently have two roles:
+\begin{itemize}
+    \item Administrator;
+    \item User.
+\end{itemize}
 
-Testudo uses a native macOS multi-column interface.
+A membership also has an active/inactive state.
 
-The three conceptual regions are:
+\section{Membership identity}
 
-\begin{enumerate}
-    \item \textbf{main navigation} on the left;
-    \item \textbf{lists, trees or collections} in the middle;
-    \item \textbf{detail view} on the right.
-\end{enumerate}
+An Environment membership can either be linked to an existing Person entity or maintain its own first and last name. When linked to a Person, the membership name follows the Person.
 
-The exact content depends on the currently selected area.
+The management view exposes:
+\begin{itemize}
+    \item Linked Person;
+    \item first and last name when unlinked;
+    \item username;
+    \item immutable Membership ID;
+    \item Environment role;
+    \item active membership state.
+\end{itemize}
 
+\section{Environment passwords}
 
-\section{Main navigation}
+Environment passwords are separate from the local application password.
 
-The current sidebar provides:
+An Administrator can assign a new Environment password without knowing the member's current password. Security-question answers are never revealed to Administrators.
 
+\section{Environment recovery questions}
+
+A member can configure three recovery questions for the current Environment account. These recovery questions belong to that Environment account and travel with the \fileext{.testudoenv} package.
+
+If a member cannot answer a recovery question, an Environment Administrator can still assign a new password.
+
+\manualtip{Try it: verify identity separation}{
+In a disposable Environment, create or inspect a second membership. Confirm that changing the Environment password does not change the Testudo application password. If the membership is linked to a Person, edit the Person name and verify that the membership display follows the linked Person.
+}
+
+% ============================================================
+% CHAPTER 7
+% ============================================================
+\chapter{The Three-Column Interface}
+
+\section{Sidebar}
+
+The left sidebar is the global navigation layer. In 0.1.7 it contains:
 \begin{itemize}
     \item New Entry;
     \item Today;
@@ -719,6 +395,7 @@ The current sidebar provides:
     \item To Do;
     \item In Progress;
     \item Completed;
+    \item Discontinued;
     \item Archive;
     \item Timeline;
     \item Themes;
@@ -727,1426 +404,960 @@ The current sidebar provides:
     \item People.
 \end{itemize}
 
+\section{Middle column}
+
+The middle column shows the collection selected in the sidebar: a Task list, Archive tree, calendar, Theme list, entity list or other contextual collection.
+
+\section{Detail pane}
+
+The right pane shows the selected object's detail view or a creation/editing form. Normal detail views are mostly read-only and expose a single whole-object \button{Edit} action where appropriate.
 
 \section{Sidebar visibility}
 
-Testudo uses the native macOS sidebar visibility control.
+Testudo uses the native macOS sidebar behaviour. The system-provided sidebar control hides and restores the first column.
 
-When the sidebar is visible, the control belongs to the upper-right
-area of the sidebar. When the sidebar is hidden, macOS relocates the
-control beside the standard window controls.
+\section{Back and Forward navigation}
 
-On the current macOS interface the control uses the native Liquid
-Glass appearance.
+The detail pane maintains browser-style navigation history through Back and Forward controls and two-finger trackpad navigation.
 
-
-\section{Detail navigation}
-
-Objects displayed inside detail views are active references wherever
-navigation is semantically appropriate.
-
-The current navigation system supports direct opening of:
-
+The navigation history represents the complete three-column context. When you move backward or forward, Testudo restores:
 \begin{itemize}
-    \item Tasks;
-    \item Notes;
-    \item Activities;
-    \item Themes;
-    \item People;
-    \item Groups;
-    \item Organizations;
-    \item Calendar Events.
+    \item the sidebar section;
+    \item the middle-column selection;
+    \item the right-pane detail content.
 \end{itemize}
 
-A displayed description or preview that belongs to a particular
-object can also navigate to the owning object.
-
-For example, the body preview shown for Related Work opens that Work
-item, while a displayed Theme name opens the Theme itself.
-
-Editors, selection popovers, menus, disclosure controls and similar
-interactive controls retain their original editing or selection
-behaviour.
-
-The detail area maintains Back and Forward navigation history so that
-users can follow chains of references without losing their previous
-context.
-
-Two small independent circular Liquid Glass buttons are positioned at
-the upper-right of the right-hand detail pane.
-
-Supported trackpad gestures use the same Back and Forward history.
-
-The navigation history follows the content actually displayed in the
-right-hand pane rather than only Work-item selection. Tasks, Notes,
-Activities, Themes, People, Organizations, Groups, Calendar Events
-and the supported creation views can therefore participate in the
-same Back and Forward chain.
-
-An explicit selection always takes precedence over a transient
-creation view, so selecting a concrete object immediately opens that
-object in the right-hand pane.
-
-\section{Hierarchical presentation}
-
-Hierarchical data is used extensively.
-
-Examples include:
-
-\begin{itemize}
-    \item Tasks and sub-tasks;
-    \item Themes and sub-themes;
-    \item Organizations;
-    \item Groups and their containers;
-    \item People inside Groups or Organizations.
-\end{itemize}
-
-Disclosure controls can be used to expand or collapse nested content.
-
-Hierarchy affects both structural navigation and contextual
-presentation. In particular, Related Work can be aggregated from
-descendants into a parent Theme, Organization or Group.
-
-\section{Middle-column selection}
-
-Selection in the middle column is controlled by Testudo's application
-state rather than depending on temporary macOS List focus.
-
-The selected row fills the complete visible row width and height using
-Testudo's blue selection colour with subtle rounded corners.
-
-Hierarchical DisclosureGroup rows use the same visual treatment, so
-Themes and nested Work remain consistent with ordinary List rows.
-
-% ============================================================
-% CHAPTER 7
-% ============================================================
-
-\chapter{Work}
-
-\section{New Entry}
-
-New Entry is Testudo's global Work creation action.
-
-Selecting New Entry in the sidebar opens the New Work Entry editor
-directly in the right-hand pane, independently of the previously
-selected sidebar area.
-
-The keyboard shortcut is:
-
-\begin{lstlisting}
-Command-N
-\end{lstlisting}
-
-The editor can create a Task, Note or Activity and exposes the
-relevant Theme, Parent Task, timing, time-zone and relationship
-controls.
-
-The same SwiftUI Work editor is used when editing an existing Task,
-Note or Activity. In Edit mode the existing item's values are loaded
-into the form, while its Work type remains fixed. The normal Work
-detail inspector is read-only and provides a single Edit action rather
-than separate per-property edit controls.
-
-After cancelling a creation form, selecting New Entry again opens a
-fresh creation form.
-
-\section{Work item types}
-
-The current Work model has three principal item types:
-
-\begin{description}
-
-    \item[Task]
-    An actionable work item with state and optional planning
-    information.
-
-    \item[Note]
-    Information attached to the Work hierarchy.
-
-    \item[Activity]
-    A chronological record of something that happened while working.
-
-\end{description}
-
-
-\section{Tasks}
-
-Tasks can be top-level items or sub-tasks.
-
-A Task may contain:
-
-\begin{itemize}
-    \item sub-tasks;
-    \item Notes;
-    \item Activities.
-\end{itemize}
-
-Sub-tasks may themselves contain further nested Work, allowing complex
-Work structures without a fixed practical hierarchy depth.
-
-A Task can participate in semantic relationships with People, Groups
-and Organizations and can belong to one or more Themes.
-
-\section{Task states}
-
-The implemented Task states are:
-
-\begin{longtable}{L{0.24\textwidth} L{0.68\textwidth}}
-\toprule
-\textbf{State} &
-\textbf{Meaning}
-\\
-\midrule
-\endhead
-
-To Do &
-Work exists but is not currently marked as in progress.
-\\
-
-In Progress &
-Work is actively underway.
-\\
-
-Completed &
-The work has been completed.
-\\
-
-Closed &
-The item has been formally closed.
-\\
-
-\bottomrule
-\end{longtable}
-
-The interface uses a consistent visual status language for the main
-active states. In particular, To Do, In Progress and Completed have
-distinct visual treatments.
-
-
-\section{Task dates}
-
-Depending on the item and workflow, Testudo can maintain timestamps
-such as:
-
-\begin{itemize}
-    \item creation time;
-    \item update time;
-    \item scheduled time;
-    \item deadline;
-    \item reminder time;
-    \item start time;
-    \item completion time;
-    \item logged time.
-\end{itemize}
-
-These timestamps are stored as absolute instants while preserving
-relevant source time-zone information.
-
-The \term{Created} timestamp is an audit value describing when the
-Task was entered into Testudo and is not edited through the Work
-editor.
-
-The \term{Started} timestamp describes when the work actually began.
-It is user-editable and may intentionally predate Created, which
-allows older work to be entered retrospectively without falsifying
-the application's creation audit trail.
-
-When a Task moves from \term{To Do} to \term{In Progress} and does
-not already have a Started value, Testudo automatically records the
-transition time as Started. An existing manually supplied Started
-value is preserved.
-
-
-\section{Sub-tasks}
-
-Tasks can be nested.
-
-This allows larger work items to be decomposed into increasingly
-specific actions while retaining their relationship to the parent
-Task.
-
-A sub-task remains a full Task and may have its own:
-
-\begin{itemize}
-    \item state;
-    \item dates;
-    \item content;
-    \item relationships;
-    \item history;
-    \item nested children.
-\end{itemize}
-
-
-\section{Notes}
-
-Notes are informational Work items.
-
-They can be placed inside the Work hierarchy and used to preserve
-context that is not itself an actionable Task.
-
-Notes may also participate in date/reminder workflows where supported
-by the interface.
-
-A Note's normal detail inspector is read-only. The single Edit action
-opens the shared Work editor with the existing Note content, hierarchy,
-Theme membership, reminder and relationships pre-filled.
-
-
-\section{Activities}
-
-An Activity records something that happened during work.
-
-Examples include:
-
-\begin{itemize}
-    \item a discussion took place;
-    \item a server was upgraded;
-    \item a manuscript section was reviewed;
-    \item a measurement was completed;
-    \item a decision was made;
-    \item an external dependency was resolved.
-\end{itemize}
-
-An Activity is a work-log object, not a scheduled Calendar Event.
-
-An Activity's normal detail inspector is read-only. The single Edit
-action opens the shared Work editor with the Activity's current
-content, hierarchy, Theme membership, occurrence time and
-relationships pre-filled.
-
-This distinction is fundamental:
-
-\begin{center}
-\textbf{Activity = something recorded as having happened}
-\end{center}
-
-\begin{center}
-\textbf{Calendar Event = a calendar-based event with a time interval}
-\end{center}
-
+Archived Tasks participate in the same history as active Work.
+
+\manualtip{Try it: verify three-column history}{
+Open an active Task, then open \menu{Archive} and select a Closed Task, then open a Person. Use Back and Forward or the trackpad gesture. Verify that each step restores not only the right pane but also the corresponding sidebar section and middle-column selection.
+}
 
 % ============================================================
 % CHAPTER 8
 % ============================================================
+\chapter{Work: Tasks, Notes and Activities}
 
-\chapter{Relationships}
+\section{Three Work types}
 
-\section{Why relationships matter}
+\begin{description}
+    \item[Task] Actionable work with a Task status and optional lifecycle dates.
+    \item[Note] Durable context that does not require Task status.
+    \item[Activity] A work-log item recording something that happened, optionally at a specific date and time.
+\end{description}
 
-Testudo is not limited to placing Tasks in folders.
+Only Tasks can contain child Work. A Task may contain sub-tasks, Notes and Activities, and sub-tasks can contain further Work without a fixed nesting limit.
 
-Work can be connected semantically to People, Groups and
-Organizations.
+\section{Creating Work}
 
-This makes it possible to represent \emph{why} an entity is connected
-to work.
+Choose \menu{New Entry} or press Command-N. The Work editor includes sections for content, classification, parentage, timing and semantic relationships.
 
-
-\section{Work relationship roles}
-
-The current relationship roles are:
-
-\begin{longtable}{L{0.25\textwidth} L{0.67\textwidth}}
-\toprule
-\textbf{Relationship} &
-\textbf{Typical interpretation}
-\\
-\midrule
-\endhead
-
-For &
-The work is being performed for the related entity.
-\\
-
-Requested by &
-The related entity requested the work.
-\\
-
-With &
-The work is being performed with the related entity.
-\\
-
-Assigned to &
-Responsibility for the work is assigned to the related entity.
-\\
-
-Related to &
-A general semantic relationship.
-\\
-
-\bottomrule
-\end{longtable}
-
-
-\section{Relationship inheritance}
-
-Work relationships can be inherited by child Work items.
-
-This allows a relationship established at a higher level of the Work
-hierarchy to remain relevant to nested Work without repeatedly
-entering the same relationship.
-
-Inheritance is controlled by the
-\term{Inherited by children} property of the relationship.
-
-Where precision is required, relationships can also be managed at the
-specific Work-item level.
-
-\section{Related Work}
-
-People, Themes, Organizations and Groups use a common
-\term{Related Work} pane at the top of the right-hand detail area.
-
-When Related Work exists, the detail area is divided into two
-independently scrollable halves:
-
+Common fields include:
 \begin{itemize}
-    \item the upper half contains Related Work;
-    \item the lower half contains the normal detail inspector.
+    \item Type;
+    \item one or more Themes;
+    \item Parent Task;
+    \item optional Title;
+    \item Description or Note / What happened? text;
+    \item relationships to People, Groups and Organizations.
 \end{itemize}
 
-When no Related Work exists, the normal detail inspector occupies the
-full height.
+At least a title or description is required.
 
-Related Work may contain all three Work types:
+\section{Editing existing Work}
 
+Open the Work item and choose \button{Edit}. The same complete editor is used for Tasks, Notes and Activities. Existing values are pre-filled.
+
+\section{Creating child Work quickly}
+
+Inside a Task detail page, the \menu{Contains} area can create:
 \begin{itemize}
-    \item Tasks;
-    \item Notes;
-    \item Activities.
+    \item Sub-task;
+    \item Note;
+    \item Activity.
 \end{itemize}
 
-The shared compact row presentation can include:
+Activities created this way are still Work-log objects, not Calendar Events.
 
-\begin{itemize}
-    \item Work icon;
-    \item title;
-    \item Work type;
-    \item Task status where applicable;
-    \item Theme;
-    \item deadline where applicable;
-    \item description preview;
-    \item creation date at the right-hand side.
-\end{itemize}
-
-The same typography, spacing and navigation behaviour is used in all
-four structural areas.
-
-References inside Related Work remain navigable.
-
-\manualnote{Aggregation and inheritance}{
-Related Work aggregation and Work-relationship inheritance are
-distinct mechanisms.
-
-Relationship inheritance determines whether a child Work item inherits
-a semantic relationship from a parent Work item.
-
-Related Work aggregation determines which Work items are displayed
-when viewing a parent Theme, Organization or Group.
-
-Both mechanisms can operate at the same time.
+\manualtip{Try it: build a small hierarchy}{
+Create a top-level Task called \emph{Prepare field campaign}. Add a sub-task called \emph{Check instruments}, a Note with background information and an Activity recording a completed phone call. Then add a deeper sub-task under \emph{Check instruments}. Navigate up and down the hierarchy and confirm that each item retains its own detail page.
 }
 
 % ============================================================
 % CHAPTER 9
 % ============================================================
+\chapter{Task Workflow Status}
 
-\chapter{Themes}
+\section{The four statuses}
 
-\section{Purpose}
-
-Themes provide a semantic classification system that is independent
-of the Work hierarchy and independent of the organizational
-hierarchy.
-
-A Theme can represent, for example:
-
+In Testudo 0.1.7, the user-facing Task statuses are exactly:
 \begin{itemize}
-    \item a scientific subject;
-    \item a research programme;
-    \item an infrastructure topic;
-    \item a long-running initiative;
-    \item an administrative domain;
-    \item a technical area.
+    \item To Do;
+    \item In Progress;
+    \item Completed;
+    \item Discontinued.
 \end{itemize}
 
+\term{Closed} is deliberately absent from this list because it is an archive lifecycle action rather than a workflow outcome.
 
-\section{Theme hierarchy}
+\section{To Do}
 
-Themes can contain sub-themes.
+Use To Do for work that exists but has not begun. A Task can still have a deadline while remaining To Do.
 
-This makes it possible to model broad and narrow areas without forcing
-the Work hierarchy itself to reproduce the same structure.
+\section{In Progress}
 
+Use In Progress when work has begun. When a Task changes from To Do to In Progress and does not already have a Started date, Testudo can record the transition time automatically. A manually entered Started time remains independently editable.
 
-\section{Theme information}
+\section{Completed}
 
-The current Theme inspector exposes:
+Use Completed when the work ended successfully. The completion timestamp is preserved independently from Created and Started.
 
-\begin{itemize}
-    \item name;
-    \item parent Theme;
-    \item summary;
-    \item notes;
-    \item related People, Groups and Organizations;
-    \item start date;
-    \item target date;
-    \item tags;
-    \item URL;
-    \item SF Symbol;
-    \item created and updated timestamps.
-\end{itemize}
+\section{Changing status from the detail view}
 
-Older Environment data can contain additional legacy structure
-metadata. Structure code, status, priority and owner fields remain
-compatible at the persistence layer but are not exposed by the current
-Theme interface.
+The status control allows normal workflow changes. Discontinued requires additional metadata, so it is intentionally handled through the full Work editor rather than a shortcut that could omit the reason.
 
-The normal Theme inspector is read-only. A single Edit action in the
-Theme header opens the complete Theme editor. This replaces the former
-per-property pencil controls and provides one consistent edit workflow
-for the whole Theme.
-
-
-\section{Themes and Work}
-
-Work items can be associated with Themes.
-
-The current data model supports explicit multi-Theme membership,
-allowing one Task, Note or Activity to belong to more than one
-semantic domain without duplicating the Work item.
-
-For compatibility with older data, Testudo can still interpret legacy
-single-Theme membership. Explicit multi-Theme membership is
-authoritative when present.
-
-The Related Work view of a Theme is hierarchical.
-
-A Theme displays:
-
-\begin{itemize}
-    \item Work belonging directly to that Theme;
-    \item Work belonging to its child Themes;
-    \item Work belonging to all deeper descendant Themes.
-\end{itemize}
-
-Aggregation is recursive.
-
-For example:
-
-\begin{lstlisting}
-Theme A
-`-- Theme B
-    `-- Theme C
-\end{lstlisting}
-
-A Note belonging to Theme C is visible in the Related Work panes of
-Theme C, Theme B and Theme A.
-
-The Work item's actual Theme membership is not changed by this
-presentation. Parent Themes aggregate descendant context rather than
-reassigning the Work item.
-
-\section{Themes and entities}
-
-Themes can also be related directly to People, Groups and
-Organizations.
-
-This lets Testudo represent knowledge such as:
-
-\begin{itemize}
-    \item which laboratory works on a Theme;
-    \item which person is associated with a research subject;
-    \item which Organization participates in a programme.
-\end{itemize}
-
+\manualtip{Try it: normal lifecycle}{
+Create a Task as To Do. Change it to In Progress and check its Started value. Then mark it Completed and confirm that a completion time appears. Reopen the editor and verify that Created, Started and Completed represent different concepts and can describe historical work accurately.
+}
 
 % ============================================================
 % CHAPTER 10
 % ============================================================
+\chapter{Discontinued Tasks}
 
-\chapter{People}
+\section{Why Discontinued exists}
 
-\section{People directory}
+Not every Task finishes successfully. Work may fail, become unnecessary, be replaced by another approach, or prove infeasible. Deleting such a Task loses useful history; marking it Completed is misleading. Testudo therefore provides a terminal \term{Discontinued} status.
 
-The People area maintains Person entities inside a Work Environment.
+\section{Required metadata}
 
-A Person may contain professional information and can participate in
-work relationships, affiliations, groups and organizational
-structures.
-
-
-\section{Names and ordering}
-
-The People list is ordered primarily by surname, with first name used
-as a secondary key where appropriate.
-
-Older records that do not contain a separately stored surname can
-fall back to their available display name.
-
-
-\section{Affiliations}
-
-A Person can have multiple affiliations.
-
-This is important for academic and technical work where one
-individual may simultaneously belong to:
-
+When the Task status is Discontinued, the editor requires a reason. Available reasons are:
 \begin{itemize}
-    \item a university;
-    \item a laboratory;
-    \item a department;
-    \item a collaboration;
-    \item a working group;
-    \item another institution.
+    \item Failed;
+    \item Superseded;
+    \item No longer needed;
+    \item Not feasible;
+    \item Other.
 \end{itemize}
 
+The editor also includes:
+\begin{itemize}
+    \item Discontinued date/time with source time zone;
+    \item optional Outcome / note.
+\end{itemize}
 
-\section{Primary affiliation}
+The discontinued time cannot be in the future and cannot be earlier than Started when a Started time exists.
 
-One affiliation may be explicitly marked as the primary affiliation.
+\section{What remains visible}
 
-When no explicit Primary affiliation is selected, Testudo can use an
-appropriate directly affiliated Organization as the display
-affiliation.
+The normal detail page shows the Discontinued time, reason and optional outcome. The Task also appears in the \menu{Discontinued} sidebar section while it remains active rather than archived.
 
-When available, an Organization's Short Name can be used in compact
-presentation.
+A discontinuation lifecycle event is retained in History.
 
+\section{Historical cycles}
 
+If a Task later returns to active work, earlier discontinuation history remains preserved. A later discontinuation can therefore represent a new lifecycle cycle without erasing the previous one.
 
-\section{Related Work}
-
-The upper part of a Person detail view uses the common Related Work
-presentation.
-
-It can display Tasks, Notes and Activities related to the Person.
-
-It also respects Work relationships inherited from parent Tasks when
-the corresponding relationship is configured to be inherited by
-children.
-
-Each row uses the same compact typography and navigation behaviour as
-Related Work elsewhere in Testudo, including the Work item's creation
-date at the far right.
-
-\section{Person versus local profile}
-
-A Person inside an Environment is not automatically identical to the
-application's Local User Profile.
-
-A user's compatible local profile information may be used to create
-or populate a corresponding Person when appropriate, but the two
-objects belong to different layers of the application.
-
+\manualtip{Try it: discontinue for a reason}{
+Create a Task called \emph{Use vendor API A}. Start it, edit it to Discontinued, choose \emph{Superseded}, and write \emph{Replaced by API B}. Confirm that the Task appears in \menu{Discontinued}, that its detail page shows the reason and outcome, and that its Log contains a discontinuation event.
+}
 
 % ============================================================
 % CHAPTER 11
 % ============================================================
+\chapter{Closing, Archive and Reopening}
 
-\chapter{Groups and Organizations}
+\section{Closed is not a status}
 
-\section{Organizations}
-
-Organizations represent institutional structures.
-
-Examples include:
-
+Closing is an archival lifecycle operation. Only a \textbf{top-level Task} can be Closed, and it must already be terminal:
 \begin{itemize}
-    \item universities;
-    \item institutes;
-    \item departments;
-    \item companies;
-    \item observatories;
-    \item research centres.
+    \item Completed; or
+    \item Discontinued.
 \end{itemize}
 
-Organizations can contain other Organizations, allowing institutional
-hierarchies to be represented.
+A To Do or In Progress Task cannot be closed directly.
 
+\section{What closing does}
 
-\section{Organization metadata}
-
-The current Organization inspector exposes:
-
+Closing a top-level Task:
 \begin{itemize}
-    \item full name;
-    \item short name;
-    \item structural memberships;
-    \item affiliated People;
-    \item start date;
-    \item target date;
-    \item website;
-    \item e-mail;
-    \item phone;
-    \item address;
-    \item city;
-    \item postal code;
-    \item country;
-    \item tags;
-    \item SF Symbol;
-    \item notes;
-    \item created and updated timestamps.
+    \item records a Closed timestamp and source time zone;
+    \item retains the real workflow status;
+    \item moves the whole Task subtree to Archive;
+    \item records a Closed lifecycle History event;
+    \item removes the subtree from active Work queries.
 \end{itemize}
 
-Older Environment data can contain additional legacy structure
-metadata. Structure code, status, priority and owner remain compatible
-at the persistence layer but are not exposed by the current
-Organization or Group interface.
+Children do not independently become Closed. They are archived because their top-level ancestor is closed.
 
-Organizations and Groups use the same whole-object editing pattern as
-People. Their normal inspectors are read-only, and a single Edit action
-in the header opens the complete editor, including structural
-memberships and affiliated People.
+\section{Archive presentation}
 
+The Archive middle column displays Closed top-level Tasks and their retained subtree. The root still indicates whether the actual outcome was Completed or Discontinued, and its context shows the Closed time.
 
-\section{Groups}
+\section{Reopen}
 
-Groups represent teams or other collective structures.
+A Closed top-level Task exposes \button{Reopen}. Reopening removes the archive marker, returns the tree to active views, preserves the actual Completed or Discontinued status and records a Reopened History event.
 
-Examples include:
+\section{Backward compatibility}
 
-\begin{itemize}
-    \item laboratories;
-    \item project teams;
-    \item committees;
-    \item working groups;
-    \item technical teams;
-    \item collaborations.
-\end{itemize}
+Testudo 0.1.6 stored Closed as a Task status. Testudo 0.1.7 keeps a legacy persistence-only value so older Environment data can be decoded, then migrates the item to the separate archive lifecycle while preserving the most meaningful previous workflow state available.
 
-A Group may exist inside an Organization or independently where the
-data model permits it.
-
-
-\section{Membership}
-
-Entity memberships connect People, Groups and Organizations.
-
-These memberships are separate from Work relationships.
-
-For example, ``Person A belongs to Laboratory B'' is structurally
-different from ``Task C is assigned to Person A''.
-
-
-
-\section{Related Work}
-
-Organizations and Groups use the same Related Work pane as People and
-Themes.
-
-The lower detail inspectors for Themes, Organizations, Groups and
-People use a consistent card-based visual language and aligned
-vertical spacing.
-
-The view can contain Tasks, Notes and Activities.
-
-For container entities, Related Work is aggregated recursively from
-the complete descendant Entity hierarchy.
-
-An Organization can therefore display:
-
-\begin{itemize}
-    \item Work related directly to the Organization;
-    \item Work related to a child Organization;
-    \item Work related to a descendant Group;
-    \item Work related to a Person contained below it;
-    \item Work inherited through parent-Task relationships where
-          \term{Inherited by children} is enabled.
-\end{itemize}
-
-A Group likewise aggregates Related Work from its descendant entities
-where such memberships exist.
-
-A Work item is presented once even when more than one structural path
-makes it relevant.
-
-This aggregation does not change Entity memberships or Work
-relationships. It gives parent structures a consolidated view of Work
-taking place below them.
+\manualtip{Try it: complete archive lifecycle}{
+Perform the following in a disposable Environment:
+\begin{enumerate}
+    \item Create a top-level Task and a child Note.
+    \item Mark the Task Completed.
+    \item Use \button{Close} in the detail header.
+    \item Confirm that the Task disappears from active lists and appears in \menu{Archive} with its child Note.
+    \item Open the archived Task and verify that its Status is still Completed.
+    \item Use Back/Forward navigation and confirm Archive selection is restored correctly.
+    \item Choose \button{Reopen}.
+    \item Confirm that the Task returns to active views as Completed and that Closed/Reopened events are preserved in its Log.
+\end{enumerate}
+Repeat the exercise with a Discontinued Task and verify that its discontinuation reason and outcome survive Close and Reopen.
+}
 
 % ============================================================
 % CHAPTER 12
 % ============================================================
+\chapter{Notes}
 
-\chapter{Calendar}
+Notes are informational Work items. They do not have Task status and are useful for durable context that belongs near the work.
 
-\section{Calendar Events}
-
-Calendar Events represent scheduled events.
-
-A Calendar Event can contain information such as:
-
+A Note can have:
 \begin{itemize}
-    \item title;
-    \item notes;
-    \item location;
-    \item start time;
-    \item end time;
-    \item all-day state;
-    \item time zones;
-    \item confirmation status;
-    \item recurrence information;
-    \item organizer;
-    \item attendees;
-    \item conference URL;
-    \item external calendar identifiers.
+    \item title and body;
+    \item one or more Themes;
+    \item a Parent Task;
+    \item a Reminder;
+    \item semantic relationships.
 \end{itemize}
 
+Use a Note when the item should remain available as context but does not represent work that progresses through To Do, In Progress, Completed or Discontinued.
 
-\section{Calendar Event status}
-
-Calendar Events can represent states including:
-
-\begin{itemize}
-    \item Confirmed;
-    \item Tentative;
-    \item Cancelled.
-\end{itemize}
-
-
-\section{Testudo calendars}
-
-Testudo supports its own local calendar source.
-
-Calendar Events created as local Testudo events can participate
-directly in Testudo relationships.
-
-
-\section{Apple Calendar and iCloud}
-
-A Work Environment can connect supported Apple Calendar calendars
-through macOS EventKit.
-
-Apple Calendar integration requires macOS Calendar permission.
-
-External source data imported from Apple Calendar is treated as
-read-only source information inside Testudo.
-
-Testudo does not need to modify the original external Apple Calendar
-event in order to create Testudo-specific relationships.
-
-
-\section{iCal subscriptions}
-
-Testudo also supports iCal subscription sources.
-
-A subscription can import calendar information from an iCalendar
-feed.
-
-
-\section{Secret iCal addresses}
-
-The actual secret iCal subscription URL is not intended to be stored
-as ordinary portable Environment data.
-
-Testudo stores the sensitive address using the macOS Keychain
-mechanism and keeps a lookup reference in its calendar configuration.
-
-
-\section{External calendars and Environment administration}
-
-Connected calendar sources can be managed from the Work Environment
-administration tools.
-
-Depending on the source, administrators can:
-
-\begin{itemize}
-    \item connect calendars;
-    \item synchronise them;
-    \item review synchronisation status;
-    \item remove an external calendar connection.
-\end{itemize}
-
-Removing a connected external calendar removes its imported Testudo
-representation and Testudo-specific relationships as appropriate.
-
-It does not imply deletion of the source calendar from the external
-calendar service.
-
-
-\section{Linking Calendar Events to Work}
-
-Calendar Events can be linked to Testudo Work items.
-
-This lets a scheduled meeting or appointment be connected to the Task,
-Note or Activity context to which it relates.
-
-Calendar Events can also be linked to Themes.
-
-Displayed linked Work and Theme references are navigable.
-
-Calendar Events themselves also participate in Testudo's normal detail
-navigation and Back/Forward history.
+\manualtip{Try it: reminder-bearing Note}{
+Inside a Task, create a Note containing a decision or reference, enable a Reminder for tomorrow, and save it. Confirm that it appears under the parent Task and that the reminder is represented in Calendar and relevant Today views when its date becomes current.
+}
 
 % ============================================================
 % CHAPTER 13
 % ============================================================
+\chapter{Activities and the Work Log}
 
-\chapter{Time Zones and Date Handling}
+\section{Activity semantics}
 
-\section{Device time zone}
+An Activity records something that happened while working. Examples include a discussion, measurement, intervention, review, decision or resolved problem.
 
-Testudo uses the Mac's automatically updating current time zone as the
-default display context.
+The Activity editor provides an optional \menu{Occurred} date/time with source time zone.
 
-The device zone is obtained from macOS rather than being permanently
-hard-coded into an Environment.
+\manualnote{Activity vs Calendar Event}{
+An Activity belongs to the Work history. A Calendar Event belongs to the Calendar domain. A meeting that is planned for tomorrow is a Calendar Event; after it occurs, you may also record an Activity containing the useful outcome.
+}
 
+\section{Activity in Timeline and History}
 
-\section{IANA time zones}
+Activities contribute to chronological views and appear in the Work Log. A parent Task can therefore preserve a running record without rewriting its description repeatedly.
 
-Where a date and time is entered with a source time zone, Testudo uses
-real IANA time-zone identifiers.
-
-Examples include:
-
-\begin{lstlisting}
-Europe/Paris
-America/Argentina/Buenos_Aires
-America/New_York
-Asia/Tokyo
-\end{lstlisting}
-
-
-\section{Absolute timestamps}
-
-Dates represent absolute instants.
-
-Where relevant, Testudo additionally records the IANA time zone in
-which that time was originally entered or generated.
-
-
-\section{Displaying source and local time}
-
-When a timestamp's source zone differs from the current device zone,
-Testudo can display both contexts.
-
-Conceptually, a time may be shown as:
-
-\begin{center}
-current-device-time
-\quad $\cdot$ \quad
-source-time and source-zone
-\end{center}
-
-This is useful when work crosses geographical time zones.
-
-
-\section{Changing the selected source zone}
-
-When editing a date and changing its source zone, Testudo treats the
-change as a reinterpretation of the entered wall-clock time.
-
-For example, changing an entry from ``10:00 Paris'' to
-``10:00 New York'' is treated as a request for 10:00 in the new zone,
-rather than silently converting the original instant to 04:00 New
-York.
-
-This makes the time-zone selector behave like an input-zone selector
-rather than an accidental conversion command.
-
+\manualtip{Try it: scheduled event and resulting Activity}{
+Create a Calendar Event for a meeting and link it to a Task. After the simulated meeting, create an Activity under the Task called \emph{Meeting outcome} and record a historical Occurred time. Compare how the Calendar Event and Activity appear in their respective views.
+}
 
 % ============================================================
 % CHAPTER 14
 % ============================================================
+\chapter{Themes and Multi-Theme Classification}
 
-\chapter{History and Audit Information}
+\section{Purpose}
 
-\section{Work history}
+Themes classify Work semantically and independently from the Task hierarchy and professional entity hierarchy.
 
-Testudo maintains chronological history for important Work changes.
+A Theme can have a parent Theme, allowing arbitrary Theme depth.
 
-History can include events such as:
+\section{Theme detail fields}
 
+The current Theme interface exposes information including:
 \begin{itemize}
-    \item creation;
-    \item editing;
-    \item status changes;
-    \item scheduling;
-    \item starting work;
-    \item completion;
-    \item Activity logging;
-    \item relationship creation;
-    \item relationship removal;
-    \item movement within the Work hierarchy.
+    \item Name and Parent Theme;
+    \item Summary and Notes;
+    \item Start and Target dates;
+    \item Tags;
+    \item URL;
+    \item SF Symbol;
+    \item related People, Groups and Organizations;
+    \item Created and Updated timestamps.
 \end{itemize}
 
+The normal detail page is read-only and exposes a whole-object \button{Edit} action.
 
-\section{Actor information}
+\section{Multiple Themes on one Work item}
 
-Where an authenticated Environment membership is available, history
-can identify the Environment member responsible for the action.
+A Work item can belong to several Themes simultaneously. This avoids duplicating the same Task simply because it belongs to multiple conceptual domains.
 
+\section{Descendant aggregation}
 
-\section{History time zones}
+Related Work for a parent Theme includes Work assigned to descendant Themes recursively. This aggregation does not rewrite direct membership.
 
-History timestamps can preserve the zone in which an action occurred.
-
-Where the history describes another date value, Testudo can also
-retain that value's source zone separately.
-
+\manualtip{Try it: multi-Theme aggregation}{
+Create Theme A, then child Theme B. Create a Task assigned directly to Theme B and also to a second independent Theme. Open Theme B and Theme A and verify that the Task appears in Related Work for both levels of the A/B hierarchy, while the Task editor still shows its actual direct Theme selections.
+}
 
 % ============================================================
 % CHAPTER 15
 % ============================================================
+\chapter{People}
 
+People are first-class professional entities with richer profile data than a simple name string.
+
+\section{Person profile fields}
+
+The Person editor can represent:
+\begin{itemize}
+    \item first, middle, last and preferred name;
+    \item academic title and position;
+    \item primary and secondary email/phone;
+    \item office and assistant/contact;
+    \item staff or employee ID;
+    \item address and workplace;
+    \item website, LinkedIn and GitHub;
+    \item ORCID, ResearcherID, Scopus Author ID and Google Scholar;
+    \item fields/expertise, responsibilities and tags;
+    \item preferred language and time zone;
+    \item notes;
+    \item Organization and Group affiliations.
+\end{itemize}
+
+\section{Affiliations}
+
+A Person can belong to multiple Organizations and Groups. One affiliation can be primary. Some affiliations can be shown as automatic when implied by structure or membership data.
+
+\section{Environment membership link}
+
+A Person may be linked to an Environment membership. The Person detail page then exposes membership identity, role, active/inactive state and whether a local Environment password is configured.
+
+A Person linked to an Environment membership cannot be deleted until the membership is unlinked.
+
+\manualtip{Try it: professional directory}{
+Create a Person with a preferred name and ORCID, affiliate the Person with an Organization and a Group, then relate a Task to that Person using \term{With}. Open the Person and confirm that the Task appears in Related Work.
+}
+
+% ============================================================
+% CHAPTER 16
+% ============================================================
+\chapter{Organizations and Groups}
+
+\section{Organizations}
+
+Organizations model institutional structure such as universities, institutes, departments, companies or observatories. Organizations can themselves be contained in other Organizations.
+
+The editor can expose fields such as full name, short name, website, email, phone, address, city, postal code, country, tags, symbol, dates and notes.
+
+\section{Groups}
+
+Groups model teams, laboratories, committees, collaborations and working groups. A Group may be independent or contained by one or more compatible structural entities according to the current hierarchy rules.
+
+\section{Affiliated People}
+
+Organization and Group editors can manage affiliated People. Related Work can aggregate relevant work from descendant structures while suppressing duplicates.
+
+\manualtip{Try it: build a small structure}{
+Create an Organization called \emph{Institute}, a child Organization called \emph{Department}, and a Group called \emph{Lab} inside the Department. Affiliate a Person with the Lab. Relate a Task to the Lab and verify Related Work from the relevant structural views.
+}
+
+% ============================================================
+% CHAPTER 17
+% ============================================================
+\chapter{Work Relationships}
+
+Work relationships attach professional context directly to Work items.
+
+Available roles are:
+\begin{itemize}
+    \item For;
+    \item Requested by;
+    \item With;
+    \item Assigned to;
+    \item Related to.
+\end{itemize}
+
+Each relationship points to a Person, Group or Organization.
+
+\section{Inheritance by child items}
+
+A relationship may be marked \menu{Inherited by child items}. Child Work can then inherit relevant context from its parent Task.
+
+When changing the Parent Task in the full editor, Testudo may ask whether to use the new Parent's inherited relationships. Copying them replaces the current related People, Groups and Organizations with the Parent relationships marked for inheritance.
+
+\manualtip{Try it: inherited context}{
+Create a parent Task related \term{For} an Organization and enable inheritance. Create a child Task and inspect its inherited context. Then move the child to another Parent Task with a different inherited relationship and test the \menu{Copy Parent Relationships} / \menu{Keep Current Relationships} decision.
+}
+
+% ============================================================
+% CHAPTER 18
+% ============================================================
+\chapter{Related Work}
+
+People, Themes, Organizations and Groups share a Related Work presentation.
+
+Related Work can contain Tasks, Notes and Activities. When related Work exists, the detail area can present the Work separately from the object's own inspector information.
+
+Aggregation follows the relevant semantic structure:
+\begin{itemize}
+    \item parent Themes can include descendant Theme Work;
+    \item Organizations and Groups can aggregate from relevant descendants;
+    \item duplicate Work is suppressed when several paths resolve to the same item.
+\end{itemize}
+
+Rows are navigable, so Related Work is also a bridge between the structural and Work domains.
+
+\manualtip{Try it: navigate through Related Work}{
+Open a Person or Theme that has several related Work items. Select a related Task, then use Back. Verify that the original Person/Theme and its corresponding left/middle-column context are restored.
+}
+
+% ============================================================
+% CHAPTER 19
+% ============================================================
+\chapter{Today}
+
+\section{Today is a work summary, not only a schedule}
+
+The Today view combines several kinds of current-day relevance. In 0.1.7 the interface includes sections such as:
+\begin{itemize}
+    \item Needs Attention;
+    \item In Progress;
+    \item Upcoming;
+    \item Done Today;
+    \item Discontinued Today;
+    \item Today's Log.
+\end{itemize}
+
+The underlying Today collection considers active Work whose Created, Logged/Occurred, Started, Completed or Discontinued date is today.
+
+\section{Needs Attention}
+
+Needs Attention highlights urgent active items such as overdue deadlines, work due today and relevant reminders. Closed Task trees are excluded because archived Work is not part of the active workflow.
+
+\section{Upcoming}
+
+Upcoming provides near-future actionable context, such as deadlines and reminders.
+
+\manualtip{Try it: populate Today}{
+Create one Task due today, start another Task today, complete a third Task today, discontinue a fourth Task today and create an Activity with today's Occurred time. Open \menu{Today} and identify where each item appears. Then Close one terminal top-level Task and confirm the archived tree no longer contributes to the active Today workflow.
+}
+
+% ============================================================
+% CHAPTER 20
+% ============================================================
+\chapter{Task Lists and Timeline}
+
+The sidebar exposes dedicated Task filters:
+\begin{itemize}
+    \item All Tasks;
+    \item To Do;
+    \item In Progress;
+    \item Completed;
+    \item Discontinued.
+\end{itemize}
+
+These lists operate on active Work. Archived Task trees are excluded until reopened.
+
+\section{Timeline}
+
+Timeline focuses on chronological Work activity rather than a single workflow state. Activities and lifecycle dates help make long-running work understandable after the fact.
+
+\manualtip{Try it: compare filters}{
+Create four Tasks, one in each workflow status. Confirm that each appears in its corresponding sidebar filter. Close the Completed and Discontinued top-level Tasks and verify that they move to Archive and disappear from the active status filters. Reopen them and verify that they return to their retained status filters.
+}
+
+% ============================================================
+% CHAPTER 21
+% ============================================================
+\chapter{History and the Work Log}
+
+\section{Audit timestamps}
+
+The History section exposes key timestamps such as Created and Updated, plus type-specific lifecycle values such as Started, Completed, Discontinued or Occurred.
+
+\section{Log events}
+
+The chronological Log can represent:
+\begin{itemize}
+    \item created;
+    \item edited;
+    \item status changed;
+    \item scheduled;
+    \item started;
+    \item completed;
+    \item discontinued;
+    \item closed;
+    \item reopened;
+    \item activity logged;
+    \item relationship added or removed;
+    \item moved.
+\end{itemize}
+
+The Log is deliberately not only a mirror of the current state. Earlier lifecycle cycles remain meaningful historical records.
+
+\section{Deletion and history}
+
+Deleting a Work item is different from discontinuing or closing it. Deletion permanently removes the item and its descendants, plus associated relationships and history for those deleted Work items.
+
+\manualwarning{Prefer lifecycle actions for historical work}{
+If a Task existed and its outcome matters, prefer Completed, Discontinued and possibly Close. Use deletion for data that should genuinely be removed rather than preserved as history.
+}
+
+% ============================================================
+% CHAPTER 22
+% ============================================================
+\chapter{Calendar Overview}
+
+\section{What appears in Calendar}
+
+The Calendar combines several scheduling concepts:
+\begin{itemize}
+    \item Calendar Events;
+    \item Task deadlines;
+    \item Note reminders.
+\end{itemize}
+
+The month view includes navigation for previous/next month and \button{Today}. Day summaries distinguish Events, Deadlines and Reminders.
+
+Toolbar actions include:
+\begin{itemize}
+    \item Connect iCal Calendar;
+    \item Connect Apple / iCloud Calendar;
+    \item Sync connected external calendars;
+    \item New Calendar Event.
+\end{itemize}
+
+\section{Calendar sources}
+
+Current source kinds include:
+\begin{itemize}
+    \item Testudo local calendar;
+    \item iCal Subscription;
+    \item Apple Calendar / iCloud.
+\end{itemize}
+
+\manualtip{Try it: deadline, reminder and event}{
+For the same date, create a Task deadline, a Note reminder and a Calendar Event. Open that date in Calendar and confirm that all three appear but are identified by their different scheduling roles.
+}
+
+% ============================================================
+% CHAPTER 23
+% ============================================================
+\chapter{Creating and Editing Calendar Events}
+
+\section{New Calendar Event}
+
+A local Calendar Event can contain:
+\begin{itemize}
+    \item Title;
+    \item Calendar;
+    \item All day flag;
+    \item Start and End;
+    \item source time zones for timed events;
+    \item Location;
+    \item Notes;
+    \item Related Tasks;
+    \item Related Themes.
+\end{itemize}
+
+The End cannot be earlier than Start.
+
+Related Tasks are selected from the Task hierarchy, and related Themes are selected from the Theme hierarchy.
+
+\section{Calendar Event status}
+
+Calendar event statuses include Confirmed, Tentative and Cancelled where applicable to the event model.
+
+\section{External events}
+
+Events imported from external calendars are read-only for their external details. Testudo relationships can still be edited. The detail view explicitly states when an event is a read-only external calendar event.
+
+\manualtip{Try it: event linking}{
+Create a local Event called \emph{Project review}, link it to a Task and a Theme, then open the Event and navigate through those links. Return with Back and verify the Calendar context is restored.
+}
+
+% ============================================================
+% CHAPTER 24
+% ============================================================
+\chapter{Apple Calendar Integration}
+
+\section{Connecting Apple Calendar}
+
+Choose \button{Connect Apple / iCloud Calendar}. Testudo requests macOS Calendar access and lists calendars available through Apple Calendar on the Mac.
+
+The connection view states that imported events are read-only in Testudo and that only Testudo relationships can be edited.
+
+The initial synchronisation window covers approximately one year in the past through two years in the future.
+
+\section{Permission and availability}
+
+If macOS permission is not granted, or no compatible calendars are available, the connection view reports the condition. Permission is controlled by macOS privacy settings.
+
+\manualtip{Try it: read-only behaviour}{
+Connect a non-critical Apple Calendar, sync it and open one imported event. Confirm that event details are read-only while Related Work / Theme links remain manageable inside Testudo.
+}
+
+% ============================================================
+% CHAPTER 25
+% ============================================================
+\chapter{iCal Subscriptions}
+
+Choose \button{Connect iCal Calendar} and provide the secret address in iCal format. An optional Calendar name can be entered.
+
+Events imported from an iCal subscription are read-only.
+
+The secret subscription address is treated as sensitive and is stored in macOS Keychain rather than in ordinary Testudo data.
+
+\manualwarning{Treat secret iCal URLs as credentials}{
+Anyone with a secret subscription URL may be able to read the calendar feed. Do not place the URL in screenshots, Notes or shared documentation.
+}
+
+\manualtip{Try it: subscription lifecycle}{
+If you have a disposable iCal feed, connect it, trigger external-calendar synchronisation and inspect an event. Verify that the source behaves as read-only and that the feed URL is not shown as ordinary Work Environment data.
+}
+
+% ============================================================
+% CHAPTER 26
+% ============================================================
+\chapter{Time Zones and Historical Dates}
+
+\section{Absolute time and source zone}
+
+Testudo stores absolute timestamps as dates and, where relevant, stores a separate IANA time-zone identifier describing the zone in which the value was entered or recorded.
+
+Time-zone-aware fields include, depending on type:
+\begin{itemize}
+    \item Created and Updated;
+    \item Scheduled;
+    \item Deadline;
+    \item Reminder;
+    \item Started;
+    \item Completed;
+    \item Discontinued;
+    \item Closed;
+    \item Activity Occurred;
+    \item Calendar Event Start and End.
+\end{itemize}
+
+The current device time zone is the normal display context, while the source zone helps preserve meaning across travel and historical entry.
+
+\section{Historical entry}
+
+Started, Discontinued and Activity occurrence times can describe events before the item was entered into Testudo, subject to logical validation rules.
+
+\manualtip{Try it: source-zone preservation}{
+Create an Activity with a historical time and explicitly choose another IANA time zone. Save it, then reopen the detail and editor. Verify that the absolute moment and source-zone context remain consistent.
+}
+
+% ============================================================
+% CHAPTER 27
+% ============================================================
 \chapter{Demo Environment}
 
 \section{Purpose}
 
-The Work Environments screen provides a way to create a demonstration
-Environment.
+\button{Load Demo Environment} creates a complete fictional data set intended for exploration. It includes People, Organizations, Groups, Themes, Tasks, sub-tasks, Notes, Activities, Calendar Events, affiliations, relationships, chronology, history and archived work.
 
-The Demo Environment is intended for learning and exploration without
-requiring the user to enter a large amount of data manually.
-
-
-\section{Demo subject matter}
-
-The generated demonstration data represents a fictional academic and
-scientific working environment.
-
-It can include areas such as:
-
-\begin{itemize}
-    \item Research Software Engineering;
-    \item Scientific Computing and HPC;
-    \item Data Infrastructure;
-    \item AI and Data Science;
-    \item Earth and Environmental Sciences;
-    \item Physics and Astronomy;
-    \item Computational Biology;
-    \item Chemistry and Materials Science;
-    \item Instrumentation and Sensors;
-    \item Open Science and FAIR Data;
-    \item International Collaborations;
-    \item Seminars and Training;
-    \item Research Administration.
-\end{itemize}
-
-
-\section{Generated objects}
-
-A Demo Environment contains interconnected examples of:
-
-\begin{itemize}
-    \item People;
-    \item Organizations;
-    \item Groups;
-    \item Themes;
-    \item Tasks;
-    \item sub-tasks;
-    \item Notes;
-    \item Activities;
-    \item Calendar Events;
-    \item affiliations;
-    \item Work relationships;
-    \item history.
-\end{itemize}
-
-
-\section{Demo dates}
-
-Demo dates are generated relative to the date on which the Demo
-Environment is created.
-
-The generated timeline covers approximately one month before creation
-and two months after creation.
-
-Operational dates are generally placed on working days and during
-normal working hours.
-
+Dates are generated relative to the date on which the Demo is created, so the environment remains useful over time.
 
 \section{Demo naming}
 
-Repeated Demo creation uses the lowest available name.
-
-For example:
-
+Multiple Demo Environments can coexist. The generator uses names such as:
 \begin{lstlisting}
 Demo
 Demo-2
 Demo-3
 \end{lstlisting}
 
-If a numbered Demo is removed, its number may later become available
-again.
+Available numbering can be reused after a Demo is removed.
 
+\section{Suggested tour}
 
-% ============================================================
-% CHAPTER 16
-% ============================================================
-
-\chapter{Data Portability and Storage}
-
-\section{What is portable}
-
-The principal portable object is the
-\fileext{.testudoenv} Work Environment package.
-
-It contains the Environment data needed to identify and operate that
-Environment.
-
-
-\section{What is local to one installation}
-
-Some information intentionally remains local to the Testudo
-installation.
-
-Examples include:
-
-\begin{itemize}
-    \item local Environment registration;
-    \item filesystem bookmark information;
-    \item local mapping between the application's user and an
-          Environment membership;
-    \item remembered local authentication state;
-    \item some sensitive Keychain-managed credentials.
-\end{itemize}
-
-
-\section{Moving a Work Environment}
-
-To move an Environment:
-
+Use the Demo to inspect, in order:
 \begin{enumerate}
-    \item make sure Testudo has finished writing changes;
-    \item copy or move the complete
-          \fileext{.testudoenv} package;
-    \item allow filesystem or cloud synchronisation to finish;
-    \item register or reopen the package from the new location.
+    \item Today;
+    \item one multi-level Task tree;
+    \item a Person with affiliations and Related Work;
+    \item a Theme with descendant-related Work;
+    \item Calendar;
+    \item Archive;
+    \item browser-style Back/Forward navigation across different object types.
 \end{enumerate}
 
-
-\section{Using cloud-synchronised storage}
-
-A Work Environment package can live in a directory managed by a
-synchronisation provider.
-
-This can make the same Environment package available on more than one
-computer.
-
-However, users should avoid generating simultaneous divergent edits
-to the same package.
-
-\manualwarning{Backups are still required}{
-File synchronisation is not equivalent to historical backup.
-Accidental deletion or corruption may itself be synchronised.
-Maintain independent backups for important Environments.
+\manualtip{Try it: acceptance-test tour}{
+Before upgrading an important real Environment, create a fresh Demo and perform the tour above. It is a low-risk way to detect obvious UI or persistence regressions.
 }
 
+% ============================================================
+% CHAPTER 28
+% ============================================================
+\chapter{Storage, Portability and Backups}
+
+\section{Portable Environment package}
+
+The \fileext{.testudoenv} package is the principal portable unit. It contains the Environment's manifest, data, credentials and optional icon.
+
+\section{Cloud-synchronised folders}
+
+An Environment can live in Dropbox, iCloud Drive, OneDrive or another filesystem provider visible to macOS. Testudo still works on the package as a file package.
+
+Avoid simultaneous conflicting edits from several Macs. Wait for file synchronisation to complete before opening the same package elsewhere.
+
+\section{Backups}
+
+File synchronisation is not a substitute for independent backup. A deletion or corruption can itself be synchronised.
+
+Recommended practice:
+\begin{enumerate}
+    \item keep at least one independent backup of important Environments;
+    \item before upgrading between early versions, copy critical \fileext{.testudoenv} packages;
+    \item avoid manually editing JSON inside production Environment packages;
+    \item if using cloud storage, confirm synchronisation has completed before moving computers.
+\end{enumerate}
 
 % ============================================================
-% CHAPTER 17
+% CHAPTER 29
 % ============================================================
-
-\chapter{Administration}
-
-\section{Environment Administrator}
-
-The Administrator role applies to a particular Work Environment.
-
-Administrative capabilities include Environment-level configuration
-that ordinary members should not necessarily be able to perform.
-
-
-\section{Membership administration}
-
-Administrators can manage Environment membership and authentication
-information according to the current local-account model.
-
-
-\section{Password administration}
-
-An Administrator can assign a new password to another Environment
-member without needing to know the old password.
-
-
-\section{Environment appearance}
-
-Administrators can manage the Work Environment icon, including
-restoring the default appearance.
-
-
-\section{Connected calendars}
-
-Environment administration includes management of connected external
-calendar sources.
-
-This includes supported Apple Calendar and iCal connections.
-
-
-% ============================================================
-% CHAPTER 18
-% ============================================================
-
 \chapter{Security and Privacy}
-
-\section{Local-first privacy model}
-
-Testudo does not require a central Testudo cloud service for normal
-operation.
-
-Environment information remains in the chosen
-\fileext{.testudoenv} package.
-
 
 \section{Passwords}
 
-Passwords are not intended to be stored as readable plaintext.
+Application and Environment passwords are separate. Password verification uses salted password hashes rather than readable plaintext storage.
 
-The authentication layer uses password hashing and separate recovery
-mechanisms.
+\section{Security questions}
 
+Recovery answers are stored only as salted hashes. Administrators cannot view other users' recovery answers.
 
-\section{Sensitive external calendar information}
+\section{External calendar secrets}
 
-Secret iCal subscription addresses are treated as sensitive
-information and are stored using macOS Keychain integration rather
-than being exposed as ordinary Environment data.
+Secret iCal URLs use macOS Keychain integration rather than ordinary Environment data.
 
+\section{Sensitive portable files}
 
-\section{Calendar permission}
-
-Apple Calendar integration requires the user to grant the application
-appropriate macOS Calendar access.
-
-The external Apple Calendar event source remains read-only from
-Testudo's integration perspective.
-
-
-\section{Portable files}
-
-A portable Work Environment may contain significant professional or
-organizational information.
-
-Treat \fileext{.testudoenv} packages as potentially sensitive files
-when copying, sharing or backing them up.
-
+A \fileext{.testudoenv} package may contain substantial professional context, including entities, relationships and history. Treat it as potentially sensitive when copying, sharing or backing it up.
 
 % ============================================================
-% CHAPTER 19
+% CHAPTER 30
 % ============================================================
+\chapter{Deletion Semantics}
 
+Deletion is permanent and differs from lifecycle transitions.
+
+\begin{description}
+    \item[Task / Note / Activity] Deleting a Work item removes it and descendant Work, together with associated relationships and history for the deleted items.
+    \item[Theme] Deleting a Theme can also delete descendant Themes and Work assigned inside that Theme hierarchy according to the confirmation shown by the application.
+    \item[Organization / Group] Deleting the entity removes structural memberships and Work relationships; contained entities themselves are retained where the application confirmation states so.
+    \item[Person] Deletion removes the Person profile, structural memberships and Work relationships, but is blocked while the Person is linked to an Environment membership.
+    \item[Calendar Event] Deletion permanently removes the event from Testudo; an externally synchronised deletion can be queued for synchronisation where supported.
+\end{description}
+
+\manualwarning{Read the confirmation text}{
+Deletion scope differs by object type. Testudo's confirmation message is the authoritative description of what will be removed. For Tasks with meaningful history, prefer Completed, Discontinued and Archive instead of deletion.
+}
+
+% ============================================================
+% CHAPTER 31
+% ============================================================
+\chapter{Recommended Working Practices}
+
+\section{Separate plan, context and evidence}
+
+A useful Testudo pattern is:
+\begin{itemize}
+    \item Task for what must be done;
+    \item Note for stable context or reference material;
+    \item Activity for what actually happened;
+    \item Calendar Event for reserved or scheduled time.
+\end{itemize}
+
+\section{Use Discontinued instead of pretending success}
+
+If work ended without successful completion, use Discontinued with a reason and optional outcome. This gives later readers a truthful explanation.
+
+\section{Close only when the top-level work is no longer part of active workflow}
+
+A Completed or Discontinued Task can remain visible in active status lists for as long as it is still operationally relevant. Close it when the whole top-level Task tree belongs in Archive.
+
+\section{Use Themes for concepts, not as a duplicate Task tree}
+
+Themes are semantic classification. Parent Task relationships should represent Work decomposition, while Theme hierarchy should represent conceptual grouping.
+
+\section{Model recurring professional context explicitly}
+
+If the same Person, lab, institution or committee repeatedly appears, create an entity and relationship rather than repeatedly typing names into free text.
+
+\section{Record outcomes as Activities}
+
+For long-running work, short Activities documenting important events provide a more useful record than continuously rewriting the Task description.
+
+% ============================================================
+% CHAPTER 32
+% ============================================================
 \chapter{Troubleshooting}
 
-\section{The build fails with an old toolchain}
+\section{The installer says the source checkout has local changes}
 
-The current Testudo source targets macOS 26 and the contemporary
-Apple SwiftUI SDK.
-
-Check the selected development tools:
-
-\begin{lstlisting}
-xcodebuild -version
-swift --version
-\end{lstlisting}
-
-The documented baseline is Xcode 27 with Apple Swift 6.4 or later.
-
-If older versions are installed, update macOS and Xcode before
-retrying the build.
-
-
-\section{SwiftPM build progress}
-
-Current Testudo uses SwiftPM's modern default build backend.
-
-During a normal build SwiftPM may display progress such as:
-
-\begin{lstlisting}
-[Planning deferred tasks]
-\end{lstlisting}
-
-This text is build progress and is not itself an error.
-
-The current production baseline has been verified to complete normally
-with the supported toolchain.
-
-
-\section{Apple developer tools are missing}
-
-Run:
-
-\begin{lstlisting}
-xcode-select --install
-\end{lstlisting}
-
-After installation, retry the build.
-
-
-\section{The automatic installer refuses to update}
-
-The automatic installer intentionally avoids overwriting a source
-checkout containing local changes.
-
-Inspect the repository:
-
+The automatic installer deliberately refuses to overwrite local work. Inspect the checkout:
 \begin{lstlisting}
 cd ~/Testudo
 git status
 \end{lstlisting}
+Commit, stash or intentionally discard the local changes before using the automatic updater.
 
-Resolve, commit, stash or deliberately discard your own changes before
-using automatic update behaviour.
+\section{Apple developer tools are missing}
 
+Request Apple's Command Line Tools:
+\begin{lstlisting}
+xcode-select --install
+\end{lstlisting}
+Then rerun the compatibility check or installer.
 
-\section{The Work Environment cannot be found}
+\section{An Environment package was moved}
 
-If a \fileext{.testudoenv} package was moved, renamed or relocated by
-a synchronisation provider, Testudo's stored local path or filesystem
-bookmark may no longer point to the correct location.
+If the registered path or security-scoped bookmark no longer points to the package, use \button{Open Existing Environment...} and select the package at its new location.
 
-Locate the package and register or reopen it from its current
-location.
+\section{Environment login fails}
 
+Check:
+\begin{itemize}
+    \item the correct Environment is active;
+    \item the username is correct;
+    \item the membership is Active;
+    \item a password is actually configured for the membership;
+    \item password recovery questions are configured if using recovery.
+\end{itemize}
+If recovery is unavailable, contact an Environment Administrator.
 
 \section{Apple Calendar does not appear}
 
-Check:
-
-\begin{enumerate}
-    \item that Calendar permission has been granted in macOS;
-    \item that the relevant external calendar has been connected;
-    \item that the calendar is enabled;
-    \item that synchronisation has been run successfully.
-\end{enumerate}
-
+Check macOS Calendar permission, verify that the desired calendar is available in Apple Calendar, reconnect if necessary and run external-calendar synchronisation.
 
 \section{iCal synchronisation fails}
 
-Possible causes include:
+Possible causes include an invalid or expired secret address, connectivity problems, or changes at the calendar provider. Reconnect the source if the URL has changed.
 
+\section{A Task cannot be Closed}
+
+Closing is available only for top-level Tasks whose status is Completed or Discontinued. Complete or Discontinue the Task first. Child Tasks are archived through their closed top-level ancestor.
+
+\section{A Discontinued status change appears unavailable in a shortcut}
+
+Discontinued requires a reason and date. Use the full Work editor so the required metadata can be entered and validated.
+
+\section{Archived Work is missing from active lists}
+
+This is expected. A Closed top-level Task and its subtree are removed from active Task, Today and related active-work queries. Open Archive or Reopen the root Task.
+
+% ============================================================
+% CHAPTER 33
+% ============================================================
+\chapter{Guided End-to-End Verification Lab}
+
+This chapter provides a complete hands-on test that exercises the most important 0.1.7 behaviours in one disposable Environment.
+
+\section{Step 1: create the Environment}
+
+Create a new Environment named \emph{Manual Verification}. Create its Administrator account and enter the Environment.
+
+Expected result: a fresh Environment opens with no Work data other than any application defaults.
+
+\section{Step 2: create professional context}
+
+Create:
 \begin{itemize}
-    \item an invalid or expired subscription address;
-    \item loss of network connectivity;
-    \item a remote server error;
-    \item authentication or access changes at the provider.
+    \item Organization: \emph{Example Institute};
+    \item Group: \emph{Field Team};
+    \item Person: \emph{Alex Example};
+    \item Theme: \emph{Campaign 2027}.
+\end{itemize}
+Affiliate the Person with the Group and/or Organization as appropriate.
+
+Expected result: each object has a read-only detail inspector and whole-object Edit action, and navigation links work between structural objects.
+
+\section{Step 3: create a top-level Task}
+
+Create Task \emph{Prepare campaign} assigned to Theme \emph{Campaign 2027}. Add a relationship \term{With} Alex Example and enable inheritance for child items. Set a future Deadline.
+
+Expected result: the Task appears in To Do and in Related Work for the selected Theme/Person where appropriate.
+
+\section{Step 4: create children}
+
+Inside the Task create:
+\begin{itemize}
+    \item sub-task \emph{Check instruments};
+    \item Note \emph{Shipping instructions};
+    \item Activity \emph{Kick-off discussion} with an Occurred time.
 \end{itemize}
 
-Review the calendar's synchronisation status and reconnect the source
-if necessary.
+Expected result: the Task's Contains section shows all three children and inherited relationships behave according to the relationship settings.
 
+\section{Step 5: exercise status and Today}
 
-\section{Several old Testudo installer volumes appear}
+Change \emph{Check instruments} to In Progress. Confirm Started is populated or set manually. Create another Task due today.
 
-Current local-build scripts attempt to detach older mounted Testudo
-installer images before opening the newly built DMG.
+Expected result: Today shows relevant active work in the appropriate Needs Attention / In Progress / Upcoming areas.
 
-If an old volume remains mounted, eject it manually in Finder or
-Disk Utility and run the build again.
+\section{Step 6: exercise Discontinued}
 
+Create Task \emph{Use legacy sensor}. Edit it to Discontinued, reason \emph{Superseded}, outcome \emph{New sensor selected}.
 
-% ============================================================
-% CHAPTER 20
-% ============================================================
+Expected result: the Task appears in Discontinued, its detail page shows the metadata, and the Log contains the lifecycle event.
 
-\chapter{Recommended Working Practices}
+\section{Step 7: exercise Completed and Archive}
 
-\section{Use Tasks for actionable work}
+Complete the top-level \emph{Prepare campaign} Task, then choose Close.
 
-Create a Task when an item represents work that can meaningfully
-progress through a state.
-
-Use sub-tasks when decomposition adds useful structure.
-
-
-\section{Use Notes for context}
-
-Use Notes for durable contextual information that should live beside
-the work but does not itself require Task state.
-
-
-\section{Use Activities for the work log}
-
-Use Activities to record what actually happened.
-
-A useful Activity should usually answer at least one of these
-questions:
-
+Expected result:
 \begin{itemize}
-    \item What happened?
-    \item When did it happen?
-    \item What changed?
-    \item What decision was made?
-    \item What result was obtained?
+    \item the complete subtree moves to Archive;
+    \item the root still reports Status = Completed;
+    \item active Task lists no longer include the tree;
+    \item Close is present in history.
 \end{itemize}
 
+\section{Step 8: navigation history}
 
-\section{Use Calendar Events for scheduled time}
+While viewing the archived Task, open a Person, then a Theme. Use Back twice and Forward twice.
 
-Use Calendar Events when the object belongs on a calendar and has a
-scheduled time interval.
+Expected result: sidebar section, middle-column selection and right-pane content travel together through the history.
 
-Do not use Calendar Events merely as a substitute for Activity
-history.
+\section{Step 9: Reopen}
 
+Return to the archived root and choose Reopen.
 
-\section{Use Themes for semantic classification}
+Expected result: the Task tree leaves Archive, returns to active views with Status = Completed, and the history contains both Closed and Reopened.
 
-Themes are most useful for concepts that cut across the Work, People
-and Organization hierarchies.
+\section{Step 10: calendar}
 
-A Work item may belong to more than one Theme when several semantic
-classifications are genuinely useful.
+Create a local Calendar Event, link it to the Task and Theme, and set a location. Also create a Note reminder and Task deadline on the same date.
 
-Because a parent Theme's Related Work includes Work from descendant
-Themes, broad Themes can provide an overview without requiring Work to
-be duplicated or manually assigned at every ancestor level.
+Expected result: Calendar distinguishes Event, Reminder and Deadline while still allowing navigation to the related Work.
 
-\section{Model People and Organizations explicitly}
-
-When a person, laboratory or institution repeatedly appears in your
-work, represent it as an entity rather than repeatedly typing its name
-into free text.
-
-This makes Testudo relationships navigable and reusable.
-
-
-\section{Preserve history}
-
-For long-running work, recording Activities and maintaining Task
-state provides a much more useful record than continually rewriting
-a single Note.
-
+\manualtip{Verification complete}{
+If all ten steps behave as described, you have exercised the core 0.1.7 data model, Task lifecycle, Archive semantics, three-column navigation, semantic relationships, Today, Calendar and persistence-facing workflows.
+}
 
 % ============================================================
-% CHAPTER 21
+% CHAPTER 34
 % ============================================================
-
 \chapter{Technical Reference}
 
 \section{Important file extensions}
 
 \begin{longtable}{L{0.28\textwidth} L{0.62\textwidth}}
 \toprule
-\textbf{Extension} &
-\textbf{Purpose}
-\\
+\textbf{Extension} & \textbf{Purpose} \\
 \midrule
 \endhead
-
-\fileext{.testudoenv} &
-Portable Testudo Work Environment package.
-\\
-
-\fileext{.testudouser} &
-Portable local Testudo profile information.
-\\
-
-\fileext{.dmg} &
-Locally generated macOS installer disk image.
-\\
-
+\fileext{.testudoenv} & Portable Work Environment package. \\
+\fileext{.testudouser} & Portable local Testudo profile information; does not contain Environment registry or passwords. \\
+\fileext{.dmg} & Locally generated macOS installer disk image. \\
 \bottomrule
 \end{longtable}
 
-
 \section{Source tree}
-
-Important project locations include:
 
 \begin{lstlisting}
 Sources/Testudo/
@@ -2160,296 +1371,172 @@ Sources/Testudo/
 `-- TestudoApp.swift
 \end{lstlisting}
 
-
 \section{Build scripts}
-
-The principal build scripts are:
 
 \begin{lstlisting}
 Scripts/build-app.sh
 Scripts/build-release.sh
 Scripts/build-local-dmg.sh
+Scripts/build-manual.sh
 Scripts/version.sh
 \end{lstlisting}
 
-The standard local user-facing build is:
+\section{Version identity}
 
+\filepath{Scripts/version.sh} is the build scripts' central version source. For this manual:
 \begin{lstlisting}
-./Scripts/build-local-dmg.sh
+TESTUDO_VERSION="0.1.7"
+TESTUDO_BUILD_NUMBER="8"
 \end{lstlisting}
 
+\section{Task status persistence compatibility}
 
-\section{Version information}
-
-The default application version and build number are maintained in:
-
-\begin{lstlisting}
-Scripts/version.sh
-\end{lstlisting}
-
-This file acts as the build scripts' central version source.
-
-
-\section{Application build}
-
-To create the application bundle directly:
-
-\begin{lstlisting}
-./Scripts/build-app.sh
-\end{lstlisting}
-
-The resulting bundle is created under:
-
-\begin{lstlisting}
-dist/Testudo.app
-\end{lstlisting}
-
-The current build script uses SwiftPM's modern default build backend
-and does not force the deprecated legacy
-\filepath{--build-system native} option.
-
-The current production baseline is maintained as a warning-free build
-with the supported Xcode 27 and Apple Swift 6.4 toolchain.
-
-
-\section{Local DMG build}
-
-To create the installer disk image:
-
-\begin{lstlisting}
-./Scripts/build-release.sh
-\end{lstlisting}
-
-or use the complete user-facing workflow:
-
-\begin{lstlisting}
-./Scripts/build-local-dmg.sh
-\end{lstlisting}
-
+The current user-visible Task status set excludes Closed. A legacy persistence-only Closed value remains decodable so Environment files written by Testudo 0.1.6 and earlier can be migrated to the separate \texttt{closedAt} archive lifecycle.
 
 % ============================================================
-% CHAPTER 22
+% CHAPTER 35
 % ============================================================
-
 \chapter{Glossary}
 
 \begin{description}
-
-\item[Activity]
-A chronological Work item recording something that happened.
-
-\item[Calendar Event]
-A scheduled event represented in the Calendar domain.
-
-\item[Entity]
-A Person, Group or Organization.
-
-\item[Environment Administrator]
-A member with administrative privileges inside one Work Environment.
-
-\item[Environment member]
-An identity belonging to a specific Work Environment.
-
-\item[Group]
-A team, laboratory, committee, collaboration or similar collective
-entity.
-
-\item[Local User Profile]
-The professional profile belonging to the user of one Testudo
-installation.
-
-\item[Note]
-An informational Work item.
-
-\item[Organization]
-An institutional entity that may contain other Organizations or
-Groups.
-
-\item[Person]
-An individual represented within a Work Environment.
-
-\item[Related Work]
-The common upper detail-pane view used for People, Themes, Groups and
-Organizations. It presents relevant Tasks, Notes and Activities and
-can aggregate Work from descendant structures.
-
-\item[Task]
-An actionable Work item with Task status.
-
-\item[Theme]
-A hierarchical semantic classification independent of the Work and
-organizational hierarchies.
-
-\item[Work Environment]
-An independent portable Testudo workspace represented by a
-\fileext{.testudoenv} package.
-
-\item[Work relationship]
-A semantic connection between a Work item and a Person, Group or
-Organization.
-
+\item[Activity] A Work item recording something that happened, optionally with an Occurred timestamp.
+\item[Archive] The view containing top-level Tasks that have been Closed, together with their retained subtrees.
+\item[Calendar Event] A scheduled calendar-domain object, distinct from Activity.
+\item[Closed] An archive lifecycle state for terminal top-level Tasks; not a user-facing Task workflow status.
+\item[Completed] A terminal Task status representing successful completion.
+\item[Discontinued] A terminal Task status representing work that ended without successful completion and carries a reason/date.
+\item[Entity] A Person, Group or Organization.
+\item[Environment Administrator] A membership with administrative privileges inside one Work Environment.
+\item[Environment membership] An identity belonging to one Work Environment, separate from the local Testudo profile.
+\item[Group] A laboratory, team, committee, collaboration or similar collective entity.
+\item[Local Testudo profile] The installation-level professional profile of the Testudo user.
+\item[Note] An informational Work item without Task status.
+\item[Organization] An institutional entity that can participate in structural hierarchy.
+\item[Person] An individual represented within a Work Environment.
+\item[Related Work] Work associated with a Theme or professional entity directly or through supported descendant aggregation.
+\item[Reopened] A lifecycle event that returns a Closed top-level Task from Archive while preserving its real workflow status.
+\item[Task] An actionable Work item with one of the user-facing statuses To Do, In Progress, Completed or Discontinued.
+\item[Theme] A hierarchical semantic classification independent of Work and entity hierarchies.
+\item[Work Environment] An independent portable workspace represented by a \fileext{.testudoenv} package.
+\item[Work relationship] A semantic link between Work and a Person, Group or Organization.
 \end{description}
-
 
 % ============================================================
 % APPENDICES
 % ============================================================
-
 \appendix
 
 \chapter{Command Reference}
 
-\section{Install Testudo}
+\section{Check compatibility}
+\begin{lstlisting}
+curl -fsSL \
+  https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
+  | bash -s -- --check
+\end{lstlisting}
 
+\section{Install}
 \begin{lstlisting}
 curl -fsSL \
   https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
   | bash
 \end{lstlisting}
 
-
 \section{Clone manually}
-
 \begin{lstlisting}
 git clone https://github.com/foivoskar/Testudo.git
 cd Testudo
 \end{lstlisting}
 
-
 \section{Update source}
-
 \begin{lstlisting}
 git pull --ff-only
 \end{lstlisting}
 
-
 \section{Build local installer}
-
 \begin{lstlisting}
 ./Scripts/build-local-dmg.sh
 \end{lstlisting}
 
-
 \section{Build application only}
-
 \begin{lstlisting}
 ./Scripts/build-app.sh
 \end{lstlisting}
 
-
-\section{Check Xcode and Swift}
-
-\begin{lstlisting}
-xcodebuild -version
-swift --version
-\end{lstlisting}
-
-The documented baseline is Xcode 27 and Apple Swift 6.4 or later.
-
-
 \section{Request Apple Command Line Tools}
-
 \begin{lstlisting}
 xcode-select --install
 \end{lstlisting}
 
-
 \chapter{Manual Source and Compilation}
 
-The source files for this manual are stored under:
-
+The manual source lives under:
 \begin{lstlisting}
 Documentation/TestudoManual/
 \end{lstlisting}
 
-The two maintained manual source files are:
-
+The maintained source files are:
 \begin{lstlisting}
 Testudo_manual.tex
 testudomanual.cls
 \end{lstlisting}
 
-The cover uses:
+This edition deliberately keeps \filepath{testudomanual.cls} unchanged.
 
+The normal repository-level build command is:
 \begin{lstlisting}
-Sources/Testudo/Resources/testudo_icon_blue.png
+./Scripts/build-manual.sh
 \end{lstlisting}
 
-When compiled from the manual directory, the expected PDF is:
+The script compiles the manual with XeLaTeX using the existing class file and writes the finished PDF at the repository root. A direct build remains possible:
+\begin{lstlisting}
+cd Documentation/TestudoManual
+latexmk -xelatex Testudo_manual.tex
+\end{lstlisting}
 
+The repository-level final copy is named:
 \begin{lstlisting}
 Testudo_manual.pdf
 \end{lstlisting}
 
-The project-level build procedure places the final copy at the root of
-the Testudo repository:
+\chapter{Quick Acceptance Checklist}
 
-\begin{lstlisting}
-Testudo_manual.pdf
-\end{lstlisting}
-
+Use this checklist after installing a new Testudo build:
+\begin{enumerate}
+    \item Local login works and Settings are accessible.
+    \item A Work Environment can be opened or created.
+    \item New Entry creates Task, Note and Activity correctly.
+    \item Task status filters show To Do, In Progress, Completed and Discontinued.
+    \item Discontinued requires a reason and preserves outcome metadata.
+    \item Only terminal top-level Tasks expose Close.
+    \item Archive preserves the actual Completed/Discontinued status.
+    \item Reopen returns the subtree to active views.
+    \item Back/Forward restores all three columns, including Archive destinations.
+    \item Today reflects current-day Work lifecycle activity.
+    \item Calendar shows Events, deadlines and reminders.
+    \item External calendar events remain read-only except for Testudo relationships.
+    \item Person/Theme/Organization/Group Related Work navigation works.
+    \item A disposable Environment can be closed and reopened without data loss.
+\end{enumerate}
 
 \chapter{Early Release Notice}
 
-Testudo is currently an early public release.
-
-The application, user interface and data model may continue to evolve.
-
-Before upgrading between early versions:
-
-\begin{enumerate}
-    \item ensure important Work Environments are backed up;
-    \item allow cloud-synchronised copies to finish synchronising;
-    \item keep an independent copy of critical
-          \fileext{.testudoenv} packages;
-    \item review version-specific changes where relevant.
-\end{enumerate}
-
+Testudo is under active development. Screens, labels and individual workflows may evolve between early versions. Before upgrading important data, keep an independent copy of critical \fileext{.testudoenv} packages.
 
 \chapter*{License}
-
-\addcontentsline{
-    toc
-}{
-    chapter
-}{
-    License
-}
-
-Testudo is distributed under the MIT License.
-
-See the repository's \filepath{LICENSE} file for the complete license
-text.
-
+\addcontentsline{toc}{chapter}{License}
+Testudo is distributed under the MIT License. See the repository's \filepath{LICENSE} file for the complete text.
 
 \chapter*{Author}
-
-\addcontentsline{
-    toc
-}{
-    chapter
-}{
-    Author
-}
-
+\addcontentsline{toc}{chapter}{Author}
 \textbf{Foivos Karakostas}
 
 \vfill
-
 \begin{center}
-    \includegraphics[
-        width=0.10\textwidth
-    ]{\TestudoIconPath}
+\includegraphics[width=0.09\textwidth]{\TestudoIconPath}
+\vspace{4mm}
 
-    \vspace{4mm}
-
-    {\small
-        Testudo User Manual
-        \\
-        Manual version \ManualVersion
-        \\
-        \ManualDate
-    }
+{\small Testudo User Manual\\Manual version \ManualVersion\\\ManualDate}
 \end{center}
 
 \end{document}

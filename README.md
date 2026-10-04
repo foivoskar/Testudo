@@ -732,10 +732,13 @@ The repository contains:
 - [Testudo User Manual — PDF](Testudo_manual.pdf)
 - [LaTeX manual source](Documentation/TestudoManual/Testudo_manual.tex)
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
+- [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.2 currently documents Testudo 0.1.6 (build 7)**.
+The bundled **Testudo User Manual 1.3 documents Testudo 0.1.7 (build 8)**.
 
-This README reflects the current **Testudo 0.1.7 (build 8)** application state.
+Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
+
+This README and the User Manual reflect the current **Testudo 0.1.7 (build 8)** application state.
 
 ---
 
