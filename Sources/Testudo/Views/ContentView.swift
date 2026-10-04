@@ -417,18 +417,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 List(selection: $selection) {
                     Button {
-                        selection =
-                            .newEntry
-
-                        workCreationRequest =
-                            WorkCreationRequest(
-                                initialKind:
-                                    .task,
-                                themeID:
-                                    nil,
-                                parentWorkItemID:
-                                    nil
-                            )
+                        presentNewEntry()
                     } label: {
                         HStack(
                             spacing:
@@ -476,6 +465,17 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .tag(
                         SidebarSection.newEntry
+                    )
+                    .simultaneousGesture(
+                        TapGesture()
+                            .onEnded {
+                                if
+                                    workCreationRequest
+                                        == nil
+                                {
+                                    presentNewEntry()
+                                }
+                            }
                     )
                     .padding(
                         .vertical,
@@ -1164,6 +1164,22 @@ struct ContentView: View {
         )
     }
 
+    private func presentNewEntry() {
+        workCreationRequest =
+            WorkCreationRequest(
+                initialKind:
+                    .task,
+                themeID:
+                    nil,
+                parentWorkItemID:
+                    nil
+            )
+
+        selection =
+            .newEntry
+    }
+
+
     private func sectionDidChange(
         _ newSection:
             SidebarSection?
@@ -1179,6 +1195,13 @@ struct ContentView: View {
         }
 
         if newSection == .newEntry {
+            if
+                workCreationRequest
+                    == nil
+            {
+                presentNewEntry()
+            }
+
             return
         }
 

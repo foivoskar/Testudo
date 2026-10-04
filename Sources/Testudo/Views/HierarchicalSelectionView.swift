@@ -853,7 +853,14 @@ enum HierarchySelectionData {
 
         // Defensive handling for malformed cycles/orphans.
         for task in
-            tasks.sorted { workSort($0, $1) }
+            tasks.sorted(
+                by: {
+                    workSort(
+                        $0,
+                        $1
+                    )
+                }
+            )
         {
             if
                 !visited.contains(
@@ -1172,7 +1179,14 @@ enum HierarchySelectionData {
         }
 
         for entity in
-            candidates.sorted { entitySort($0, $1) }
+            candidates.sorted(
+                by: {
+                    entitySort(
+                        $0,
+                        $1
+                    )
+                }
+            )
         {
             if
                 !visited.contains(
@@ -1545,7 +1559,14 @@ enum HierarchySelectionData {
         }
 
         for container in
-            containers.sorted { entitySort($0, $1) }
+            containers.sorted(
+                by: {
+                    entitySort(
+                        $0,
+                        $1
+                    )
+                }
+            )
         {
             if
                 !visitedContainers

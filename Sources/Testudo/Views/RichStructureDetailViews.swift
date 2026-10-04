@@ -557,7 +557,6 @@ struct RichThemeDetailView: View {
     }
 
 
-    @ViewBuilder
     private func relatedEntitiesSection(
         _ theme: Theme
     ) -> some View {

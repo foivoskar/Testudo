@@ -43,7 +43,11 @@ private enum TestudoLanguageCatalog {
 
 
         for code in
-            Locale.isoLanguageCodes
+            Locale.LanguageCode
+                .isoLanguageCodes
+                .map(
+                    \.identifier
+                )
         {
             guard
                 let rawName =

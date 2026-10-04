@@ -275,7 +275,7 @@ struct LargeDateTimeEditor:
     private var weekdaySymbols:
         [String]
     {
-        var calendar =
+        let calendar =
             selectedCalendar
 
         let symbols =
@@ -621,7 +621,7 @@ struct LargeDateTimeEditor:
             set: {
                 newDay in
 
-                var calendar =
+                let calendar =
                     selectedCalendar
 
                 let day =
@@ -1231,7 +1231,7 @@ struct LargeDateTimeEditor:
         hour: Int,
         minute: Int
     ) {
-        var calendar =
+        let calendar =
             selectedCalendar
 
         let day =
@@ -1286,7 +1286,7 @@ struct LargeDateTimeEditor:
         let now =
             Date()
 
-        var calendar =
+        let calendar =
             selectedCalendar
 
         let nowComponents =
