@@ -7,6 +7,80 @@ DEFAULT_SOURCE_DIR="$HOME/Testudo"
 SOURCE_DIR="${TESTUDO_SOURCE_DIR:-$DEFAULT_SOURCE_DIR}"
 CHECK_ONLY=0
 
+MINIMUM_MACOS_VERSION="26.0"
+MINIMUM_MACOS_SDK_VERSION="26.0"
+MINIMUM_SWIFT_MAJOR="6"
+
+version_at_least() {
+    local actual="$1"
+    local required="$2"
+
+    local actual_major=0
+    local actual_minor=0
+    local actual_patch=0
+
+    local required_major=0
+    local required_minor=0
+    local required_patch=0
+
+    local ignored=""
+
+    IFS='.' read -r \
+        actual_major \
+        actual_minor \
+        actual_patch \
+        ignored \
+        <<< "$actual"
+
+    IFS='.' read -r \
+        required_major \
+        required_minor \
+        required_patch \
+        ignored \
+        <<< "$required"
+
+    actual_minor="${actual_minor:-0}"
+    actual_patch="${actual_patch:-0}"
+
+    required_minor="${required_minor:-0}"
+    required_patch="${required_patch:-0}"
+
+    for component in \
+        "$actual_major" \
+        "$actual_minor" \
+        "$actual_patch" \
+        "$required_major" \
+        "$required_minor" \
+        "$required_patch"
+    do
+        if ! [[ "$component" =~ ^[0-9]+$ ]]; then
+            return 2
+        fi
+    done
+
+    if (( actual_major > required_major )); then
+        return 0
+    fi
+
+    if (( actual_major < required_major )); then
+        return 1
+    fi
+
+    if (( actual_minor > required_minor )); then
+        return 0
+    fi
+
+    if (( actual_minor < required_minor )); then
+        return 1
+    fi
+
+    if (( actual_patch >= required_patch )); then
+        return 0
+    fi
+
+    return 1
+}
+
 usage() {
     cat <<'EOF'
 
@@ -90,6 +164,50 @@ echo "✓ macOS detected."
 echo "✓ Apple Silicon detected."
 
 # ------------------------------------------------------------
+# macOS version
+# ------------------------------------------------------------
+
+if [ ! -x /usr/bin/sw_vers ]; then
+    echo
+    echo "ERROR: macOS version information is unavailable."
+    exit 1
+fi
+
+MACOS_VERSION="$(
+    /usr/bin/sw_vers -productVersion 2>/dev/null || true
+)"
+
+if [ -z "$MACOS_VERSION" ]; then
+    echo
+    echo "ERROR: Could not determine the installed macOS version."
+    exit 1
+fi
+
+if ! [[ "$MACOS_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+    echo
+    echo "ERROR: Could not interpret the installed macOS version."
+    echo "Detected value:"
+    echo "  $MACOS_VERSION"
+    exit 1
+fi
+
+if ! version_at_least \
+    "$MACOS_VERSION" \
+    "$MINIMUM_MACOS_VERSION"
+then
+    echo
+    echo "ERROR: Testudo requires macOS ${MINIMUM_MACOS_VERSION} or later."
+    echo
+    echo "Detected macOS:"
+    echo "  $MACOS_VERSION"
+    echo
+    echo "Please update macOS and run the Testudo installer again."
+    exit 1
+fi
+
+echo "✓ macOS $MACOS_VERSION satisfies the Testudo requirement."
+
+# ------------------------------------------------------------
 # Apple developer tools
 # ------------------------------------------------------------
 
@@ -136,6 +254,72 @@ fi
 echo "✓ Git available."
 
 # ------------------------------------------------------------
+# macOS SDK
+# ------------------------------------------------------------
+
+MACOS_SDK_VERSION="$(
+    /usr/bin/xcrun \
+        --sdk macosx \
+        --show-sdk-version \
+        2>/dev/null \
+        || true
+)"
+
+MACOS_SDK_PATH="$(
+    /usr/bin/xcrun \
+        --sdk macosx \
+        --show-sdk-path \
+        2>/dev/null \
+        || true
+)"
+
+if [ -z "$MACOS_SDK_VERSION" ] || [ -z "$MACOS_SDK_PATH" ]; then
+    echo
+    echo "ERROR: The selected Apple developer toolchain does not"
+    echo "provide a usable macOS SDK."
+    echo
+    echo "Selected developer directory:"
+    echo "  $(xcode-select -p 2>/dev/null || echo 'unknown')"
+    echo
+    echo "Please install or update Xcode / Apple Developer Tools"
+    echo "and run the Testudo installer again."
+    exit 1
+fi
+
+if ! [[ "$MACOS_SDK_VERSION" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
+    echo
+    echo "ERROR: Could not interpret the installed macOS SDK version."
+    echo "Detected SDK version:"
+    echo "  $MACOS_SDK_VERSION"
+    exit 1
+fi
+
+if ! version_at_least \
+    "$MACOS_SDK_VERSION" \
+    "$MINIMUM_MACOS_SDK_VERSION"
+then
+    echo
+    echo "ERROR: The selected Apple developer toolchain is too old"
+    echo "to build the current Testudo release."
+    echo
+    echo "Required macOS SDK:"
+    echo "  ${MINIMUM_MACOS_SDK_VERSION} or later"
+    echo
+    echo "Detected macOS SDK:"
+    echo "  $MACOS_SDK_VERSION"
+    echo
+    echo "Selected developer directory:"
+    echo "  $(xcode-select -p 2>/dev/null || echo 'unknown')"
+    echo
+    echo "Please update Xcode / Apple Developer Tools and"
+    echo "run the Testudo installer again."
+    exit 1
+fi
+
+echo "✓ macOS SDK $MACOS_SDK_VERSION available."
+echo "  $MACOS_SDK_PATH"
+
+# ------------------------------------------------------------
 # Swift
 # ------------------------------------------------------------
 
@@ -170,9 +354,9 @@ fi
 
 SWIFT_MAJOR="${SWIFT_VERSION%%.*}"
 
-if [ "$SWIFT_MAJOR" -lt 6 ]; then
+if [ "$SWIFT_MAJOR" -lt "$MINIMUM_SWIFT_MAJOR" ]; then
     echo
-    echo "ERROR: Testudo requires Swift 6.0 or later."
+    echo "ERROR: Testudo requires Swift ${MINIMUM_SWIFT_MAJOR}.0 or later."
     echo "Detected Swift version: $SWIFT_VERSION"
     exit 1
 fi
