@@ -1,6 +1,6 @@
 \documentclass{testudomanual}
 
-\newcommand{\ManualVersion}{1.1}
+\newcommand{\ManualVersion}{1.2}
 \newcommand{\DocumentedTestudoVersion}{0.1.4}
 \newcommand{\DocumentedTestudoBuild}{5}
 \newcommand{\ManualDate}{October 2026}
@@ -106,6 +106,12 @@ technical, academic and research work.
 This edition documents Testudo
 \DocumentedTestudoVersion\
 (build \DocumentedTestudoBuild).
+
+Manual version 1.2 reflects the current macOS 26 application baseline,
+the modern SwiftUI interface, reliable global New Entry routing,
+native sidebar behaviour, Liquid Glass Back and Forward detail
+navigation, the unified structural detail inspectors, and the current
+warning-free SwiftPM build workflow.
 
 The manual focuses on the user-facing concepts and workflows of the
 application. It also explains the local-first storage model,
@@ -273,15 +279,24 @@ configuration.
 
 \section{System requirements}
 
-The current public version of Testudo requires:
+The current public Testudo source targets the modern Apple development
+platform.
+
+It requires:
 
 \begin{itemize}
-    \item macOS 14 or later;
+    \item macOS 26 or later;
     \item an Apple Silicon Mac;
-    \item Swift 6.0 or later;
-    \item Xcode or Apple Command Line Tools;
+    \item Xcode 27 or an equivalent Apple developer toolchain;
+    \item Apple Swift 6.4 or later;
     \item Git for the normal source-based installation workflow.
 \end{itemize}
+
+Older macOS and Xcode releases are not maintained as compatibility
+targets for the current source tree.
+
+Testudo uses current native SwiftUI functionality, including the
+modern macOS Liquid Glass interface.
 
 The current distribution model intentionally builds the application
 locally from source.
@@ -315,6 +330,10 @@ The installer:
 
 The Testudo executable itself is therefore compiled on the user's Mac
 rather than downloaded as a prebuilt application binary.
+
+Before installing the current source, update macOS and Xcode to the
+supported versions above. An older SDK or Swift toolchain is not a
+supported build environment.
 
 
 \section{Inspecting the installer first}
@@ -690,18 +709,35 @@ The exact content depends on the currently selected area.
 
 \section{Main navigation}
 
-The primary navigation provides access to the major functional areas,
-including:
+The current sidebar provides:
 
 \begin{itemize}
-    \item Work;
+    \item New Entry;
+    \item Today;
     \item Calendar;
+    \item All Tasks;
+    \item To Do;
+    \item In Progress;
+    \item Completed;
+    \item Archive;
+    \item Timeline;
     \item Themes;
-    \item People;
-    \item Groups;
     \item Organizations;
-    \item Environment administration where permitted.
+    \item Groups;
+    \item People.
 \end{itemize}
+
+
+\section{Sidebar visibility}
+
+Testudo uses the native macOS sidebar visibility control.
+
+When the sidebar is visible, the control belongs to the upper-right
+area of the sidebar. When the sidebar is hidden, macOS relocates the
+control beside the standard window controls.
+
+On the current macOS interface the control uses the native Liquid
+Glass appearance.
 
 
 \section{Detail navigation}
@@ -735,6 +771,11 @@ behaviour.
 The detail area maintains Back and Forward navigation history so that
 users can follow chains of references without losing their previous
 context.
+
+Two small independent circular Liquid Glass buttons are positioned at
+the upper-right of the right-hand detail pane.
+
+Supported trackpad gestures use the same Back and Forward history.
 
 \section{Hierarchical presentation}
 
@@ -772,6 +813,27 @@ Themes and nested Work remain consistent with ordinary List rows.
 % ============================================================
 
 \chapter{Work}
+
+\section{New Entry}
+
+New Entry is Testudo's global Work creation action.
+
+Selecting New Entry in the sidebar opens the New Work Entry editor
+directly in the right-hand pane, independently of the previously
+selected sidebar area.
+
+The keyboard shortcut is:
+
+\begin{lstlisting}
+Command-N
+\end{lstlisting}
+
+The editor can create a Task, Note or Activity and exposes the
+relevant Theme, Parent Task, timing, time-zone and relationship
+controls.
+
+After cancelling a creation form, selecting New Entry again opens a
+fresh creation form.
 
 \section{Work item types}
 
@@ -1081,22 +1143,26 @@ the Work hierarchy itself to reproduce the same structure.
 
 \section{Theme information}
 
-A Theme may contain information such as:
+The current Theme inspector exposes:
 
 \begin{itemize}
     \item name;
+    \item parent Theme;
     \item summary;
     \item notes;
-    \item code;
-    \item status;
-    \item priority;
-    \item owner;
+    \item related People, Groups and Organizations;
     \item start date;
     \item target date;
     \item tags;
     \item URL;
-    \item visual symbol.
+    \item SF Symbol;
+    \item created and updated timestamps.
 \end{itemize}
+
+Older Environment data can contain additional legacy structure
+metadata. Structure code, status, priority and owner fields remain
+compatible at the persistence layer but are not exposed by the current
+Theme interface.
 
 
 \section{Themes and Work}
@@ -1258,15 +1324,15 @@ hierarchies to be represented.
 
 \section{Organization metadata}
 
-Organizational entities may include information such as:
+The current Organization inspector exposes:
 
 \begin{itemize}
     \item full name;
     \item short name;
-    \item code;
-    \item status;
-    \item priority;
-    \item owner;
+    \item structural memberships;
+    \item affiliated People;
+    \item start date;
+    \item target date;
     \item website;
     \item e-mail;
     \item phone;
@@ -1275,8 +1341,15 @@ Organizational entities may include information such as:
     \item postal code;
     \item country;
     \item tags;
-    \item notes.
+    \item SF Symbol;
+    \item notes;
+    \item created and updated timestamps.
 \end{itemize}
+
+Older Environment data can contain additional legacy structure
+metadata. Structure code, status, priority and owner remain compatible
+at the persistence layer but are not exposed by the current
+Organization or Group interface.
 
 
 \section{Groups}
@@ -1313,6 +1386,10 @@ different from ``Task C is assigned to Person A''.
 
 Organizations and Groups use the same Related Work pane as People and
 Themes.
+
+The lower detail inspectors for Themes, Organizations, Groups and
+People use a consistent card-based visual language and aligned
+vertical spacing.
 
 The view can contain Tasks, Notes and Activities.
 
@@ -1806,35 +1883,38 @@ when copying, sharing or backing them up.
 
 \chapter{Troubleshooting}
 
-\section{The build stops at Planning deferred tasks}
+\section{The build fails with an old toolchain}
 
-Newer Swift toolchains may use a newer Swift build backend by default.
+The current Testudo source targets macOS 26 and the contemporary
+Apple SwiftUI SDK.
 
-Testudo's build script explicitly prefers the established native
-SwiftPM build backend where that option is supported.
-
-Make sure the repository is current:
+Check the selected development tools:
 
 \begin{lstlisting}
-git pull --ff-only
-\end{lstlisting}
-
-Then rebuild:
-
-\begin{lstlisting}
-./Scripts/build-local-dmg.sh
-\end{lstlisting}
-
-
-\section{Swift is too old}
-
-Check the version:
-
-\begin{lstlisting}
+xcodebuild -version
 swift --version
 \end{lstlisting}
 
-Testudo currently requires Swift 6.0 or later.
+The documented baseline is Xcode 27 with Apple Swift 6.4 or later.
+
+If older versions are installed, update macOS and Xcode before
+retrying the build.
+
+
+\section{SwiftPM build progress}
+
+Current Testudo uses SwiftPM's modern default build backend.
+
+During a normal build SwiftPM may display progress such as:
+
+\begin{lstlisting}
+[Planning deferred tasks]
+\end{lstlisting}
+
+This text is build progress and is not itself an error.
+
+The current production baseline has been verified to complete normally
+with the supported toolchain.
 
 
 \section{Apple developer tools are missing}
@@ -2075,6 +2155,13 @@ The resulting bundle is created under:
 dist/Testudo.app
 \end{lstlisting}
 
+The current build script uses SwiftPM's modern default build backend
+and does not force the deprecated legacy
+\filepath{--build-system native} option.
+
+The current production baseline is maintained as a warning-free build
+with the supported Xcode 27 and Apple Swift 6.4 toolchain.
+
 
 \section{Local DMG build}
 
@@ -2201,11 +2288,14 @@ git pull --ff-only
 \end{lstlisting}
 
 
-\section{Check Swift}
+\section{Check Xcode and Swift}
 
 \begin{lstlisting}
+xcodebuild -version
 swift --version
 \end{lstlisting}
+
+The documented baseline is Xcode 27 and Apple Swift 6.4 or later.
 
 
 \section{Request Apple Command Line Tools}

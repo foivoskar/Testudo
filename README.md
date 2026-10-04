@@ -4,328 +4,359 @@
   <img src="Sources/Testudo/Resources/TestudoIcon.png" alt="Testudo application icon" width="180">
 </p>
 
-**Testudo** is a native macOS application for organizing complex professional and research work across tasks, notes, activities, calendar events, people, groups, organizations, themes, and independent Work Environments.
+<p align="center">
+  <strong>A native, local-first macOS environment for structured professional and research work.</strong>
+</p>
 
-It is designed especially for researchers, research software engineers, technical staff, academics, and people whose work involves multiple projects, institutions, collaborators, and scientific domains.
+Testudo combines work management, professional context, organizational structure, calendar information, chronology, and portable local storage in one native macOS application.
+
+It is intended for work that cannot be represented well by a flat task list: scientific research, research software engineering, academic collaboration, technical operations, laboratories, infrastructure, multi-institution projects, committees, and other long-running professional activity.
 
 **Current documented version: Testudo 0.1.4 (build 5).**
+
+---
+
+## Requirements
+
+The current Testudo source targets the modern Apple development platform.
+
+Required:
+
+- **macOS 26 or later**
+- **Apple Silicon Mac**
+- **Xcode 27** or an equivalent Apple developer toolchain
+- **Apple Swift 6.4 or later**
+- Git
+
+Older macOS and Xcode versions are not maintained as compatibility targets for the current source tree.
+
+Testudo uses current native SwiftUI functionality, including the modern macOS Liquid Glass interface.
+
+---
 
 ## Installation
 
 Testudo currently uses a **source-first local installation model**.
 
-The application is compiled directly on the Mac where it will be used. No prebuilt Testudo executable is required, and no paid Apple Developer account is needed for this installation method.
+The application is compiled directly on the Mac where it will be used. A prebuilt Testudo executable is not required, and the current local-build workflow does not require membership in the paid Apple Developer Program.
 
-### Quick install
+Before installing, update macOS and Xcode to the supported versions above.
 
-The easiest installation method is:
+### Quick installation
 
-    curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh | bash
+```bash
+curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh | bash
+```
 
-This command downloads the Testudo installation script from the public repository.
+The installer obtains the public source code, builds Testudo locally, ad-hoc signs the resulting application, creates a local installer DMG, verifies it, and opens the finished installer.
 
-The script then:
+When the DMG opens, drag `Testudo.app` into `Applications`.
 
-- verifies that the Mac is compatible
-- checks the Apple developer tools
-- checks that Swift 6.0 or later is available
-- clones the Testudo source code into `~/Testudo`
-- safely updates an existing clean `~/Testudo` checkout
-- builds Testudo locally in release configuration
-- ad-hoc signs the locally compiled application
-- creates and verifies a local installer DMG
-- opens the finished installer
+The default source checkout is:
 
-The Testudo application executable itself is **not downloaded prebuilt**. It is compiled locally from the public source code on the user's Mac.
+```text
+~/Testudo
+```
 
-When the installer opens, drag `Testudo.app` into `Applications`.
+The installer deliberately refuses to overwrite a source checkout that contains local modifications.
 
-The automatic installer never overwrites an existing source checkout containing local modifications.
+### Inspect the installer first
 
-### Manual local build
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh \
+  -o testudo-install.sh
+```
 
-Users who prefer to inspect and run each step manually can clone Testudo themselves:
+Then inspect the file and run:
 
-    git clone https://github.com/foivoskar/Testudo.git
-    cd Testudo
+```bash
+bash testudo-install.sh
+```
 
-Then build the local installer:
+### Manual build
 
-    ./Scripts/build-local-dmg.sh
+```bash
+git clone https://github.com/foivoskar/Testudo.git
+cd Testudo
+./Scripts/build-local-dmg.sh
+```
 
-The resulting installer is written to `dist/`, for example:
+The resulting installer is written to `dist/`, normally as:
 
-    dist/Testudo-0.1.4-macOS-arm64.dmg
+```text
+dist/Testudo-0.1.4-macOS-arm64.dmg
+```
 
-When the build finishes, the completed installer opens automatically.
+### Updating
 
-Drag `Testudo.app` into `Applications`.
+For an installation made with the quick installer, run the same installation command again.
 
-### Requirements
+For a manual checkout:
 
-- macOS 14 or later
-- Apple Silicon Mac
-- Swift 6.0 or later
-- Xcode or Apple Command Line Tools
-- Git
+```bash
+cd ~/Testudo
+git pull --ff-only
+./Scripts/build-local-dmg.sh
+```
 
-If Apple developer tools are not installed, request them with:
+Replace the older application in `/Applications` with the newly built copy.
 
-    xcode-select --install
+---
 
-After the installation of the developer tools completes, run the Testudo installation command again.
+## Core model
 
-### Updating Testudo
+Testudo connects several domains that are often split across unrelated applications:
 
-If the quick installer was used previously, simply run the same command again:
+- Tasks and arbitrarily nested sub-tasks
+- Notes
+- Activities and work history
+- Calendar Events
+- Themes and sub-themes
+- People
+- Groups
+- Organizations
+- professional affiliations
+- semantic Work relationships
+- time-zone-aware dates
+- independent portable Work Environments
 
-    curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh | bash
+The purpose is not only to record what must be done. Testudo also preserves **what happened, who or what the work concerned, where it belongs conceptually, and how it evolved over time**.
 
-The installer detects the existing `~/Testudo` checkout and performs a safe fast-forward update before rebuilding the application.
-
-Alternatively, update manually:
-
-    cd ~/Testudo
-    git pull --ff-only
-    ./Scripts/build-local-dmg.sh
-
-If Testudo was cloned somewhere else, run the equivalent commands from that repository.
-
-### Custom source directory
-
-The installer uses:
-
-    ~/Testudo
-
-by default.
-
-A different source directory can be selected by downloading the installer script and supplying `--source-dir`, or by setting the `TESTUDO_SOURCE_DIR` environment variable.
-
-For example:
-
-    curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh -o /tmp/testudo-install.sh
-    bash /tmp/testudo-install.sh --source-dir "$HOME/Developer/Testudo"
-
-### Inspect before running
-
-Users who prefer to inspect the installer before executing it can download it first:
-
-    curl -fsSL https://raw.githubusercontent.com/foivoskar/Testudo/main/install.sh -o testudo-install.sh
-
-Inspect `testudo-install.sh`, then run:
-
-    bash testudo-install.sh
-
-### Source archive alternative
-
-Git is not required by the Testudo build scripts themselves.
-
-A GitHub source archive can also be downloaded and extracted manually. From the extracted Testudo directory, run:
-
-    ./Scripts/build-local-dmg.sh
-
-Using the Git checkout or quick installer is recommended because subsequent updates are simpler.
-
-### Distribution model
-
-Testudo currently does not use prebuilt application binaries as its normal installation channel.
-
-Git tags identify source versions of Testudo. Installation is performed by compiling Testudo locally from the public source code.
-
-This keeps the current installation model independent of Developer ID distribution and Apple notarization of a prebuilt Testudo executable.
-
-## Documentation
-
-A complete English user manual is available directly from this repository:
-
-- [Testudo User Manual — PDF](Testudo_manual.pdf)
-- [LaTeX source](Documentation/TestudoManual/Testudo_manual.tex)
-- [LaTeX document class](Documentation/TestudoManual/testudomanual.cls)
-
-The manual covers installation, Work Environments, authentication, navigation, Tasks, Notes, Activities, Calendar Events, Themes, People, Groups, Organizations, external calendars, time zones, data portability, administration, security, troubleshooting, recommended workflows and technical reference material.
-
-The PDF is generated from the LaTeX sources stored under `Documentation/TestudoManual/`.
-
-## Core idea
-
-Testudo combines three things that are often separated in conventional task managers:
-
-- hierarchical work
-- people and organizational structure
-- chronological activity and history
-
-A Work Environment can contain Tasks, sub-tasks, Notes, Activities, Calendar Events, Themes, People, Groups, Organizations, affiliations, relationships, and historical information.
-
-Work can be related to entities through semantic relationships such as:
-
-- For
-- Requested by
-- With
-- Assigned to
-- Related to
+---
 
 ## Work Environments
 
 Testudo supports multiple independent **Work Environments**.
 
-Each Environment is stored as a portable `.testudoenv` package.
+Each Environment is stored as a portable `.testudoenv` package. A typical package contains:
 
-A typical Environment package contains:
+```text
+Example.testudoenv/
+├── EnvironmentManifest.json
+├── EnvironmentData.json
+├── EnvironmentCredentials.json
+└── EnvironmentIcon.png
+```
 
-    Example.testudoenv/
-    ├── EnvironmentManifest.json
-    ├── EnvironmentData.json
-    ├── EnvironmentCredentials.json
-    └── EnvironmentIcon.png
+The icon is optional.
 
-The icon file is optional.
+A Work Environment may be stored locally or in a filesystem location synchronized through Dropbox, iCloud Drive, OneDrive, or another provider available to macOS.
 
-Environment packages can be stored locally or in a synchronized filesystem location such as Dropbox, iCloud Drive, OneDrive, or another location available to macOS.
+Testudo works directly with the Environment package rather than importing it into a required central cloud service.
 
-Testudo works directly with the selected package rather than copying its data into an internal database.
+Cloud-synchronized storage should still be treated as filesystem synchronization. Avoid simultaneous conflicting edits from several computers.
+
+---
 
 ## Local-first design
 
-Testudo is designed as a local-first macOS application.
+Testudo does not require a Testudo cloud service.
 
-There is no required Testudo cloud service. Environment data remains inside its `.testudoenv` package.
+Environment data remains inside the selected `.testudoenv` package.
 
-Application-level state such as the local Testudo profile, registered Environment locations and local authentication state is stored separately from Environment data.
+Application-level information such as the local Testudo profile, registered Environment locations, and local authentication state is stored separately.
 
-## Identity and authentication
+This separation keeps Work Environment data portable and independently back-upable.
 
-Testudo has two distinct identity layers.
+---
 
-### Testudo application user
+## Interface
 
-The local application user has a Testudo profile and application password.
+Testudo uses a native three-column macOS interface:
 
-The application account supports:
+1. **left sidebar** — global navigation
+2. **middle column** — lists, hierarchies and collections
+3. **right pane** — creation and detail views
 
-- password changes
-- password recovery using three security questions
-- portable `.testudouser` profile export/import
-- Log Out
-- complete local Sign Out
+The sidebar contains:
 
-### Work Environment users
+- New Entry
+- Today
+- Calendar
+- All Tasks
+- To Do
+- In Progress
+- Completed
+- Archive
+- Timeline
+- Themes
+- Organizations
+- Groups
+- People
 
-Each Work Environment has its own memberships, roles and authentication.
+### Sidebar visibility
 
-Environment users can:
+The native macOS sidebar control hides and restores the first column.
 
-- sign in with an Environment username and password
-- change their own password
-- configure three security questions
-- recover a forgotten password using one of those questions
+When the sidebar is visible, the control belongs to the upper-right area of the sidebar. When it is hidden, macOS relocates the control beside the standard window controls.
 
-Environment Administrators can assign a new password to another Environment member without knowing the previous password.
+On current macOS this uses the native Liquid Glass appearance.
 
-Application authentication and Environment authentication are independent.
+### Detail navigation
 
-## Work
+The right pane keeps browser-style Back and Forward history.
 
-### Tasks
+Two small circular Liquid Glass buttons appear at the upper-right of the right pane:
 
-Tasks represent actionable work and can have the following states:
+- Back
+- Forward
+
+Trackpad navigation gestures use the same history.
+
+Displayed references inside detail views are navigable where appropriate, allowing direct movement between Work items, Themes, People, Groups, Organizations and Calendar Events.
+
+---
+
+## New Entry
+
+`New Entry` is the global Work creation action.
+
+Selecting it opens the **New Work Entry** editor in the right pane regardless of which sidebar area was selected previously.
+
+The keyboard shortcut is:
+
+```text
+Command-N
+```
+
+The creation form can create:
+
+- Task
+- Note
+- Activity
+
+It also exposes the relevant Theme, Parent Task, dates, time zones and Work relationships.
+
+New Entry is repeatable: after cancelling a creation form, selecting New Entry again opens a fresh form.
+
+---
+
+## Tasks
+
+Tasks represent actionable work.
+
+Task states are:
 
 - To Do
 - In Progress
 - Completed
 - Closed
 
-Tasks can contain:
+Tasks can contain further Tasks to arbitrary depth.
 
-- sub-tasks
-- Notes
-- Activities
+They can also participate in Theme membership, relationships, deadlines, chronology and history.
 
-Nested Tasks can themselves contain further Work, allowing arbitrarily deep Work hierarchies.
+---
 
-Tasks can have deadlines, scheduling information, history, relationships, and Theme membership.
+## Notes
 
-### Notes
+Notes preserve contextual or durable information without requiring Task status.
 
-Notes preserve contextual or durable information inside the Work hierarchy without requiring Task status.
+Notes can live inside the Work hierarchy and can use reminders and relationships where appropriate.
 
-Notes can also participate in reminders and relationships where appropriate.
+---
 
-### Activities
+## Activities
 
-An **Activity** records something that happened while work was being performed.
+Activities record something that happened.
 
-Examples include a discussion, decision, intervention, measurement, review, completed action, or resolved dependency.
+Examples include:
+
+- a discussion
+- a decision
+- a measurement
+- an intervention
+- a review
+- a completed action
+- a resolved problem
 
 Activities are chronological work-log objects.
 
-They are deliberately separate from Calendar Events:
+They are deliberately different from Calendar Events:
 
-    Activity       = something recorded as having happened
-    Calendar Event = a scheduled calendar object with a time interval
+```text
+Activity       = something recorded as having happened
+Calendar Event = a scheduled calendar object
+```
+
+---
 
 ## Themes
 
-Themes provide a semantic classification layer independent of both the Work hierarchy and the organizational hierarchy.
+Themes provide semantic classification independently of both the Work hierarchy and the organizational hierarchy.
 
-Themes can be hierarchical.
+Themes can themselves be hierarchical.
 
-A Theme may contain metadata such as:
+The current Theme interface exposes:
 
 - name
+- parent Theme
 - summary
 - notes
-- code
-- status
-- priority
-- owner
+- related People, Groups and Organizations
 - start date
 - target date
 - tags
 - URL
-- visual symbol
+- SF Symbol
+- created and updated timestamps
+
+Older Environment files may contain additional legacy metadata fields. Structure code, status, priority and owner remain persistence-compatible but are not exposed by the current Theme interface.
 
 ### Multi-Theme Work
 
-A Work item can belong to more than one Theme.
+A Work item may belong to more than one Theme.
 
-This allows a Task, Note, or Activity to participate in several semantic domains without duplicating the Work item.
+This allows one Task, Note or Activity to participate in several semantic domains without duplication.
 
-The current model supports explicit multi-Theme membership while remaining compatible with older single-Theme records.
+### Descendant aggregation
 
-### Parent Theme aggregation
-
-The **Related Work** view of a parent Theme includes:
-
-- Work assigned directly to the Theme
-- Work belonging to child Themes
-- Work belonging to all deeper descendant Themes
-
-Aggregation is recursive.
+A parent Theme's Related Work includes Work associated with descendant Themes recursively.
 
 For example:
 
-    Theme A
-    └── Theme B
-        └── Theme C
+```text
+Theme A
+└── Theme B
+    └── Theme C
+```
 
-A Note belonging to Theme C appears in the Related Work views of Theme C, Theme B, and Theme A.
+Work belonging to Theme C can appear in the Related Work views of Theme C, Theme B and Theme A.
 
-This does not reassign the Work item to the parent Themes. It is a consolidated parent view.
+This does not silently reassign the Work item to all ancestor Themes.
+
+---
+
+## People
+
+People are first-class professional entities.
+
+A Person can have:
+
+- profile information
+- multiple affiliations
+- a primary affiliation
+- Work relationships
+- Related Work
+
+A Person inside a Work Environment is distinct from the installation's Local User Profile.
+
+---
 
 ## Organizations
 
-Organizations represent institutional structures such as universities, institutes, departments, companies, observatories, and research centres.
+Organizations represent institutional structures such as universities, institutes, departments, companies, observatories and research centres.
 
-Organizations can contain other Organizations and Groups.
+Organizations may contain other Organizations.
 
-They can hold rich metadata including:
+The current Organization interface exposes:
 
 - full name
 - short name
-- code
-- status
-- priority
-- owner
+- structural memberships
+- affiliated People
+- start and target dates
 - website
 - e-mail
 - telephone
@@ -334,29 +365,29 @@ They can hold rich metadata including:
 - postal code
 - country
 - tags
+- SF Symbol
 - notes
+- created and updated timestamps
 
-An Organization's **Related Work** pane includes both its own Work context and the Related Work of all descendant entities.
+Legacy persisted structure code, status, priority and owner fields remain compatible with older data but are not exposed in the current Organization interface.
+
+---
 
 ## Groups
 
-Groups represent teams, laboratories, committees, collaborations, working groups, project teams, and technical teams.
+Groups represent laboratories, teams, committees, collaborations, working groups and similar collective structures.
 
-Groups may exist inside Organizations or other supported containers and may contain People.
+Groups use the same general structural detail system as Organizations.
 
-A Group's **Related Work** pane uses the same presentation as People, Themes, and Organizations.
+Themes, Organizations, Groups and People share a consistent card-based detail presentation.
 
-Parent Groups aggregate Related Work from descendant entities recursively.
+---
 
-## People
+## Work relationships
 
-People are first-class entities with detailed professional profiles and affiliations.
+Work can be linked semantically to People, Groups and Organizations.
 
-A Person can have multiple affiliations and can belong to multiple Groups and Organizations.
-
-One affiliation may be marked as primary.
-
-People can participate in Work relationships through semantic roles such as:
+Available roles are:
 
 - For
 - Requested by
@@ -364,18 +395,22 @@ People can participate in Work relationships through semantic roles such as:
 - Assigned to
 - Related to
 
-The Person detail view uses the same **Related Work** presentation as Themes, Groups, and Organizations.
+A relationship may be marked **Inherited by children**.
+
+This allows descendant Work items to inherit useful context from a parent Task while still adding their own relationships.
+
+---
 
 ## Related Work
 
-People, Themes, Organizations, and Groups use a common **Related Work** pane at the top of the right-hand detail view.
+People, Themes, Organizations and Groups share a common **Related Work** presentation.
 
-When Related Work exists, the right pane is divided into two independently scrollable halves:
+When Related Work exists, the right pane is divided into two independently scrollable regions:
 
-- upper half: Related Work
-- lower half: the object's normal detail inspector
+- upper region — Related Work
+- lower region — the object's normal detail inspector
 
-If there is no Related Work, the normal detail view occupies the full height.
+When no Related Work exists, the detail inspector uses the full height.
 
 Related Work can contain:
 
@@ -383,108 +418,71 @@ Related Work can contain:
 - Notes
 - Activities
 
-Each compact row can display:
+For Themes, descendant Theme Work can be aggregated recursively.
 
-- Work icon
-- title
-- Work type
-- Task status where applicable
-- Theme
-- deadline where applicable
-- description/body preview
-- creation date at the far right
+For Organizations and Groups, relevant Work can be aggregated from descendant structural entities.
 
-The same typography, spacing, and navigation behaviour is used in all four structural areas.
+Duplicate Work items are suppressed when several descendant paths resolve to the same item.
 
-### Descendant aggregation
+---
 
-Related Work propagates upward for presentation.
+## Calendar
 
-For Themes, a parent sees Work belonging to all descendant Themes.
+Calendar Events are separate from Activities.
 
-For Organizations and Groups, a parent sees Related Work associated with descendant Organizations, Groups, and People.
+Testudo supports:
 
-Aggregation is recursive and does not change the underlying memberships or relationships.
+- Testudo Calendar Events
+- Apple Calendar / EventKit integration
+- iCal subscriptions
+- links between Calendar Events and Testudo Work
+- Environment-level calendar administration where appropriate
 
-Work items are not duplicated merely because several descendant paths make the same Work item relevant.
+External calendar information may be read-only depending on its source.
 
-### Relationship inheritance
+---
 
-Related Work aggregation is separate from Work relationship inheritance.
+## Time zones
 
-A Work relationship can also be marked **Inherited by children**, allowing descendant Work items to inherit a semantic relationship defined on a parent Work item.
+Date and time handling is time-zone-aware.
 
-Both mechanisms can operate at the same time.
+The device time zone is the default display context, while timestamps can retain their source IANA time-zone identifiers.
 
-## Navigation
+This allows Testudo to preserve the absolute instant while presenting dates and times correctly when the user's system time zone changes.
 
-Testudo uses a native three-column macOS interface:
+The date/time picker uses a Monday-first calendar layout.
 
-1. main navigation
-2. lists, trees, and collections
-3. detail pane
+---
 
-### Middle-column selection
+## Identity and authentication
 
-The selected item in the middle column uses an application-controlled full-row blue selection.
+Testudo has two distinct identity layers.
 
-The selection fills the available row width and height and uses subtle rounded corners.
+### Local Testudo user
 
-The same treatment is applied to ordinary rows and hierarchical DisclosureGroup rows, including Themes and nested Work.
+The installation-level user has a local Testudo profile and application authentication.
 
-### Global object navigation
+The application supports:
 
-Displayed references throughout the detail interface are navigable wherever navigation is semantically appropriate.
+- password changes
+- password recovery through security questions
+- portable `.testudouser` profile export/import
+- Log Out
+- complete local Sign Out
 
-Supported destinations include:
+### Work Environment users
 
-- Tasks
-- Notes
-- Activities
-- Themes
-- People
-- Groups
-- Organizations
-- Calendar Events
+Each Work Environment has its own membership and authentication.
 
-Descriptions and previews that represent a particular object also navigate to their owning object.
+Environment Administrators can manage Environment membership and supported password administration independently of the local application password.
 
-For example:
-
-- a Related Work title opens that Work item
-- its body preview opens the same Work item
-- a displayed Theme name opens the Theme
-- Calendar Event Work and Theme references open their corresponding objects
-
-Editors, selectors, menus, disclosure controls, and other interactive controls retain their original editing or selection behaviour.
-
-The detail pane maintains Back and Forward navigation history.
+---
 
 ## Demo Environment
 
-The Work Environments screen includes **Load Demo Environment**.
+The Work Environments screen can generate a complete fictional Demo Environment.
 
-This generates a complete fictional academic and scientific working environment intended to demonstrate Testudo without requiring the user to enter data manually.
-
-The Demo environment is centred on software development and scientific work in a university or research institute with extensive international collaboration.
-
-It includes areas such as:
-
-- Research Software Engineering
-- Scientific Computing and HPC
-- Data Infrastructure
-- AI and Data Science
-- Earth and Environmental Sciences
-- Physics and Astronomy
-- Computational Biology
-- Chemistry and Materials Science
-- Instrumentation and Sensors
-- Open Science and FAIR Data
-- International Collaborations
-- Seminars and Training
-- Research Administration
-
-The generated Demo contains interconnected:
+The Demo contains interconnected examples of:
 
 - People
 - Organizations
@@ -496,109 +494,90 @@ The generated Demo contains interconnected:
 - Activities
 - Calendar Events
 - affiliations
-- work relationships
-- history
+- Work relationships
+- chronology and history
 
-Demo dates are generated relative to the day on which the Environment is created.
+Demo dates are generated relative to the date on which the Environment is created.
 
-The generated timeline covers approximately:
+---
 
-- one month before the creation date
-- two months after the creation date
+## Portable profiles
 
-Operational dates are placed on working days and during normal working hours.
+The local Testudo profile can be exported as a `.testudouser` file.
 
-The current Testudo application user becomes the Administrator of the Demo Environment and their compatible profile information is used for the corresponding Person.
+This can restore profile information after local Sign Out.
 
-Demo Environments initially contain no Environment passwords, allowing immediate exploration.
+A `.testudouser` file intentionally does not contain Environment passwords, recovery credentials or Environment registrations.
 
-Repeated Demo creation uses the lowest available name:
-
-    Demo
-    Demo-2
-    Demo-3
-
-If a numbered Demo is removed from Testudo, its available number can be reused later.
-
-## Environment icons
-
-Each Work Environment can optionally use a custom icon.
-
-The icon is stored directly inside the `.testudoenv` package.
-
-If no custom icon exists, Testudo uses its default Environment icon.
-
-Environment Administrators can change or restore the icon through Admin Tools.
-
-## Portable Testudo profiles
-
-The local Testudo user profile can be exported as a `.testudouser` file.
-
-This provides a convenient way to restore profile information after a complete local Sign Out.
-
-Environment registrations, Environment passwords and recovery credentials are intentionally not stored in `.testudouser`.
+---
 
 ## Building from source
 
-Developer requirements:
-
-- macOS 14 or later
-- Apple Silicon
-- Swift 6.0 or later
-- Xcode or Apple Command Line Tools
-
 Build the application bundle directly with:
 
-    ./Scripts/build-app.sh
+```bash
+./Scripts/build-app.sh
+```
 
-The resulting application is created at:
+The result is created at:
 
-    dist/Testudo.app
+```text
+dist/Testudo.app
+```
 
-The default Testudo version and build number are defined in:
+Testudo uses SwiftPM's current **default build backend**.
 
-    Scripts/version.sh
+The production source is currently maintained as a **zero-warning build** with the supported Xcode 27 / Apple Swift 6.4 toolchain.
 
-This file is the single source of truth used by the build scripts.
+Version and build identity are defined centrally in:
 
-## Building a local installer DMG
+```text
+Scripts/version.sh
+```
 
-For development, testing, or release preparation, build the local installer DMG with:
+### Build a local installer DMG
 
-    ./Scripts/build-release.sh
+```bash
+./Scripts/build-release.sh
+```
 
-The default version and build number are read from `Scripts/version.sh`.
+or use:
 
-A specific version and build number can still be supplied explicitly:
+```bash
+./Scripts/build-local-dmg.sh
+```
 
-    ./Scripts/build-release.sh 0.2.0 6
+---
 
-The resulting disk image is written to `dist/`, for example:
+## Documentation
 
-    dist/Testudo-0.1.4-macOS-arm64.dmg
+The complete English user manual is maintained in this repository:
 
-The DMG contains:
+- [Testudo User Manual — PDF](Testudo_manual.pdf)
+- [LaTeX source](Documentation/TestudoManual/Testudo_manual.tex)
+- [LaTeX document class](Documentation/TestudoManual/testudomanual.cls)
 
-- `Testudo.app`
-- an `Applications` shortcut
+The current documentation edition is **Testudo User Manual 1.2**, documenting Testudo **0.1.4 (build 5)**.
 
-The build script sizes the writable installer image from the current application bundle instead of relying on a fixed application-size assumption.
+---
 
-Installation consists of dragging Testudo into the Applications folder.
+## Development status
 
-## Release status
+Testudo is an early public release.
 
-Testudo is currently an early public release.
+Its interface and data model will continue to evolve.
 
-The application and its data model may continue to evolve.
+Maintain independent backups of important `.testudoenv` packages, especially when moving between early versions.
 
-Maintain backups of important `.testudoenv` packages, particularly while using early releases.
+---
 
 ## License
 
 Testudo is released under the **MIT License**.
 
-See the `LICENSE` file.
+See [`LICENSE`](LICENSE).
+
+---
 
 ## Author
 
