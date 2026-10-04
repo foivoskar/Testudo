@@ -3558,8 +3558,16 @@ private struct EntityListView: View {
                             )
                 }
                 .sorted(
-                    by:
-                        organizationSort
+                    by: {
+                        lhs,
+                        rhs in
+
+                        lhs.name
+                            .localizedCaseInsensitiveCompare(
+                                rhs.name
+                            )
+                        == .orderedAscending
+                    }
                 )
 
 
@@ -3607,9 +3615,17 @@ private struct EntityListView: View {
                         == organization.id
                     }
                     .sorted(
-                        by:
-                            organizationSort
-                    )
+                    by: {
+                        lhs,
+                        rhs in
+
+                        lhs.name
+                            .localizedCaseInsensitiveCompare(
+                                rhs.name
+                            )
+                        == .orderedAscending
+                    }
+                )
 
 
             for child in
@@ -3639,8 +3655,16 @@ private struct EntityListView: View {
         for organization in
             organizations
                 .sorted(
-                    by:
-                        organizationSort
+                    by: {
+                        lhs,
+                        rhs in
+
+                        lhs.name
+                            .localizedCaseInsensitiveCompare(
+                                rhs.name
+                            )
+                        == .orderedAscending
+                    }
                 )
         {
             if
@@ -3659,20 +3683,6 @@ private struct EntityListView: View {
 
 
         return result
-    }
-
-
-    private func organizationSort(
-        _ lhs:
-            Entity,
-        _ rhs:
-            Entity
-    ) -> Bool {
-        lhs.name
-            .localizedCaseInsensitiveCompare(
-                rhs.name
-            )
-        == .orderedAscending
     }
 
 

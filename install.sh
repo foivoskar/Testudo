@@ -117,7 +117,7 @@ echo "✓ Apple developer tools available."
 # Required commands
 # ------------------------------------------------------------
 
-for command_name in git swift; do
+for command_name in git; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo
         echo "ERROR: Required command not found:"
@@ -126,13 +126,36 @@ for command_name in git swift; do
     fi
 done
 
+if [ ! -x /usr/bin/xcrun ]; then
+    echo
+    echo "ERROR: xcrun is unavailable."
+    echo "Install Xcode or Apple Command Line Tools and try again."
+    exit 1
+fi
+
 echo "✓ Git available."
 
 # ------------------------------------------------------------
 # Swift
 # ------------------------------------------------------------
 
-SWIFT_VERSION_OUTPUT="$(swift --version)"
+APPLE_SWIFT="$(
+    /usr/bin/xcrun --find swift 2>/dev/null || true
+)"
+
+if [ -z "$APPLE_SWIFT" ] || [ ! -x "$APPLE_SWIFT" ]; then
+    echo
+    echo "ERROR: Apple Swift could not be located through xcrun."
+    echo
+    echo "Selected developer directory:"
+    xcode-select -p 2>/dev/null || true
+    exit 1
+fi
+
+echo "✓ Apple Swift:"
+echo "  $APPLE_SWIFT"
+
+SWIFT_VERSION_OUTPUT="$("$APPLE_SWIFT" --version)"
 SWIFT_VERSION="$(
     printf '%s\n' "$SWIFT_VERSION_OUTPUT" \
     | sed -n 's/.*Swift version \([0-9][0-9.]*\).*/\1/p' \

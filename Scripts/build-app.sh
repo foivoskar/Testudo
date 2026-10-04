@@ -14,6 +14,40 @@ echo "Building Testudo ${VERSION} (${BUILD_NUMBER}) [$CONFIG]..."
 echo
 
 # ------------------------------------------------------------
+# Apple developer toolchain
+# ------------------------------------------------------------
+#
+# Testudo is a native macOS application. Build it with the
+# Swift compiler selected by xcrun so Swift, Clang, SDK and
+# linker all come from one coherent Apple toolchain.
+#
+# This prevents environment managers such as Conda, Swiftly
+# or Homebrew from injecting incompatible compiler tools.
+
+if [ ! -x /usr/bin/xcrun ]; then
+    echo "ERROR: xcrun is unavailable."
+    echo "Install Xcode or Apple Command Line Tools."
+    exit 1
+fi
+
+APPLE_SWIFT="$(
+    /usr/bin/xcrun --find swift 2>/dev/null || true
+)"
+
+if [ -z "$APPLE_SWIFT" ] || [ ! -x "$APPLE_SWIFT" ]; then
+    echo "ERROR: Apple Swift could not be located through xcrun."
+    echo
+    echo "Selected developer directory:"
+    xcode-select -p 2>/dev/null || true
+    exit 1
+fi
+
+echo "Apple Swift:"
+echo "  $APPLE_SWIFT"
+"$APPLE_SWIFT" --version
+echo
+
+# ------------------------------------------------------------
 # SwiftPM build backend
 # ------------------------------------------------------------
 #
@@ -27,7 +61,7 @@ echo
 # Older Swift toolchains that do not expose --build-system already
 # use the native backend, so they continue to build normally.
 
-SWIFT_BUILD_HELP="$(swift build --help 2>&1 || true)"
+SWIFT_BUILD_HELP="$("$APPLE_SWIFT" build --help 2>&1 || true)"
 
 BUILD_SYSTEM_ARGS=()
 
@@ -48,7 +82,7 @@ fi
 
 echo
 
-swift build "${BUILD_SYSTEM_ARGS[@]}" -c "$CONFIG"
+"$APPLE_SWIFT" build "${BUILD_SYSTEM_ARGS[@]}" -c "$CONFIG"
 
 BIN="$ROOT/.build/$CONFIG/Testudo"
 

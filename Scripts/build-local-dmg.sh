@@ -39,8 +39,8 @@ echo "✓ Apple Silicon detected."
 # ------------------------------------------------------------
 
 REQUIRED_COMMANDS=(
-    swift
     xcode-select
+    xcrun
     codesign
     hdiutil
     iconutil
@@ -73,7 +73,20 @@ echo "✓ Apple developer tools available."
 
 echo
 
-SWIFT_VERSION_OUTPUT="$(swift --version)"
+APPLE_SWIFT="$(
+    /usr/bin/xcrun --find swift 2>/dev/null || true
+)"
+
+if [ -z "$APPLE_SWIFT" ] || [ ! -x "$APPLE_SWIFT" ]; then
+    echo "ERROR: Apple Swift could not be located through xcrun."
+    exit 1
+fi
+
+echo "Apple Swift:"
+echo "  $APPLE_SWIFT"
+echo
+
+SWIFT_VERSION_OUTPUT="$("$APPLE_SWIFT" --version)"
 echo "$SWIFT_VERSION_OUTPUT"
 echo
 
@@ -114,6 +127,15 @@ echo
 echo "------------------------------------------------------------"
 echo "BUILDING TESTUDO"
 echo "------------------------------------------------------------"
+echo
+
+# SwiftPM workspace metadata is not necessarily compatible
+# between toolchain versions. A source-first user installation
+# therefore starts from a fresh build cache.
+
+echo "Cleaning previous SwiftPM build cache..."
+rm -rf "$ROOT/.build"
+echo "✓ SwiftPM build cache cleared."
 echo
 
 ./Scripts/build-release.sh \
