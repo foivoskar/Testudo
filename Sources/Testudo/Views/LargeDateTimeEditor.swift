@@ -34,13 +34,13 @@ struct LargeDateTimeEditor:
             alignment:
                 .leading,
             spacing:
-                20
+                16
         ) {
             HStack(
                 alignment:
                     .top,
                 spacing:
-                    28
+                    24
             ) {
                 calendarSection
 
@@ -58,7 +58,7 @@ struct LargeDateTimeEditor:
                 timeZoneSection
             }
         }
-        .padding(18)
+        .padding(16)
         .onAppear {
             if
                 TestudoTime
@@ -85,7 +85,7 @@ struct LargeDateTimeEditor:
             alignment:
                 .leading,
             spacing:
-                12
+                10
         ) {
             Label(
                 "Date",
@@ -102,7 +102,7 @@ struct LargeDateTimeEditor:
 
             VStack(
                 spacing:
-                    12
+                    9
             ) {
                 HStack {
                     Button {
@@ -161,13 +161,16 @@ struct LargeDateTimeEditor:
                     columns:
                         calendarColumns,
                     spacing:
-                        7
+                        5
                 ) {
                     ForEach(
-                        weekdaySymbols,
+                        Array(
+                            weekdaySymbols
+                                .enumerated()
+                        ),
                         id:
-                            \.self
-                    ) { symbol in
+                            \.offset
+                    ) { _, symbol in
                         Text(symbol)
                             .font(
                                 .system(
@@ -195,10 +198,10 @@ struct LargeDateTimeEditor:
                 }
             }
             .padding(
-                14
+                12
             )
             .frame(
-                width: 390
+                width: 370
             )
             .background(
                 Color.primary
@@ -258,10 +261,10 @@ struct LargeDateTimeEditor:
                 GridItem(
                     .flexible(
                         minimum:
-                            42
+                            38
                     ),
                     spacing:
-                        7
+                        5
                 ),
             count:
                 7
@@ -465,7 +468,7 @@ struct LargeDateTimeEditor:
             )
             .font(
                 .system(
-                    size: 14,
+                    size: 13,
                     weight:
                         isSelected
                         ? .semibold
@@ -489,7 +492,7 @@ struct LargeDateTimeEditor:
                 maxWidth:
                     .infinity,
                 minHeight:
-                    39
+                    34
             )
             .background(
                 isSelected
@@ -694,7 +697,7 @@ struct LargeDateTimeEditor:
             alignment:
                 .leading,
             spacing:
-                12
+                10
         ) {
             Label(
                 "Time",
@@ -714,7 +717,7 @@ struct LargeDateTimeEditor:
             )
             .font(
                 .system(
-                    size: 42,
+                    size: 38,
                     weight:
                         .semibold,
                     design:
@@ -730,7 +733,7 @@ struct LargeDateTimeEditor:
                 alignment:
                     .top,
                 spacing:
-                    10
+                    8
             ) {
                 numberColumn(
                     title:
@@ -760,7 +763,7 @@ struct LargeDateTimeEditor:
                     )
                     .padding(
                         .top,
-                        48
+                        43
                     )
 
                 numberColumn(
@@ -808,7 +811,7 @@ struct LargeDateTimeEditor:
             }
         }
         .frame(
-            width: 260,
+            width: 250,
             alignment:
                 .topLeading
         )
@@ -826,7 +829,7 @@ struct LargeDateTimeEditor:
             alignment:
                 .leading,
             spacing:
-                7
+                6
         ) {
             Text(title)
                 .font(
@@ -894,7 +897,7 @@ struct LargeDateTimeEditor:
                                     maxWidth:
                                         .infinity,
                                     minHeight:
-                                        34
+                                        30
                                 )
                                 .contentShape(
                                     Rectangle()
@@ -965,8 +968,8 @@ struct LargeDateTimeEditor:
                 }
             }
             .frame(
-                width: 92,
-                height: 245
+                width: 86,
+                height: 220
             )
             .background(
                 Color.primary
@@ -1859,8 +1862,18 @@ struct LargeDateTimeEditor:
                     .gregorian
             )
 
+        calendar.locale =
+            .autoupdatingCurrent
+
         calendar.timeZone =
             selectedTimeZone
+
+        // Testudo uses a Monday-first working week.
+        calendar.firstWeekday =
+            2
+
+        calendar.minimumDaysInFirstWeek =
+            4
 
         return calendar
     }
