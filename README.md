@@ -12,7 +12,7 @@ Testudo combines work management, professional context, organizational structure
 
 It is intended for work that cannot be represented well by a flat task list: scientific research, research software engineering, academic collaboration, technical operations, laboratories, infrastructure, multi-institution projects, committees, and other long-running professional activity.
 
-**Current documented version: Testudo 0.1.4 (build 5).**
+**Current documented version: Testudo 0.1.5 (build 6).**
 
 ---
 
@@ -85,7 +85,7 @@ cd Testudo
 The resulting installer is written to `dist/`, normally as:
 
 ```text
-dist/Testudo-0.1.4-macOS-arm64.dmg
+dist/Testudo-0.1.5-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -204,6 +204,8 @@ Two small circular Liquid Glass buttons appear at the upper-right of the right p
 
 Trackpad navigation gestures use the same history.
 
+The history follows the actual content displayed in the right pane. Tasks, Notes, Activities, Themes, People, Organizations, Groups, Calendar Events, New Work Entry and New Calendar Event views can therefore participate in the same Back/Forward chain. Explicitly selecting another object always replaces a transient creation view.
+
 Displayed references inside detail views are navigable where appropriate, allowing direct movement between Work items, Themes, People, Groups, Organizations and Calendar Events.
 
 ---
@@ -304,6 +306,8 @@ The current Theme interface exposes:
 
 Older Environment files may contain additional legacy metadata fields. Structure code, status, priority and owner remain persistence-compatible but are not exposed by the current Theme interface.
 
+The normal Theme detail view is read-only. A single **Edit** action in the Theme header opens the complete Theme editor, replacing the previous per-property edit controls.
+
 ### Multi-Theme Work
 
 A Work item may belong to more than one Theme.
@@ -370,6 +374,8 @@ The current Organization interface exposes:
 - created and updated timestamps
 
 Legacy persisted structure code, status, priority and owner fields remain compatible with older data but are not exposed in the current Organization interface.
+
+Organizations and Groups use the same whole-object editing model as People: the normal detail inspector remains read-only and one **Edit** action opens a complete editor for the object, including structural memberships and affiliated People.
 
 ---
 
@@ -557,7 +563,7 @@ The complete English user manual is maintained in this repository:
 - [LaTeX source](Documentation/TestudoManual/Testudo_manual.tex)
 - [LaTeX document class](Documentation/TestudoManual/testudomanual.cls)
 
-The current documentation edition is **Testudo User Manual 1.2**, documenting Testudo **0.1.4 (build 5)**.
+The current documentation edition is **Testudo User Manual 1.2**, documenting Testudo **0.1.5 (build 6)**.
 
 ---
 

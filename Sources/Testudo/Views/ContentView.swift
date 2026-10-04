@@ -352,6 +352,14 @@ private enum DetailNavigationEntry:
     case calendarEvent(
         id: UUID
     )
+
+    case workCreation(
+        request: WorkCreationRequest
+    )
+
+    case calendarEventCreation(
+        request: CalendarEventCreationRequest
+    )
 }
 
 struct ContentView: View {
@@ -449,9 +457,6 @@ struct ContentView: View {
                                     0
                             )
                         }
-                        .fontWeight(
-                            .medium
-                        )
                         .frame(
                             maxWidth:
                                 .infinity,
@@ -696,9 +701,20 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerWorkSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+
+                if selection == .newEntry {
+                    selection =
+                        .allTasks
+                }
+            }
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selectedCalendarEventID
@@ -706,9 +722,18 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerCalendarEventSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+
+                selection =
+                    .calendar
+            }
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selectedThemeID
@@ -716,9 +741,15 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerThemeSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+            }
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selectedOrganizationID
@@ -726,9 +757,15 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerOrganizationSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+            }
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selectedGroupID
@@ -736,9 +773,15 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerGroupSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+            }
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selectedPersonID
@@ -746,9 +789,31 @@ struct ContentView: View {
             _,
             newValue in
 
-            registerPersonSelection(
-                newValue
-            )
+            if newValue != nil {
+                workCreationRequest =
+                    nil
+
+                calendarEventCreationRequest =
+                    nil
+            }
+
+            registerVisibleDetailNavigation()
+        }
+        .onChange(
+            of: calendarEventCreationRequest
+        ) {
+            _,
+            _ in
+
+            registerVisibleDetailNavigation()
+        }
+        .onChange(
+            of: workCreationRequest
+        ) {
+            _,
+            _ in
+
+            registerVisibleDetailNavigation()
         }
         .onChange(
             of: selection
@@ -988,183 +1053,183 @@ struct ContentView: View {
     }
 
 
-    private func registerWorkSelection(
-        _ id: UUID?
-    ) {
-        if
-            let id,
-            selection == .newEntry
-        {
-            workCreationRequest =
-                nil
-
-            selection =
-                .allTasks
-
-            registerDetailNavigation(
-                .work(
-                    section:
-                        .allTasks,
-                    id:
-                        id
-                )
-            )
-
-            return
+    private var visibleDetailNavigationEntry:
+        DetailNavigationEntry?
+    {
+        guard
+            let section =
+                selection
+        else {
+            return nil
         }
 
-        guard
-            let id,
-            let section =
-                selection,
-            (
-                isWorkSection(
-                    section
+        // Keep this precedence aligned with
+        // WorkDetailRouterView.
+
+        if
+            section == .calendar,
+            let request =
+                calendarEventCreationRequest
+        {
+            return
+                .calendarEventCreation(
+                    request:
+                        request
                 )
-                || section == .themes
-            )
+        }
+
+        if
+            section == .calendar,
+            let selectedCalendarEventID
+        {
+            return
+                .calendarEvent(
+                    id:
+                        selectedCalendarEventID
+                )
+        }
+
+        if
+            let request =
+                workCreationRequest
+        {
+            return
+                .workCreation(
+                    request:
+                        request
+                )
+        }
+
+        if
+            section == .themes,
+            let selectedWorkItemID
+        {
+            return
+                .work(
+                    section:
+                        .themes,
+                    id:
+                        selectedWorkItemID
+                )
+        }
+
+        if
+            section == .themes,
+            let selectedThemeID
+        {
+            return
+                .theme(
+                    id:
+                        selectedThemeID
+                )
+        }
+
+        if
+            section == .organizations,
+            let selectedOrganizationID
+        {
+            return
+                .organization(
+                    id:
+                        selectedOrganizationID
+                )
+        }
+
+        if
+            section == .groups,
+            let selectedGroupID
+        {
+            return
+                .group(
+                    id:
+                        selectedGroupID
+                )
+        }
+
+        if
+            section == .people,
+            let selectedPersonID
+        {
+            return
+                .person(
+                    id:
+                        selectedPersonID
+                )
+        }
+
+        if
+            detailRouterShowsWork(
+                in:
+                    section
+            ),
+            let selectedWorkItemID
+        {
+            return
+                .work(
+                    section:
+                        section,
+                    id:
+                        selectedWorkItemID
+                )
+        }
+
+        return nil
+    }
+
+
+    private func registerVisibleDetailNavigation() {
+        guard
+            let entry =
+                visibleDetailNavigationEntry
         else {
             return
         }
 
-        workCreationRequest =
-            nil
+        // Changing only the Work filter while the exact same
+        // Work object remains visible must not create a fake
+        // browser-history step. Update only its section context.
+        if
+            case
+                .work(
+                    let newSection,
+                    let newID
+                ) =
+                entry,
+            case
+                .work(
+                    _,
+                    let currentID
+                )? =
+                currentDetailEntry,
+            newID == currentID
+        {
+            currentDetailEntry =
+                .work(
+                    section:
+                        newSection,
+                    id:
+                        newID
+                )
 
-        if section == .themes {
-            selectedThemeID =
-                nil
+            return
         }
 
         registerDetailNavigation(
-            .work(
-                section:
-                    section,
-                id:
-                    id
-            )
+            entry
         )
     }
 
-    private func registerCalendarEventSelection(
-        _ id: UUID?
-    ) {
-        guard
-            let id,
-            selection == .calendar
-        else {
-            return
-        }
 
-        workCreationRequest =
+    private func presentNewEntry() {
+        selectedWorkItemID =
+            nil
+
+        selectedCalendarEventID =
             nil
 
         calendarEventCreationRequest =
             nil
 
-        selectedWorkItemID =
-            nil
-
-        registerDetailNavigation(
-            .calendarEvent(
-                id: id
-            )
-        )
-    }
-
-
-    private func registerThemeSelection(
-        _ id: UUID?
-    ) {
-        guard
-            let id,
-            selection == .themes
-        else {
-            return
-        }
-
-        workCreationRequest =
-            nil
-
-        selectedWorkItemID =
-            nil
-
-        registerDetailNavigation(
-            .theme(
-                id: id
-            )
-        )
-    }
-
-    private func registerOrganizationSelection(
-        _ id: UUID?
-    ) {
-        guard
-            let id,
-            selection == .organizations
-        else {
-            return
-        }
-
-        workCreationRequest =
-            nil
-
-        selectedWorkItemID =
-            nil
-
-        registerDetailNavigation(
-            .organization(
-                id: id
-            )
-        )
-    }
-
-    private func registerGroupSelection(
-        _ id: UUID?
-    ) {
-        guard
-            let id,
-            selection == .groups
-        else {
-            return
-        }
-
-        workCreationRequest =
-            nil
-
-        selectedWorkItemID =
-            nil
-
-        registerDetailNavigation(
-            .group(
-                id: id
-            )
-        )
-    }
-
-    private func registerPersonSelection(
-        _ id: UUID?
-    ) {
-        guard
-            let id,
-            selection == .people
-        else {
-            return
-        }
-
-        workCreationRequest =
-            nil
-
-        selectedWorkItemID =
-            nil
-
-        registerDetailNavigation(
-            .person(
-                id: id
-            )
-        )
-    }
-
-    private func presentNewEntry() {
         workCreationRequest =
             WorkCreationRequest(
                 initialKind:
@@ -1184,121 +1249,56 @@ struct ContentView: View {
         _ newSection:
             SidebarSection?
     ) {
-        guard let newSection
+        guard
+            let newSection
         else {
             return
         }
 
-        if newSection != .newEntry {
+        if
+            newSection != .newEntry
+        {
             workCreationRequest =
                 nil
         }
 
-        if newSection == .newEntry {
-            if
-                workCreationRequest
-                    == nil
-            {
-                presentNewEntry()
-            }
-
-            return
+        if
+            newSection == .newEntry,
+            workCreationRequest
+                == nil
+        {
+            presentNewEntry()
         }
 
-        // Moving between Work filters does not create a
-        // new browser-history entry when the right pane
-        // still shows exactly the same object. We merely
-        // update the section context of the current entry.
-        if
-            isWorkSection(
-                newSection
-            ),
-            let selectedWorkItemID
-        {
-            let newEntry =
-                DetailNavigationEntry
-                    .work(
-                        section:
-                            newSection,
-                        id:
-                            selectedWorkItemID
-                    )
+        registerVisibleDetailNavigation()
+    }
 
-            if
-                case
-                    .work(
-                        _,
-                        let currentID
-                    )? =
-                    currentDetailEntry,
-                currentID
-                    == selectedWorkItemID
-            {
-                currentDetailEntry =
-                    newEntry
-            } else {
-                registerDetailNavigation(
-                    newEntry
-                )
-            }
 
-            return
-        }
+    private func detailRouterShowsWork(
+        in section:
+            SidebarSection
+    ) -> Bool {
+        // This mirrors WorkDetailRouterView.isWorkSection.
+        switch section {
+        case .today,
+             .calendar,
+             .allTasks,
+             .todo,
+             .inProgress,
+             .completed,
+             .timeline:
+            return true
 
-        if
-            newSection == .themes,
-            let selectedThemeID
-        {
-            registerDetailNavigation(
-                .theme(
-                    id:
-                        selectedThemeID
-                )
-            )
-
-            return
-        }
-
-        if
-            newSection == .organizations,
-            let selectedOrganizationID
-        {
-            registerDetailNavigation(
-                .organization(
-                    id:
-                        selectedOrganizationID
-                )
-            )
-
-            return
-        }
-
-        if
-            newSection == .groups,
-            let selectedGroupID
-        {
-            registerDetailNavigation(
-                .group(
-                    id:
-                        selectedGroupID
-                )
-            )
-
-            return
-        }
-
-        if
-            newSection == .people,
-            let selectedPersonID
-        {
-            registerDetailNavigation(
-                .person(
-                    id:
-                        selectedPersonID
-                )
-            )
+        case .newEntry,
+             .archive,
+             .themes,
+             .organizations,
+             .groups,
+             .people:
+            return false
         }
     }
+
 
     private func registerDetailNavigation(
         _ entry:
@@ -1480,6 +1480,7 @@ struct ContentView: View {
             DetailNavigationEntry
     ) {
         switch entry {
+
         case
             .work(
                 let section,
@@ -1489,11 +1490,25 @@ struct ContentView: View {
             workCreationRequest =
                 nil
 
+            calendarEventCreationRequest =
+                nil
+
+            if section == .calendar {
+                selectedCalendarEventID =
+                    nil
+            }
+
+            if section == .themes {
+                selectedThemeID =
+                    nil
+            }
+
             selection =
                 section
 
             selectedWorkItemID =
                 id
+
 
         case
             .calendarEvent(
@@ -1515,12 +1530,16 @@ struct ContentView: View {
             selection =
                 .calendar
 
+
         case
             .theme(
                 let id
             ):
 
             workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
                 nil
 
             selectedWorkItemID =
@@ -1532,12 +1551,16 @@ struct ContentView: View {
             selection =
                 .themes
 
+
         case
             .organization(
                 let id
             ):
 
             workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
                 nil
 
             selectedWorkItemID =
@@ -1549,12 +1572,16 @@ struct ContentView: View {
             selection =
                 .organizations
 
+
         case
             .group(
                 let id
             ):
 
             workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
                 nil
 
             selectedWorkItemID =
@@ -1566,12 +1593,16 @@ struct ContentView: View {
             selection =
                 .groups
 
+
         case
             .person(
                 let id
             ):
 
             workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
                 nil
 
             selectedWorkItemID =
@@ -1582,8 +1613,51 @@ struct ContentView: View {
 
             selection =
                 .people
+
+
+        case
+            .workCreation(
+                let request
+            ):
+
+            selectedWorkItemID =
+                nil
+
+            selectedCalendarEventID =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            selection =
+                .newEntry
+
+            workCreationRequest =
+                request
+
+
+        case
+            .calendarEventCreation(
+                let request
+            ):
+
+            workCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            selectedCalendarEventID =
+                nil
+
+            selection =
+                .calendar
+
+            calendarEventCreationRequest =
+                request
         }
     }
+
 
     private func isWorkSection(
         _ section:

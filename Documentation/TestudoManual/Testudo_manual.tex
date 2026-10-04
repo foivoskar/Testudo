@@ -1,8 +1,8 @@
 \documentclass{testudomanual}
 
 \newcommand{\ManualVersion}{1.2}
-\newcommand{\DocumentedTestudoVersion}{0.1.4}
-\newcommand{\DocumentedTestudoBuild}{5}
+\newcommand{\DocumentedTestudoVersion}{0.1.5}
+\newcommand{\DocumentedTestudoBuild}{6}
 \newcommand{\ManualDate}{October 2026}
 
 \newcommand{\TestudoIconPath}{
@@ -777,6 +777,16 @@ the upper-right of the right-hand detail pane.
 
 Supported trackpad gestures use the same Back and Forward history.
 
+The navigation history follows the content actually displayed in the
+right-hand pane rather than only Work-item selection. Tasks, Notes,
+Activities, Themes, People, Organizations, Groups, Calendar Events
+and the supported creation views can therefore participate in the
+same Back and Forward chain.
+
+An explicit selection always takes precedence over a transient
+creation view, so selecting a concrete object immediately opens that
+object in the right-hand pane.
+
 \section{Hierarchical presentation}
 
 Hierarchical data is used extensively.
@@ -1164,6 +1174,11 @@ metadata. Structure code, status, priority and owner fields remain
 compatible at the persistence layer but are not exposed by the current
 Theme interface.
 
+The normal Theme inspector is read-only. A single Edit action in the
+Theme header opens the complete Theme editor. This replaces the former
+per-property pencil controls and provides one consistent edit workflow
+for the whole Theme.
+
 
 \section{Themes and Work}
 
@@ -1350,6 +1365,11 @@ Older Environment data can contain additional legacy structure
 metadata. Structure code, status, priority and owner remain compatible
 at the persistence layer but are not exposed by the current
 Organization or Group interface.
+
+Organizations and Groups use the same whole-object editing pattern as
+People. Their normal inspectors are read-only, and a single Edit action
+in the header opens the complete editor, including structural
+memberships and affiliated People.
 
 
 \section{Groups}

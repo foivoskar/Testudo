@@ -10,15 +10,16 @@ VERSION="${1:-$TESTUDO_VERSION}"
 BUILD_NUMBER="${2:-$TESTUDO_BUILD_NUMBER}"
 ARCH="$(uname -m)"
 
-APP_NAME="Testudo"
 APP_PATH="dist/Testudo.app"
-
 DIST_DIR="dist"
 
 DMG_NAME="Testudo-${VERSION}-macOS-${ARCH}.dmg"
 DMG_PATH="${DIST_DIR}/${DMG_NAME}"
 
-RW_DMG="${DIST_DIR}/Testudo-${VERSION}-rw.dmg"
+RW_IMAGE="${DIST_DIR}/Testudo-${VERSION}-working.raw.dmg"
+
+MOUNT_DIR="${DIST_DIR}/dmg-working-mount"
+VERIFY_MOUNT="${DIST_DIR}/dmg-verify-mount"
 
 VOLNAME="Testudo ${VERSION}"
 
@@ -32,9 +33,8 @@ echo "Build:        ${BUILD_NUMBER}"
 echo "Architecture: ${ARCH}"
 echo
 
-
 # ============================================================
-# BUILD APP
+# 1. BUILD APPLICATION
 # ============================================================
 
 echo "Building Testudo.app..."
@@ -52,7 +52,7 @@ fi
 
 EXECUTABLE="$APP_PATH/Contents/MacOS/Testudo"
 
-if [ ! -f "$EXECUTABLE" ]; then
+if [ ! -x "$EXECUTABLE" ]; then
     echo "ERROR: Testudo executable was not found."
     exit 1
 fi
@@ -67,146 +67,144 @@ echo "Verifying application bundle..."
 plutil -lint \
     "$APP_PATH/Contents/Info.plist"
 
-echo "✓ Info.plist valid."
-
-
-# ============================================================
-# DETERMINE INSTALLER IMAGE SIZE
-# ============================================================
-
-APP_SIZE_KIB="$(
-    du -sk "$APP_PATH"     | awk '{print $1}'
+APP_VERSION="$(
+    /usr/libexec/PlistBuddy \
+        -c 'Print :CFBundleShortVersionString' \
+        "$APP_PATH/Contents/Info.plist"
 )"
 
-if [ -z "$APP_SIZE_KIB" ]; then
-    echo "ERROR: Could not determine Testudo.app size."
+APP_BUILD="$(
+    /usr/libexec/PlistBuddy \
+        -c 'Print :CFBundleVersion' \
+        "$APP_PATH/Contents/Info.plist"
+)"
+
+if [ "$APP_VERSION" != "$VERSION" ]; then
+    echo "ERROR: Application version mismatch."
+    echo "Expected: $VERSION"
+    echo "Actual:   $APP_VERSION"
     exit 1
 fi
 
-APP_SIZE_MIB="$(
-    awk -v kib="$APP_SIZE_KIB"         'BEGIN { printf "%d", (kib + 1023) / 1024 }'
+if [ "$APP_BUILD" != "$BUILD_NUMBER" ]; then
+    echo "ERROR: Application build mismatch."
+    echo "Expected: $BUILD_NUMBER"
+    echo "Actual:   $APP_BUILD"
+    exit 1
+fi
+
+echo "✓ Application bundle valid."
+echo "✓ Application version: ${APP_VERSION} (${APP_BUILD})"
+
+# ============================================================
+# 2. CALCULATE WORKING IMAGE SIZE
+# ============================================================
+
+APP_SIZE_KIB="$(
+    du -sk "$APP_PATH" |
+    awk '{print $1}'
 )"
 
-# Give the writable installer image enough space for:
-# - Testudo.app
-# - filesystem metadata
-# - Finder metadata
-# - future application growth
-#
-# Never create an image smaller than 100 MiB.
+APP_SIZE_MIB="$(
+    awk -v kib="$APP_SIZE_KIB" \
+        'BEGIN { printf "%d", (kib + 1023) / 1024 }'
+)"
 
-DMG_SIZE_MIB=$((APP_SIZE_MIB + 64))
+IMAGE_SIZE_MIB=$((APP_SIZE_MIB + 64))
 
-if [ "$DMG_SIZE_MIB" -lt 100 ]; then
-    DMG_SIZE_MIB=100
+if [ "$IMAGE_SIZE_MIB" -lt 100 ]; then
+    IMAGE_SIZE_MIB=100
 fi
 
 echo
 echo "Application size: approximately ${APP_SIZE_MIB} MiB"
-echo "Writable DMG size: ${DMG_SIZE_MIB} MiB"
-
+echo "Working image size: ${IMAGE_SIZE_MIB} MiB"
 
 # ============================================================
-# CLEAN PREVIOUS TEMP IMAGE
+# 3. CLEAN PREVIOUS IMAGE STATE
 # ============================================================
 
 rm -f \
-    "$RW_DMG" \
+    "$RW_IMAGE" \
     "$DMG_PATH"
 
 rm -rf \
-    "$DIST_DIR/dmg-mount"
+    "$MOUNT_DIR" \
+    "$VERIFY_MOUNT"
 
+mkdir -p \
+    "$MOUNT_DIR" \
+    "$VERIFY_MOUNT"
 
-# ============================================================
-# CREATE WRITABLE BLANK IMAGE
-# ============================================================
-
-echo
-echo "Creating writable installer image..."
-
-hdiutil create \
-    -size "${DMG_SIZE_MIB}m" \
-    -fs HFS+ \
-    -volname "$VOLNAME" \
-    "$RW_DMG" \
-    >/dev/null
-
-
-# ============================================================
-# MOUNT NORMALLY UNDER /Volumes
-# ============================================================
-
-echo "Mounting installer image..."
-
-ATTACH_INFO="$(
-    hdiutil attach \
-        "$RW_DMG" \
-        -readwrite \
-        -noverify \
-        -noautoopen \
-        -nobrowse \
-        -plist \
-    | python3 -c '
-import plistlib
-import sys
-
-data = plistlib.loads(
-    sys.stdin.buffer.read()
-)
-
-for entity in data.get("system-entities", []):
-    mount = entity.get("mount-point")
-    device = entity.get("dev-entry")
-
-    if mount and device:
-        print(device)
-        print(mount)
-        break
-else:
-    raise SystemExit("Could not find mounted volume in hdiutil plist.")
-'
-)"
-
-DEVICE="$(
-    printf '%s\n' "$ATTACH_INFO" \
-    | sed -n '1p'
-)"
-
-MOUNT_DIR="$(
-    printf '%s\n' "$ATTACH_INFO" \
-    | sed -n '2p'
-)"
-
-if [ -z "$DEVICE" ] || [ -z "$MOUNT_DIR" ]; then
-    echo "ERROR: Could not determine mounted DMG information."
-    exit 1
-fi
-
-echo "Device:     $DEVICE"
-echo "Mount point: $MOUNT_DIR"
-
-if [ ! -d "$MOUNT_DIR" ]; then
-    echo "ERROR: Mounted volume directory does not exist."
-    exit 1
-fi
-
+WORKING_ATTACHED=0
+VERIFY_ATTACHED=0
 
 cleanup() {
-    hdiutil detach \
-        "$DEVICE" \
-        >/dev/null 2>&1 \
-        || true
+    if [ "$VERIFY_ATTACHED" -eq 1 ]; then
+        diskutil eject \
+            "$VERIFY_MOUNT" \
+            >/dev/null 2>&1 \
+            || true
+    fi
+
+    if [ "$WORKING_ATTACHED" -eq 1 ]; then
+        diskutil eject \
+            "$MOUNT_DIR" \
+            >/dev/null 2>&1 \
+            || true
+    fi
+
+    rm -rf \
+        "$MOUNT_DIR" \
+        "$VERIFY_MOUNT"
 
     rm -f \
-        "$RW_DMG"
+        "$RW_IMAGE"
 }
 
 trap cleanup EXIT
 
+# ============================================================
+# 4. CREATE BLANK READ/WRITE APFS IMAGE
+# ============================================================
+
+echo
+echo "Creating working APFS disk image..."
+
+diskutil image create blank \
+    --format RAW \
+    --size "${IMAGE_SIZE_MIB}MiB" \
+    --volumeName "$VOLNAME" \
+    --fs APFS \
+    "$RW_IMAGE"
+
+if [ ! -s "$RW_IMAGE" ]; then
+    echo "ERROR: Working disk image was not created."
+    exit 1
+fi
+
+echo "✓ Working image created."
 
 # ============================================================
-# COPY INSTALLER CONTENT
+# 5. ATTACH WORKING IMAGE
+# ============================================================
+
+echo
+echo "Attaching working image..."
+
+diskutil image attach \
+    --mountPoint "$MOUNT_DIR" \
+    "$RW_IMAGE"
+
+WORKING_ATTACHED=1
+
+if [ ! -d "$MOUNT_DIR" ]; then
+    echo "ERROR: Working image mount point is unavailable."
+    exit 1
+fi
+
+# ============================================================
+# 6. COPY INSTALLER CONTENT
 # ============================================================
 
 echo
@@ -222,61 +220,165 @@ ln -s \
 
 sync
 
+if [ ! -d "$MOUNT_DIR/Testudo.app" ]; then
+    echo "ERROR: Testudo.app missing from working image."
+    exit 1
+fi
+
+if [ ! -L "$MOUNT_DIR/Applications" ]; then
+    echo "ERROR: Applications link missing from working image."
+    exit 1
+fi
+
+echo "✓ Installer contents copied."
 
 # ============================================================
-# INSTALLER CONTENT COMPLETE
-# ============================================================
-
-# No Finder or AppleScript window is opened here.
-#
-# The writable installer image remains hidden while it is being
-# prepared. The user will see only the final DMG opened by
-# build-local-dmg.sh after the complete build has finished.
-
-sync
-
-
-# ============================================================
-# DETACH WRITABLE IMAGE
+# 7. EJECT WORKING IMAGE
 # ============================================================
 
 echo
-echo "Detaching writable image..."
+echo "Ejecting working image..."
 
-hdiutil detach \
-    "$DEVICE" \
-    >/dev/null
+diskutil eject \
+    "$MOUNT_DIR"
+
+WORKING_ATTACHED=0
+
+# ============================================================
+# 8. CONVERT EXISTING IMAGE TO COMPRESSED UDZO
+# ============================================================
+
+echo
+echo "Creating compressed release image..."
+
+diskutil image create from \
+    --format UDZO \
+    "$RW_IMAGE" \
+    "$DMG_PATH"
+
+if [ ! -s "$DMG_PATH" ]; then
+    echo "ERROR: Final DMG was not created."
+    exit 1
+fi
+
+echo "✓ Compressed DMG created."
+
+# ============================================================
+# 9. ATTACH FINAL IMAGE READ-ONLY
+# ============================================================
+
+echo
+echo "Attaching final DMG read-only for verification..."
+
+diskutil image attach \
+    --readOnly \
+    --mountOptions nobrowse \
+    --mountPoint "$VERIFY_MOUNT" \
+    "$DMG_PATH"
+
+VERIFY_ATTACHED=1
+
+if [ ! -d "$VERIFY_MOUNT/Testudo.app" ]; then
+    echo "ERROR: Testudo.app missing from final DMG."
+    exit 1
+fi
+
+if [ ! -L "$VERIFY_MOUNT/Applications" ]; then
+    echo "ERROR: Applications link missing from final DMG."
+    exit 1
+fi
+
+LINK_TARGET="$(
+    readlink \
+        "$VERIFY_MOUNT/Applications"
+)"
+
+if [ "$LINK_TARGET" != "/Applications" ]; then
+    echo "ERROR: Applications link has wrong target."
+    echo "Actual: $LINK_TARGET"
+    exit 1
+fi
+
+# ============================================================
+# 10. VERIFY FINAL DMG APPLICATION
+# ============================================================
+
+MOUNTED_INFO="$VERIFY_MOUNT/Testudo.app/Contents/Info.plist"
+
+plutil -lint \
+    "$MOUNTED_INFO"
+
+MOUNTED_VERSION="$(
+    /usr/libexec/PlistBuddy \
+        -c 'Print :CFBundleShortVersionString' \
+        "$MOUNTED_INFO"
+)"
+
+MOUNTED_BUILD="$(
+    /usr/libexec/PlistBuddy \
+        -c 'Print :CFBundleVersion' \
+        "$MOUNTED_INFO"
+)"
+
+if [ "$MOUNTED_VERSION" != "$VERSION" ]; then
+    echo "ERROR: DMG application version mismatch."
+    exit 1
+fi
+
+if [ "$MOUNTED_BUILD" != "$BUILD_NUMBER" ]; then
+    echo "ERROR: DMG application build mismatch."
+    exit 1
+fi
+
+SOURCE_HASH="$(
+    shasum -a 256 \
+        "$APP_PATH/Contents/MacOS/Testudo" |
+    awk '{print $1}'
+)"
+
+DMG_HASH="$(
+    shasum -a 256 \
+        "$VERIFY_MOUNT/Testudo.app/Contents/MacOS/Testudo" |
+    awk '{print $1}'
+)"
+
+if [ "$SOURCE_HASH" != "$DMG_HASH" ]; then
+    echo "ERROR: Executable inside DMG does not match built app."
+    exit 1
+fi
+
+echo "✓ Final DMG application: ${MOUNTED_VERSION} (${MOUNTED_BUILD})"
+echo "✓ Applications shortcut verified."
+echo "✓ Executable hash verified."
+
+# ============================================================
+# 11. EJECT FINAL IMAGE
+# ============================================================
+
+echo
+echo "Ejecting verified DMG..."
+
+diskutil eject \
+    "$VERIFY_MOUNT"
+
+VERIFY_ATTACHED=0
+
+# ============================================================
+# 12. CLEAN TEMPORARY WORKING IMAGE
+# ============================================================
+
+rm -f \
+    "$RW_IMAGE"
+
+rm -rf \
+    "$MOUNT_DIR" \
+    "$VERIFY_MOUNT"
 
 trap - EXIT
 
-
 # ============================================================
-# CONVERT TO FINAL COMPRESSED DMG
+# 13. FINAL ARTIFACT
 # ============================================================
-
-echo
-echo "Creating final compressed DMG..."
-
-hdiutil convert \
-    "$RW_DMG" \
-    -format UDZO \
-    -imagekey zlib-level=9 \
-    -o "$DMG_PATH" \
-    >/dev/null
-
-rm -f \
-    "$RW_DMG"
-
-
-# ============================================================
-# VERIFY FINAL IMAGE
-# ============================================================
-
-echo
-echo "Verifying DMG..."
-
-hdiutil verify \
-    "$DMG_PATH"
 
 echo
 echo "SHA-256:"

@@ -211,12 +211,6 @@ private struct StructureValueRow:
 
 
             Spacer()
-
-
-            StructureEditButton(
-                action:
-                    onEdit
-            )
         }
         .font(
             .callout
@@ -259,6 +253,68 @@ private struct StructureReadOnlyRow:
 }
 
 
+
+private struct StructureEntityLinksRow:
+    View
+{
+    let label:
+        String
+
+    let entities:
+        [Entity]
+
+    let emptyText:
+        String
+
+    var body:
+        some View
+    {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                14
+        ) {
+            Text(
+                label
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    120,
+                alignment:
+                    .leading
+            )
+
+            if entities.isEmpty {
+                Text(
+                    emptyText
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+            } else {
+                TestudoEntityLinks(
+                    entities:
+                        entities,
+                    font:
+                        .callout,
+                    color:
+                        .primary
+                )
+            }
+
+            Spacer()
+        }
+        .font(
+            .callout
+        )
+    }
+}
+
+
 // ============================================================
 // MARK: - Rich Theme Inspector
 // ============================================================
@@ -287,6 +343,10 @@ struct RichThemeDetailView: View {
                 deleteFooter()
             )
     }
+
+    @State
+    private var showingEditor =
+        false
 
     @State
     private var editingField:
@@ -554,6 +614,15 @@ struct RichThemeDetailView: View {
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingEditor
+        ) {
+            ThemeStructureEditView(
+                themeID:
+                    themeID
+            )
+        }
     }
 
 
@@ -570,40 +639,13 @@ struct RichThemeDetailView: View {
             title:
                 "Related People, Groups & Organizations"
         ) {
-            EntitySelectionSummaryRow(
+            StructureEntityLinksRow(
                 label:
                     "Related",
-                selectedIDs:
-                    Set(
-                        current.map(
-                            \.id
-                        )
-                    ),
-                tabs:
-                    [
-                        .people,
-                        .groups,
-                        .organizations
-                    ],
-                selectorTitle:
-                    "Related People, Groups & Organizations",
-                selectorMessage:
-                    "Choose People, Groups or Organizations related to this Theme. Existing relationships remain visible in Selected at the top.",
+                entities:
+                    current,
                 emptyText:
-                    "None",
-                buttonSystemImage:
-                    "pencil",
-                onSave: {
-                    selection in
-
-                    store
-                        .setThemeRelatedEntities(
-                            themeID:
-                                theme.id,
-                            entityIDs:
-                                selection
-                        )
-                }
+                    "None"
             )
         }
     }
@@ -613,70 +655,63 @@ struct RichThemeDetailView: View {
         _ theme: Theme
     ) -> some View {
         HStack(
-            alignment: .top,
-            spacing: 14
+            alignment:
+                .center,
+            spacing:
+                14
         ) {
             Image(
                 systemName:
                     theme.symbolName
                         ?? "folder"
             )
-            .font(.title2)
-            .frame(width: 28)
+            .font(
+                .title2
+            )
+            .frame(
+                width:
+                    28
+            )
 
             VStack(
-                alignment: .leading,
-                spacing: 6
+                alignment:
+                    .leading,
+                spacing:
+                    6
             ) {
-                if editingField == .name {
-                    TextField(
-                        "Theme name",
-                        text:
-                            $textDraft
-                    )
-                    .font(.title2)
+                Text(
+                    theme.name
+                )
+                .font(
+                    .title2
+                )
+                .fontWeight(
+                    .semibold
+                )
 
-                    StructureEditActions(
-                        onCancel:
-                            cancelEdit,
-                        onSave: {
-                            saveText(
-                                theme,
-                                field:
-                                    .name
-                            )
-                        }
-                    )
-                } else {
-                    HStack(
-                        alignment:
-                            .firstTextBaseline,
-                        spacing: 8
-                    ) {
-                        Text(theme.name)
-                            .font(.title2)
-                            .fontWeight(
-                                .semibold
-                            )
-
-                        StructureEditButton {
-                            beginText(
-                                .name,
-                                value:
-                                    theme.name
-                            )
-                        }
-                    }
-                }
-
-                Text("Theme")
-                    .font(.callout)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                Text(
+                    "Theme"
+                )
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
             }
 
             Spacer()
+
+            Button {
+                showingEditor =
+                    true
+            } label: {
+                Label(
+                    "Edit",
+                    systemImage:
+                        "pencil"
+                )
+            }
         }
     }
 
@@ -2350,6 +2385,10 @@ struct RichStructureEntityDetailView:
     }
 
     @State
+    private var showingEditor =
+        false
+
+    @State
     private var editingField:
         EditableField?
 
@@ -2708,16 +2747,26 @@ struct RichStructureEntityDetailView:
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingEditor
+        ) {
+            StructureEntityEditView(
+                entityID:
+                    entityID
+            )
+        }
     }
 
 
-    @ViewBuilder
     private func header(
         _ entity: Entity
     ) -> some View {
         HStack(
-            alignment: .top,
-            spacing: 14
+            alignment:
+                .center,
+            spacing:
+                14
         ) {
             Image(
                 systemName:
@@ -2726,65 +2775,54 @@ struct RichStructureEntityDetailView:
                         entity
                     )
             )
-            .font(.title2)
-            .frame(width: 28)
+            .font(
+                .title2
+            )
+            .frame(
+                width:
+                    28
+            )
 
             VStack(
-                alignment: .leading,
-                spacing: 6
+                alignment:
+                    .leading,
+                spacing:
+                    6
             ) {
-                if editingField == .name {
-                    TextField(
-                        "Name",
-                        text:
-                            $textDraft
-                    )
-                    .font(.title2)
-
-                    StructureEditActions(
-                        onCancel:
-                            cancelEdit,
-                        onSave: {
-                            saveText(
-                                entity,
-                                field:
-                                    .name
-                            )
-                        }
-                    )
-                } else {
-                    HStack(
-                        alignment:
-                            .firstTextBaseline,
-                        spacing: 8
-                    ) {
-                        Text(entity.name)
-                            .font(.title2)
-                            .fontWeight(
-                                .semibold
-                            )
-
-                        StructureEditButton {
-                            beginText(
-                                .name,
-                                value:
-                                    entity.name
-                            )
-                        }
-                    }
-                }
+                Text(
+                    entity.name
+                )
+                .font(
+                    .title2
+                )
+                .fontWeight(
+                    .semibold
+                )
 
                 Text(
                     entity.kind
                         .displayName
                 )
-                .font(.callout)
+                .font(
+                    .callout
+                )
                 .foregroundStyle(
                     .secondary
                 )
             }
 
             Spacer()
+
+            Button {
+                showingEditor =
+                    true
+            } label: {
+                Label(
+                    "Edit",
+                    systemImage:
+                        "pencil"
+                )
+            }
         }
     }
 
@@ -3167,7 +3205,6 @@ struct RichStructureEntityDetailView:
     }
 
 
-    @ViewBuilder
     private func membershipsSection(
         _ entity: Entity
     ) -> some View {
@@ -3177,74 +3214,25 @@ struct RichStructureEntityDetailView:
                     entity.id
             )
 
-        let candidates =
-            availableContainers(
-                entity
-            )
-
-        let tabs:
-            [EntitySelectionTab] =
-            entity.kind == .organization
-            ? [
-                .organizations
-            ]
-            : [
-                .groups,
-                .organizations
-            ]
-
-        StructureInspectorSection(
+        return StructureInspectorSection(
             title:
                 "Structure"
         ) {
-            EntitySelectionSummaryRow(
+            StructureEntityLinksRow(
                 label:
-                    entity.kind == .organization
+                    entity.kind
+                        == .organization
                     ? "Parent"
                     : "Containers",
-                selectedIDs:
-                    Set(
-                        current.map(
-                            \.id
-                        )
-                    ),
-                tabs:
-                    tabs,
-                candidateIDs:
-                    Set(
-                        candidates.map(
-                            \.id
-                        )
-                    ),
-                selectorTitle:
-                    entity.kind == .organization
-                    ? "Parent Organization"
-                    : "Group Structure",
-                selectorMessage:
-                    entity.kind == .organization
-                    ? "Choose the parent Organization. Existing selections remain visible in Selected at the top."
-                    : "Choose Groups and Organizations that structurally contain this Group. Existing selections remain visible in Selected at the top.",
+                entities:
+                    current,
                 emptyText:
-                    "Independent",
-                buttonSystemImage:
-                    "pencil",
-                onSave: {
-                    selection in
-
-                    store
-                        .updateEntityMemberships(
-                            entityID:
-                                entity.id,
-                            containerIDs:
-                                selection
-                        )
-                }
+                    "Independent"
             )
         }
     }
 
 
-    @ViewBuilder
     private func affiliatedPeopleSection(
         _ entity: Entity
     ) -> some View {
@@ -3254,58 +3242,17 @@ struct RichStructureEntityDetailView:
                     entity.id
             )
 
-        let peopleIDs =
-            Set(
-                store.data.entities
-                    .filter {
-                        $0.kind
-                            == .person
-                    }
-                    .map(
-                        \.id
-                    )
-            )
-
-        StructureInspectorSection(
+        return StructureInspectorSection(
             title:
                 "Affiliated People"
         ) {
-            EntitySelectionSummaryRow(
+            StructureEntityLinksRow(
                 label:
                     "People",
-                selectedIDs:
-                    Set(
-                        current.map(
-                            \.id
-                        )
-                    ),
-                tabs:
-                    [
-                        .people
-                    ],
-                candidateIDs:
-                    peopleIDs,
-                selectorTitle:
-                    entity.kind == .organization
-                    ? "People Affiliated with Organization"
-                    : "People Affiliated with Group",
-                selectorMessage:
-                    "People are sorted alphabetically by surname. Existing affiliations remain visible in Selected at the top.",
+                entities:
+                    current,
                 emptyText:
-                    "None",
-                buttonSystemImage:
-                    "pencil",
-                onSave: {
-                    selection in
-
-                    store
-                        .updateAffiliatedPeople(
-                            containerID:
-                                entity.id,
-                            personIDs:
-                                selection
-                        )
-                }
+                    "None"
             )
         }
     }
@@ -3585,6 +3532,1371 @@ struct RichStructureEntityDetailView:
 
         case .person:
             return "person.crop.circle"
+        }
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Whole-object Theme Editor
+// ============================================================
+
+private struct ThemeStructureEditView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    @Environment(
+        \.dismiss
+    )
+    private var dismiss
+
+    let themeID:
+        UUID
+
+    @State
+    private var draft:
+        Theme?
+
+    @State
+    private var relatedEntityIDs:
+        Set<UUID> = []
+
+    @State
+    private var errorMessage:
+        String?
+
+
+    var body:
+        some View
+    {
+        VStack(
+            spacing:
+                0
+        ) {
+            editorHeader
+
+            Divider()
+
+            ScrollView {
+                if draft != nil {
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            24
+                    ) {
+                        editSection(
+                            "Identity"
+                        ) {
+                            StructureEditorTextField(
+                                "Name",
+                                text:
+                                    stringBinding(
+                                        \.name
+                                    )
+                            )
+
+                            Picker(
+                                "Parent Theme",
+                                selection:
+                                    parentBinding
+                            ) {
+                                Text(
+                                    "None"
+                                )
+                                .tag(
+                                    Optional<UUID>
+                                        .none
+                                )
+
+                                ForEach(
+                                    availableParentThemes
+                                ) {
+                                    theme in
+
+                                    Text(
+                                        theme.name
+                                    )
+                                    .tag(
+                                        Optional(
+                                            theme.id
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        editSection(
+                            "Description"
+                        ) {
+                            StructureEditorTextField(
+                                "Summary",
+                                text:
+                                    optionalStringBinding(
+                                        \.summary
+                                    )
+                            )
+
+                            editorTextArea(
+                                "Notes",
+                                text:
+                                    stringBinding(
+                                        \.notes
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Related People, Groups & Organizations"
+                        ) {
+                            EntitySelectionSummaryRow(
+                                label:
+                                    "Related",
+                                selectedIDs:
+                                    relatedEntityIDs,
+                                tabs:
+                                    [
+                                        .people,
+                                        .groups,
+                                        .organizations
+                                    ],
+                                selectorTitle:
+                                    "Related People, Groups & Organizations",
+                                selectorMessage:
+                                    "Choose People, Groups or Organizations related to this Theme.",
+                                emptyText:
+                                    "None",
+                                onSave: {
+                                    selection in
+
+                                    relatedEntityIDs =
+                                        selection
+
+                                    return nil
+                                }
+                            )
+                        }
+
+                        editSection(
+                            "Schedule"
+                        ) {
+                            optionalDateEditor(
+                                "Start",
+                                keyPath:
+                                    \.startDate
+                            )
+
+                            optionalDateEditor(
+                                "Target",
+                                keyPath:
+                                    \.targetDate
+                            )
+                        }
+
+                        editSection(
+                            "Metadata"
+                        ) {
+                            StructureEditorTextField(
+                                "Tags",
+                                text:
+                                    optionalStringBinding(
+                                        \.tags
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "URL",
+                                text:
+                                    optionalStringBinding(
+                                        \.url
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "SF Symbol",
+                                text:
+                                    optionalStringBinding(
+                                        \.symbolName
+                                    )
+                            )
+                        }
+
+                        if let errorMessage {
+                            Text(
+                                errorMessage
+                            )
+                            .font(
+                                .caption
+                            )
+                            .foregroundStyle(
+                                .red
+                            )
+                        }
+                    }
+                    .padding(
+                        24
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Theme Not Found",
+                        systemImage:
+                            "folder.badge.questionmark"
+                    )
+                }
+            }
+        }
+        .frame(
+            width:
+                680,
+            height:
+                720
+        )
+        .onAppear {
+            load()
+        }
+    }
+
+
+    private var editorHeader:
+        some View
+    {
+        HStack {
+            Text(
+                "Edit Theme"
+            )
+            .font(
+                .title2
+            )
+            .fontWeight(
+                .semibold
+            )
+
+            Spacer()
+
+            Button(
+                "Cancel"
+            ) {
+                dismiss()
+            }
+
+            Button(
+                "Save"
+            ) {
+                save()
+            }
+            .keyboardShortcut(
+                .defaultAction
+            )
+        }
+        .padding()
+    }
+
+
+    private func editSection<
+        Content:
+            View
+    >(
+        _ title:
+            String,
+        @ViewBuilder
+        content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                12
+        ) {
+            Text(
+                title
+            )
+            .font(
+                .headline
+            )
+
+            content()
+        }
+    }
+
+
+    private func editorTextArea(
+        _ label:
+            String,
+        text:
+            Binding<String>
+    ) -> some View {
+        LabeledContent(
+            label
+        ) {
+            TextEditor(
+                text:
+                    text
+            )
+            .frame(
+                minHeight:
+                    110
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        6
+                )
+                .stroke(
+                    Color.secondary
+                        .opacity(
+                            0.2
+                        )
+                )
+            }
+        }
+    }
+
+
+    @ViewBuilder
+    private func optionalDateEditor(
+        _ label:
+            String,
+        keyPath:
+            WritableKeyPath<
+                Theme,
+                Date?
+            >
+    ) -> some View {
+        let enabled =
+            Binding<Bool>(
+                get: {
+                    draft?[
+                        keyPath:
+                            keyPath
+                    ] != nil
+                },
+                set: {
+                    value in
+
+                    if value {
+                        if
+                            draft?[
+                                keyPath:
+                                    keyPath
+                            ] == nil
+                        {
+                            draft?[
+                                keyPath:
+                                    keyPath
+                            ] =
+                                Date()
+                        }
+                    } else {
+                        draft?[
+                            keyPath:
+                                keyPath
+                        ] =
+                            nil
+                    }
+                }
+            )
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
+        ) {
+            Toggle(
+                label,
+                isOn:
+                    enabled
+            )
+
+            if enabled.wrappedValue {
+                LargeDateTimeEditor(
+                    date:
+                        Binding<Date>(
+                            get: {
+                                draft?[
+                                    keyPath:
+                                        keyPath
+                                ]
+                                ?? Date()
+                            },
+                            set: {
+                                draft?[
+                                    keyPath:
+                                        keyPath
+                                ] =
+                                    $0
+                            }
+                        ),
+                    timeZoneID:
+                        .constant(
+                            TestudoTime
+                                .deviceTimeZoneID
+                        ),
+                    includesTime:
+                        false,
+                    showsTimeZone:
+                        false
+                )
+            }
+        }
+    }
+
+
+    private var parentBinding:
+        Binding<UUID?>
+    {
+        Binding(
+            get: {
+                draft?
+                    .parentThemeID
+            },
+            set: {
+                draft?
+                    .parentThemeID =
+                    $0
+            }
+        )
+    }
+
+
+    private var availableParentThemes:
+        [Theme]
+    {
+        let descendants =
+            Set(
+                store
+                    .themeDescendantIDs(
+                        of:
+                            themeID
+                    )
+            )
+
+        return store.data.themes
+            .filter {
+                $0.id != themeID
+                && !descendants
+                    .contains(
+                        $0.id
+                    )
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+
+    private func load() {
+        guard
+            let theme =
+                store.theme(
+                    id:
+                        themeID
+                )
+        else {
+            return
+        }
+
+        draft =
+            theme
+
+        relatedEntityIDs =
+            Set(
+                store
+                    .relatedEntities(
+                        forThemeID:
+                            themeID
+                    )
+                    .map(
+                        \.id
+                    )
+            )
+
+        errorMessage =
+            nil
+    }
+
+
+    private func save() {
+        guard
+            let draft
+        else {
+            return
+        }
+
+        if
+            let error =
+                store
+                    .saveThemeMetadata(
+                        draft
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        if
+            let error =
+                store
+                    .setThemeRelatedEntities(
+                        themeID:
+                            themeID,
+                        entityIDs:
+                            relatedEntityIDs
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        dismiss()
+    }
+
+
+    private func stringBinding(
+        _ keyPath:
+            WritableKeyPath<
+                Theme,
+                String
+            >
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ]
+                ?? ""
+            },
+            set: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ] =
+                    $0
+            }
+        )
+    }
+
+
+    private func optionalStringBinding(
+        _ keyPath:
+            WritableKeyPath<
+                Theme,
+                String?
+            >
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ]
+                ?? ""
+            },
+            set: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ] =
+                    $0.isEmpty
+                    ? nil
+                    : $0
+            }
+        )
+    }
+}
+
+
+// ============================================================
+// MARK: - Whole-object Organization / Group Editor
+// ============================================================
+
+private struct StructureEntityEditView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    @Environment(
+        \.dismiss
+    )
+    private var dismiss
+
+    let entityID:
+        UUID
+
+    @State
+    private var draft:
+        Entity?
+
+    @State
+    private var containerIDs:
+        Set<UUID> = []
+
+    @State
+    private var affiliatedPeopleIDs:
+        Set<UUID> = []
+
+    @State
+    private var errorMessage:
+        String?
+
+
+    var body:
+        some View
+    {
+        VStack(
+            spacing:
+                0
+        ) {
+            editorHeader
+
+            Divider()
+
+            ScrollView {
+                if let draft {
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing:
+                            24
+                    ) {
+                        editSection(
+                            "Details"
+                        ) {
+                            LabeledContent(
+                                "Type"
+                            ) {
+                                Text(
+                                    draft.kind
+                                        .displayName
+                                )
+                            }
+
+                            StructureEditorTextField(
+                                "Name",
+                                text:
+                                    stringBinding(
+                                        \.name
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Short name",
+                                text:
+                                    optionalStringBinding(
+                                        \.shortName
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Structure"
+                        ) {
+                            structureSelector(
+                                draft
+                            )
+                        }
+
+                        editSection(
+                            "Affiliated People"
+                        ) {
+                            peopleSelector(
+                                draft
+                            )
+                        }
+
+                        editSection(
+                            "Schedule"
+                        ) {
+                            optionalDateEditor(
+                                "Start",
+                                keyPath:
+                                    \.startDate
+                            )
+
+                            optionalDateEditor(
+                                "Target",
+                                keyPath:
+                                    \.targetDate
+                            )
+                        }
+
+                        editSection(
+                            "Contact & Location"
+                        ) {
+                            StructureEditorTextField(
+                                "Website",
+                                text:
+                                    optionalStringBinding(
+                                        \.website
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Email",
+                                text:
+                                    optionalStringBinding(
+                                        \.email
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Phone",
+                                text:
+                                    optionalStringBinding(
+                                        \.phone
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Address",
+                                text:
+                                    optionalStringBinding(
+                                        \.address
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "City",
+                                text:
+                                    optionalStringBinding(
+                                        \.city
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Postal code",
+                                text:
+                                    optionalStringBinding(
+                                        \.postalCode
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "Country",
+                                text:
+                                    optionalStringBinding(
+                                        \.country
+                                    )
+                            )
+                        }
+
+                        editSection(
+                            "Metadata"
+                        ) {
+                            StructureEditorTextField(
+                                "Tags",
+                                text:
+                                    optionalStringBinding(
+                                        \.tags
+                                    )
+                            )
+
+                            StructureEditorTextField(
+                                "SF Symbol",
+                                text:
+                                    optionalStringBinding(
+                                        \.symbolName
+                                    )
+                            )
+
+                            editorTextArea(
+                                "Notes",
+                                text:
+                                    stringBinding(
+                                        \.notes
+                                    )
+                            )
+                        }
+
+                        if let errorMessage {
+                            Text(
+                                errorMessage
+                            )
+                            .font(
+                                .caption
+                            )
+                            .foregroundStyle(
+                                .red
+                            )
+                        }
+                    }
+                    .padding(
+                        24
+                    )
+                } else {
+                    ContentUnavailableView(
+                        "Item Not Found",
+                        systemImage:
+                            "questionmark.circle"
+                    )
+                }
+            }
+        }
+        .frame(
+            width:
+                680,
+            height:
+                720
+        )
+        .onAppear {
+            load()
+        }
+    }
+
+
+    private var editorHeader:
+        some View
+    {
+        HStack {
+            Text(
+                editorTitle
+            )
+            .font(
+                .title2
+            )
+            .fontWeight(
+                .semibold
+            )
+
+            Spacer()
+
+            Button(
+                "Cancel"
+            ) {
+                dismiss()
+            }
+
+            Button(
+                "Save"
+            ) {
+                save()
+            }
+            .keyboardShortcut(
+                .defaultAction
+            )
+        }
+        .padding()
+    }
+
+
+    private var editorTitle:
+        String
+    {
+        switch draft?.kind {
+        case .organization:
+            return "Edit Organization"
+
+        case .group:
+            return "Edit Group"
+
+        default:
+            return "Edit"
+        }
+    }
+
+
+    private func editSection<
+        Content:
+            View
+    >(
+        _ title:
+            String,
+        @ViewBuilder
+        content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                12
+        ) {
+            Text(
+                title
+            )
+            .font(
+                .headline
+            )
+
+            content()
+        }
+    }
+
+
+    private func structureSelector(
+        _ entity:
+            Entity
+    ) -> some View {
+        let candidates =
+            availableContainers(
+                entity
+            )
+
+        let tabs:
+            [EntitySelectionTab] =
+            entity.kind
+                == .organization
+            ? [
+                .organizations
+            ]
+            : [
+                .groups,
+                .organizations
+            ]
+
+        return EntitySelectionSummaryRow(
+            label:
+                entity.kind
+                    == .organization
+                ? "Parent"
+                : "Containers",
+            selectedIDs:
+                containerIDs,
+            tabs:
+                tabs,
+            candidateIDs:
+                Set(
+                    candidates.map(
+                        \.id
+                    )
+                ),
+            selectorTitle:
+                entity.kind
+                    == .organization
+                ? "Parent Organization"
+                : "Group Structure",
+            selectorMessage:
+                entity.kind
+                    == .organization
+                ? "Choose the parent Organization."
+                : "Choose Groups and Organizations that structurally contain this Group.",
+            emptyText:
+                "Independent",
+            onSave: {
+                selection in
+
+                containerIDs =
+                    selection
+
+                return nil
+            }
+        )
+    }
+
+
+    private func peopleSelector(
+        _ entity:
+            Entity
+    ) -> some View {
+        let peopleIDs =
+            Set(
+                store.data.entities
+                    .filter {
+                        $0.kind
+                            == .person
+                    }
+                    .map(
+                        \.id
+                    )
+            )
+
+        return EntitySelectionSummaryRow(
+            label:
+                "People",
+            selectedIDs:
+                affiliatedPeopleIDs,
+            tabs:
+                [
+                    .people
+                ],
+            candidateIDs:
+                peopleIDs,
+            selectorTitle:
+                entity.kind
+                    == .organization
+                ? "People Affiliated with Organization"
+                : "People Affiliated with Group",
+            selectorMessage:
+                "Choose the People affiliated with this item.",
+            emptyText:
+                "None",
+            onSave: {
+                selection in
+
+                affiliatedPeopleIDs =
+                    selection
+
+                return nil
+            }
+        )
+    }
+
+
+    private func editorTextArea(
+        _ label:
+            String,
+        text:
+            Binding<String>
+    ) -> some View {
+        LabeledContent(
+            label
+        ) {
+            TextEditor(
+                text:
+                    text
+            )
+            .frame(
+                minHeight:
+                    110
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        6
+                )
+                .stroke(
+                    Color.secondary
+                        .opacity(
+                            0.2
+                        )
+                )
+            }
+        }
+    }
+
+
+    @ViewBuilder
+    private func optionalDateEditor(
+        _ label:
+            String,
+        keyPath:
+            WritableKeyPath<
+                Entity,
+                Date?
+            >
+    ) -> some View {
+        let enabled =
+            Binding<Bool>(
+                get: {
+                    draft?[
+                        keyPath:
+                            keyPath
+                    ] != nil
+                },
+                set: {
+                    value in
+
+                    if value {
+                        if
+                            draft?[
+                                keyPath:
+                                    keyPath
+                            ] == nil
+                        {
+                            draft?[
+                                keyPath:
+                                    keyPath
+                            ] =
+                                Date()
+                        }
+                    } else {
+                        draft?[
+                            keyPath:
+                                keyPath
+                        ] =
+                            nil
+                    }
+                }
+            )
+
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
+        ) {
+            Toggle(
+                label,
+                isOn:
+                    enabled
+            )
+
+            if enabled.wrappedValue {
+                LargeDateTimeEditor(
+                    date:
+                        Binding<Date>(
+                            get: {
+                                draft?[
+                                    keyPath:
+                                        keyPath
+                                ]
+                                ?? Date()
+                            },
+                            set: {
+                                draft?[
+                                    keyPath:
+                                        keyPath
+                                ] =
+                                    $0
+                            }
+                        ),
+                    timeZoneID:
+                        .constant(
+                            TestudoTime
+                                .deviceTimeZoneID
+                        ),
+                    includesTime:
+                        false,
+                    showsTimeZone:
+                        false
+                )
+            }
+        }
+    }
+
+
+    private func load() {
+        guard
+            let entity =
+                store.entity(
+                    id:
+                        entityID
+                )
+        else {
+            return
+        }
+
+        draft =
+            entity
+
+        containerIDs =
+            Set(
+                store.containers(
+                    for:
+                        entityID
+                )
+                .map(
+                    \.id
+                )
+            )
+
+        affiliatedPeopleIDs =
+            Set(
+                store.affiliatedPeople(
+                    to:
+                        entityID
+                )
+                .map(
+                    \.id
+                )
+            )
+
+        errorMessage =
+            nil
+    }
+
+
+    private func save() {
+        guard
+            let draft
+        else {
+            return
+        }
+
+        if
+            let error =
+                store
+                    .saveEntityMetadata(
+                        draft
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        if
+            let error =
+                store
+                    .updateEntityMemberships(
+                        entityID:
+                            entityID,
+                        containerIDs:
+                            containerIDs
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        if
+            let error =
+                store
+                    .updateAffiliatedPeople(
+                        containerID:
+                            entityID,
+                        personIDs:
+                            affiliatedPeopleIDs
+                    )
+        {
+            errorMessage =
+                error
+
+            return
+        }
+
+        dismiss()
+    }
+
+
+    private func availableContainers(
+        _ entity:
+            Entity
+    ) -> [Entity] {
+        let descendants =
+            Set(
+                store
+                    .entityDescendantIDs(
+                        of:
+                            entity.id
+                    )
+            )
+
+        return store
+            .possibleContainers(
+                for:
+                    entity.kind
+            )
+            .filter {
+                $0.id
+                    != entity.id
+                && !descendants
+                    .contains(
+                        $0.id
+                    )
+            }
+    }
+
+
+    private func stringBinding(
+        _ keyPath:
+            WritableKeyPath<
+                Entity,
+                String
+            >
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ]
+                ?? ""
+            },
+            set: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ] =
+                    $0
+            }
+        )
+    }
+
+
+    private func optionalStringBinding(
+        _ keyPath:
+            WritableKeyPath<
+                Entity,
+                String?
+            >
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ]
+                ?? ""
+            },
+            set: {
+                draft?[
+                    keyPath:
+                        keyPath
+                ] =
+                    $0.isEmpty
+                    ? nil
+                    : $0
+            }
+        )
+    }
+}
+
+
+// ============================================================
+// MARK: - Shared whole-object editor field
+// ============================================================
+
+private struct StructureEditorTextField:
+    View
+{
+    let label:
+        String
+
+    @Binding
+    var text:
+        String
+
+    init(
+        _ label:
+            String,
+        text:
+            Binding<String>
+    ) {
+        self.label =
+            label
+
+        self._text =
+            text
+    }
+
+    var body:
+        some View
+    {
+        LabeledContent(
+            label
+        ) {
+            TextField(
+                "",
+                text:
+                    $text
+            )
+            .textFieldStyle(
+                .roundedBorder
+            )
+            .frame(
+                minWidth:
+                    320
+            )
         }
     }
 }
