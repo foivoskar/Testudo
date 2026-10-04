@@ -8,6 +8,8 @@
 
 It is designed especially for researchers, research software engineers, technical staff, academics, and people whose work involves multiple projects, institutions, collaborators, and scientific domains.
 
+**Current documented version: Testudo 0.1.4 (build 5).**
+
 ## Installation
 
 Testudo currently uses a **source-first local installation model**.
@@ -225,80 +227,236 @@ Application authentication and Environment authentication are independent.
 
 ### Tasks
 
-Tasks can have the following states:
+Tasks represent actionable work and can have the following states:
 
 - To Do
 - In Progress
 - Completed
 - Closed
 
-Tasks may contain:
+Tasks can contain:
 
 - sub-tasks
-- Activities
 - Notes
+- Activities
 
-Tasks can have deadlines and can be related to People, Groups, Organizations and Themes.
+Nested Tasks can themselves contain further Work, allowing arbitrarily deep Work hierarchies.
 
-Task status uses a consistent visual language throughout Testudo:
-
-- To Do — red
-- In Progress — orange
-- Completed — green
-
-### Activities
-
-An **Activity** records something that happened while working on a Task.
-
-Activities may optionally have a date and time.
-
-Activities are chronological work-log objects and are distinct from Calendar Events.
+Tasks can have deadlines, scheduling information, history, relationships, and Theme membership.
 
 ### Notes
 
-Notes can exist within the work hierarchy and can include reminders.
+Notes preserve contextual or durable information inside the Work hierarchy without requiring Task status.
 
-### Calendar Events
+Notes can also participate in reminders and relationships where appropriate.
 
-Calendar Events represent scheduled events and are managed separately through Testudo's Calendar.
+### Activities
 
-The word **Event** is reserved for Calendar Events; work-log entries inside Tasks are called **Activities**.
+An **Activity** records something that happened while work was being performed.
+
+Examples include a discussion, decision, intervention, measurement, review, completed action, or resolved dependency.
+
+Activities are chronological work-log objects.
+
+They are deliberately separate from Calendar Events:
+
+    Activity       = something recorded as having happened
+    Calendar Event = a scheduled calendar object with a time interval
 
 ## Themes
 
-Themes provide a semantic classification layer independent of organizational structure.
+Themes provide a semantic classification layer independent of both the Work hierarchy and the organizational hierarchy.
 
-Themes can be hierarchical and can be related to work, People, Groups and Organizations.
+Themes can be hierarchical.
+
+A Theme may contain metadata such as:
+
+- name
+- summary
+- notes
+- code
+- status
+- priority
+- owner
+- start date
+- target date
+- tags
+- URL
+- visual symbol
+
+### Multi-Theme Work
+
+A Work item can belong to more than one Theme.
+
+This allows a Task, Note, or Activity to participate in several semantic domains without duplicating the Work item.
+
+The current model supports explicit multi-Theme membership while remaining compatible with older single-Theme records.
+
+### Parent Theme aggregation
+
+The **Related Work** view of a parent Theme includes:
+
+- Work assigned directly to the Theme
+- Work belonging to child Themes
+- Work belonging to all deeper descendant Themes
+
+Aggregation is recursive.
+
+For example:
+
+    Theme A
+    └── Theme B
+        └── Theme C
+
+A Note belonging to Theme C appears in the Related Work views of Theme C, Theme B, and Theme A.
+
+This does not reassign the Work item to the parent Themes. It is a consolidated parent view.
 
 ## Organizations
 
+Organizations represent institutional structures such as universities, institutes, departments, companies, observatories, and research centres.
+
 Organizations can contain other Organizations and Groups.
 
-They can also be related directly to work.
+They can hold rich metadata including:
+
+- full name
+- short name
+- code
+- status
+- priority
+- owner
+- website
+- e-mail
+- telephone
+- address
+- city
+- postal code
+- country
+- tags
+- notes
+
+An Organization's **Related Work** pane includes both its own Work context and the Related Work of all descendant entities.
 
 ## Groups
 
-Groups can exist inside or outside Organizations.
+Groups represent teams, laboratories, committees, collaborations, working groups, project teams, and technical teams.
 
-A Group can contain People and participate in work relationships.
+Groups may exist inside Organizations or other supported containers and may contain People.
+
+A Group's **Related Work** pane uses the same presentation as People, Themes, and Organizations.
+
+Parent Groups aggregate Related Work from descendant entities recursively.
 
 ## People
 
-People have detailed profiles and can have multiple affiliations.
+People are first-class entities with detailed professional profiles and affiliations.
 
-A Person can belong to multiple Groups and Organizations and can be related to work through semantic roles.
+A Person can have multiple affiliations and can belong to multiple Groups and Organizations.
+
+One affiliation may be marked as primary.
+
+People can participate in Work relationships through semantic roles such as:
+
+- For
+- Requested by
+- With
+- Assigned to
+- Related to
+
+The Person detail view uses the same **Related Work** presentation as Themes, Groups, and Organizations.
+
+## Related Work
+
+People, Themes, Organizations, and Groups use a common **Related Work** pane at the top of the right-hand detail view.
+
+When Related Work exists, the right pane is divided into two independently scrollable halves:
+
+- upper half: Related Work
+- lower half: the object's normal detail inspector
+
+If there is no Related Work, the normal detail view occupies the full height.
+
+Related Work can contain:
+
+- Tasks
+- Notes
+- Activities
+
+Each compact row can display:
+
+- Work icon
+- title
+- Work type
+- Task status where applicable
+- Theme
+- deadline where applicable
+- description/body preview
+- creation date at the far right
+
+The same typography, spacing, and navigation behaviour is used in all four structural areas.
+
+### Descendant aggregation
+
+Related Work propagates upward for presentation.
+
+For Themes, a parent sees Work belonging to all descendant Themes.
+
+For Organizations and Groups, a parent sees Related Work associated with descendant Organizations, Groups, and People.
+
+Aggregation is recursive and does not change the underlying memberships or relationships.
+
+Work items are not duplicated merely because several descendant paths make the same Work item relevant.
+
+### Relationship inheritance
+
+Related Work aggregation is separate from Work relationship inheritance.
+
+A Work relationship can also be marked **Inherited by children**, allowing descendant Work items to inherit a semantic relationship defined on a parent Work item.
+
+Both mechanisms can operate at the same time.
 
 ## Navigation
 
-Testudo uses a three-column native macOS interface:
+Testudo uses a native three-column macOS interface:
 
 1. main navigation
-2. lists and collections
+2. lists, trees, and collections
 3. detail pane
 
-References inside detail panes are navigable.
+### Middle-column selection
 
-For example, a related Task, Theme, Person, Group or Organization can be opened directly from another object's page.
+The selected item in the middle column uses an application-controlled full-row blue selection.
+
+The selection fills the available row width and height and uses subtle rounded corners.
+
+The same treatment is applied to ordinary rows and hierarchical DisclosureGroup rows, including Themes and nested Work.
+
+### Global object navigation
+
+Displayed references throughout the detail interface are navigable wherever navigation is semantically appropriate.
+
+Supported destinations include:
+
+- Tasks
+- Notes
+- Activities
+- Themes
+- People
+- Groups
+- Organizations
+- Calendar Events
+
+Descriptions and previews that represent a particular object also navigate to their owning object.
+
+For example:
+
+- a Related Work title opens that Work item
+- its body preview opens the same Work item
+- a displayed Theme name opens the Theme
+- Calendar Event Work and Theme references open their corresponding objects
+
+Editors, selectors, menus, disclosure controls, and other interactive controls retain their original editing or selection behaviour.
 
 The detail pane maintains Back and Forward navigation history.
 

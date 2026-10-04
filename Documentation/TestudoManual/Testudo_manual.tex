@@ -1,7 +1,8 @@
 \documentclass{testudomanual}
 
-\newcommand{\ManualVersion}{1.0}
+\newcommand{\ManualVersion}{1.1}
 \newcommand{\DocumentedTestudoVersion}{0.1.4}
+\newcommand{\DocumentedTestudoBuild}{5}
 \newcommand{\ManualDate}{October 2026}
 
 \newcommand{\TestudoIconPath}{
@@ -58,7 +59,8 @@
         \\[3pt]
 
         Application version documented: &
-        \DocumentedTestudoVersion
+        \DocumentedTestudoVersion\
+        (build \DocumentedTestudoBuild)
         \\[3pt]
 
         Platform: &
@@ -100,6 +102,10 @@
 This manual documents the current implemented form of \Testudo,
 a native macOS application for organising complex professional,
 technical, academic and research work.
+
+This edition documents Testudo
+\DocumentedTestudoVersion\
+(build \DocumentedTestudoBuild).
 
 The manual focuses on the user-facing concepts and workflows of the
 application. It also explains the local-first storage model,
@@ -700,15 +706,35 @@ including:
 
 \section{Detail navigation}
 
-Objects displayed inside detail views can contain references to other
-Testudo objects.
+Objects displayed inside detail views are active references wherever
+navigation is semantically appropriate.
 
-When a related Task, Theme, Person, Group or Organization is
-selectable, Testudo can navigate directly to that object.
+The current navigation system supports direct opening of:
+
+\begin{itemize}
+    \item Tasks;
+    \item Notes;
+    \item Activities;
+    \item Themes;
+    \item People;
+    \item Groups;
+    \item Organizations;
+    \item Calendar Events.
+\end{itemize}
+
+A displayed description or preview that belongs to a particular
+object can also navigate to the owning object.
+
+For example, the body preview shown for Related Work opens that Work
+item, while a displayed Theme name opens the Theme itself.
+
+Editors, selection popovers, menus, disclosure controls and similar
+interactive controls retain their original editing or selection
+behaviour.
 
 The detail area maintains Back and Forward navigation history so that
-users can follow relationships without losing their previous context.
-
+users can follow chains of references without losing their previous
+context.
 
 \section{Hierarchical presentation}
 
@@ -720,11 +746,26 @@ Examples include:
     \item Tasks and sub-tasks;
     \item Themes and sub-themes;
     \item Organizations;
-    \item relationships between Groups and Organizations.
+    \item Groups and their containers;
+    \item People inside Groups or Organizations.
 \end{itemize}
 
 Disclosure controls can be used to expand or collapse nested content.
 
+Hierarchy affects both structural navigation and contextual
+presentation. In particular, Related Work can be aggregated from
+descendants into a parent Theme, Organization or Group.
+
+\section{Middle-column selection}
+
+Selection in the middle column is controlled by Testudo's application
+state rather than depending on temporary macOS List focus.
+
+The selected row fills the complete visible row width and height using
+Testudo's blue selection colour with subtle rounded corners.
+
+Hierarchical DisclosureGroup rows use the same visual treatment, so
+Themes and nested Work remain consistent with ordinary List rows.
 
 % ============================================================
 % CHAPTER 7
@@ -755,9 +796,19 @@ The current Work model has three principal item types:
 
 Tasks can be top-level items or sub-tasks.
 
-A Task may contain other Work items and can participate in
-relationships with Themes and entities.
+A Task may contain:
 
+\begin{itemize}
+    \item sub-tasks;
+    \item Notes;
+    \item Activities.
+\end{itemize}
+
+Sub-tasks may themselves contain further nested Work, allowing complex
+Work structures without a fixed practical hierarchy depth.
+
+A Task can participate in semantic relationships with People, Groups
+and Organizations and can belong to one or more Themes.
 
 \section{Task states}
 
@@ -932,12 +983,69 @@ A general semantic relationship.
 Work relationships can be inherited by child Work items.
 
 This allows a relationship established at a higher level of the Work
-hierarchy to remain relevant to nested work without repeatedly
+hierarchy to remain relevant to nested Work without repeatedly
 entering the same relationship.
+
+Inheritance is controlled by the
+\term{Inherited by children} property of the relationship.
 
 Where precision is required, relationships can also be managed at the
 specific Work-item level.
 
+\section{Related Work}
+
+People, Themes, Organizations and Groups use a common
+\term{Related Work} pane at the top of the right-hand detail area.
+
+When Related Work exists, the detail area is divided into two
+independently scrollable halves:
+
+\begin{itemize}
+    \item the upper half contains Related Work;
+    \item the lower half contains the normal detail inspector.
+\end{itemize}
+
+When no Related Work exists, the normal detail inspector occupies the
+full height.
+
+Related Work may contain all three Work types:
+
+\begin{itemize}
+    \item Tasks;
+    \item Notes;
+    \item Activities.
+\end{itemize}
+
+The shared compact row presentation can include:
+
+\begin{itemize}
+    \item Work icon;
+    \item title;
+    \item Work type;
+    \item Task status where applicable;
+    \item Theme;
+    \item deadline where applicable;
+    \item description preview;
+    \item creation date at the right-hand side.
+\end{itemize}
+
+The same typography, spacing and navigation behaviour is used in all
+four structural areas.
+
+References inside Related Work remain navigable.
+
+\manualnote{Aggregation and inheritance}{
+Related Work aggregation and Work-relationship inheritance are
+distinct mechanisms.
+
+Relationship inheritance determines whether a child Work item inherits
+a semantic relationship from a parent Work item.
+
+Related Work aggregation determines which Work items are displayed
+when viewing a parent Theme, Organization or Group.
+
+Both mechanisms can operate at the same time.
+}
 
 % ============================================================
 % CHAPTER 9
@@ -996,9 +1104,39 @@ A Theme may contain information such as:
 Work items can be associated with Themes.
 
 The current data model supports explicit multi-Theme membership,
-allowing one Work item to belong to more than one semantic domain
-where appropriate.
+allowing one Task, Note or Activity to belong to more than one
+semantic domain without duplicating the Work item.
 
+For compatibility with older data, Testudo can still interpret legacy
+single-Theme membership. Explicit multi-Theme membership is
+authoritative when present.
+
+The Related Work view of a Theme is hierarchical.
+
+A Theme displays:
+
+\begin{itemize}
+    \item Work belonging directly to that Theme;
+    \item Work belonging to its child Themes;
+    \item Work belonging to all deeper descendant Themes.
+\end{itemize}
+
+Aggregation is recursive.
+
+For example:
+
+\begin{lstlisting}
+Theme A
+`-- Theme B
+    `-- Theme C
+\end{lstlisting}
+
+A Note belonging to Theme C is visible in the Related Work panes of
+Theme C, Theme B and Theme A.
+
+The Work item's actual Theme membership is not changed by this
+presentation. Parent Themes aggregate descendant context rather than
+reassigning the Work item.
 
 \section{Themes and entities}
 
@@ -1066,6 +1204,22 @@ affiliation.
 When available, an Organization's Short Name can be used in compact
 presentation.
 
+
+
+\section{Related Work}
+
+The upper part of a Person detail view uses the common Related Work
+presentation.
+
+It can display Tasks, Notes and Activities related to the Person.
+
+It also respects Work relationships inherited from parent Tasks when
+the corresponding relationship is configured to be inherited by
+children.
+
+Each row uses the same compact typography and navigation behaviour as
+Related Work elsewhere in Testudo, including the Work item's creation
+date at the far right.
 
 \section{Person versus local profile}
 
@@ -1153,6 +1307,38 @@ These memberships are separate from Work relationships.
 For example, ``Person A belongs to Laboratory B'' is structurally
 different from ``Task C is assigned to Person A''.
 
+
+
+\section{Related Work}
+
+Organizations and Groups use the same Related Work pane as People and
+Themes.
+
+The view can contain Tasks, Notes and Activities.
+
+For container entities, Related Work is aggregated recursively from
+the complete descendant Entity hierarchy.
+
+An Organization can therefore display:
+
+\begin{itemize}
+    \item Work related directly to the Organization;
+    \item Work related to a child Organization;
+    \item Work related to a descendant Group;
+    \item Work related to a Person contained below it;
+    \item Work inherited through parent-Task relationships where
+          \term{Inherited by children} is enabled.
+\end{itemize}
+
+A Group likewise aggregates Related Work from its descendant entities
+where such memberships exist.
+
+A Work item is presented once even when more than one structural path
+makes it relevant.
+
+This aggregation does not change Entity memberships or Work
+relationships. It gives parent structures a consolidated view of Work
+taking place below them.
 
 % ============================================================
 % CHAPTER 12
@@ -1263,6 +1449,10 @@ Note or Activity context to which it relates.
 
 Calendar Events can also be linked to Themes.
 
+Displayed linked Work and Theme references are navigable.
+
+Calendar Events themselves also participate in Testudo's normal detail
+navigation and Back/Forward history.
 
 % ============================================================
 % CHAPTER 13
@@ -1767,9 +1957,15 @@ history.
 
 \section{Use Themes for semantic classification}
 
-Themes are most useful for concepts that cut across the Work,
-People and Organization hierarchies.
+Themes are most useful for concepts that cut across the Work, People
+and Organization hierarchies.
 
+A Work item may belong to more than one Theme when several semantic
+classifications are genuinely useful.
+
+Because a parent Theme's Related Work includes Work from descendant
+Themes, broad Themes can provide an overview without requiring Work to
+be duplicated or manually assigned at every ancestor level.
 
 \section{Model People and Organizations explicitly}
 
@@ -1935,6 +2131,11 @@ Groups.
 
 \item[Person]
 An individual represented within a Work Environment.
+
+\item[Related Work]
+The common upper detail-pane view used for People, Themes, Groups and
+Organizations. It presents relevant Tasks, Notes and Activities and
+can aggregate Work from descendant structures.
 
 \item[Task]
 An actionable Work item with Task status.
