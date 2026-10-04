@@ -23,6 +23,38 @@ private struct StructureInspectorSection<
 
             content()
         }
+        .padding(
+            16
+        )
+        .background(
+            Color.primary
+                .opacity(
+                    0.025
+                ),
+            in:
+                RoundedRectangle(
+                    cornerRadius:
+                        12,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius:
+                    12,
+                style:
+                    .continuous
+            )
+            .stroke(
+                Color.primary
+                    .opacity(
+                        0.06
+                    ),
+                lineWidth:
+                    1
+            )
+        }
     }
 }
 
@@ -227,75 +259,6 @@ private struct StructureReadOnlyRow:
 }
 
 
-private struct OrganizationDetailCardModifier:
-    ViewModifier
-{
-    let enabled:
-        Bool
-
-    @ViewBuilder
-    func body(
-        content:
-            Content
-    ) -> some View {
-        if enabled {
-            content
-                .padding(
-                    16
-                )
-                .background(
-                    Color.primary
-                        .opacity(
-                            0.025
-                        ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius:
-                                12,
-                            style:
-                                .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius:
-                            12,
-                        style:
-                            .continuous
-                    )
-                    .stroke(
-                        Color.primary
-                            .opacity(
-                                0.06
-                            ),
-                        lineWidth:
-                            1
-                    )
-                }
-
-        } else {
-            content
-        }
-    }
-}
-
-
-private extension View {
-
-    func organizationDetailCard(
-        _ enabled:
-            Bool
-    ) -> some View {
-        modifier(
-            OrganizationDetailCardModifier(
-                enabled:
-                    enabled
-            )
-        )
-    }
-}
-
-
 // ============================================================
 // MARK: - Rich Theme Inspector
 // ============================================================
@@ -400,25 +363,12 @@ struct RichThemeDetailView: View {
 
                         StructureInspectorSection(
                             title:
-                                "Classification"
+                                "Structure"
                         ) {
                             VStack(
                                 spacing: 10
                             ) {
                                 parentRow(theme)
-                                statusRow(theme)
-                                priorityRow(theme)
-                                ownerRow(theme)
-
-                                textRow(
-                                    theme,
-                                    label:
-                                        "Code",
-                                    value:
-                                        theme.code,
-                                    field:
-                                        .code
-                                )
                             }
                         }
 
@@ -578,7 +528,7 @@ struct RichThemeDetailView: View {
                     )
                     .padding(
                         .top,
-                        8
+                        12
                     )
                     .padding(
                         .bottom,
@@ -2486,10 +2436,7 @@ struct RichStructureEntityDetailView:
                     VStack(
                         alignment: .leading,
                         spacing:
-                            entity.kind
-                                == .organization
-                            ? 18
-                            : 26
+                            26
                     ) {
                         header(entity)
 
@@ -2517,33 +2464,11 @@ struct RichStructureEntityDetailView:
                                     field:
                                         .shortName
                                 )
-
-                                textRow(
-                                    entity,
-                                    label:
-                                        "Code",
-                                    value:
-                                        entity.code,
-                                    field:
-                                        .code
-                                )
-
-                                statusRow(entity)
-                                priorityRow(entity)
-                                ownerRow(entity)
                             }
                         }
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
-                        )
 
                         membershipsSection(
                             entity
-                        )
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
                         )
 
 
@@ -2553,10 +2478,6 @@ struct RichStructureEntityDetailView:
                         {
                             affiliatedPeopleSection(
                                 entity
-                            )
-                            .organizationDetailCard(
-                                entity.kind
-                                    == .organization
                             )
                         }
 
@@ -2588,10 +2509,6 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
-                        )
 
                         StructureInspectorSection(
                             title:
@@ -2671,10 +2588,6 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
-                        )
 
                         StructureInspectorSection(
                             title:
@@ -2716,10 +2629,6 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
-                        )
 
                         if let errorMessage {
                             Text(errorMessage)
@@ -2757,10 +2666,6 @@ struct RichStructureEntityDetailView:
                                 )
                             }
                         }
-                        .organizationDetailCard(
-                            entity.kind
-                                == .organization
-                        )
 
                         // DETAIL DELETE FOOTER
                         HStack {
@@ -2778,7 +2683,7 @@ struct RichStructureEntityDetailView:
                     )
                     .padding(
                         .top,
-                        8
+                        12
                     )
                     .padding(
                         .bottom,

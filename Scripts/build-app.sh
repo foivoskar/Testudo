@@ -225,7 +225,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>${BUILD_NUMBER}</string>
 
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>26.0</string>
 
     <key>NSHighResolutionCapable</key>
     <true/>

@@ -638,6 +638,23 @@ struct ContentView: View {
                     maxWidth: .infinity,
                     maxHeight: .infinity
                 )
+                .overlay(
+                    alignment:
+                        .topTrailing
+                ) {
+                    detailNavigationControls
+                        .padding(
+                            .top,
+                            7
+                        )
+                        .padding(
+                            .trailing,
+                            12
+                        )
+                        .zIndex(
+                            100
+                        )
+                }
             }
             // Keep the detail pane at one permanent vertical
             // position, independent of sidebar visibility.
@@ -846,71 +863,8 @@ struct ContentView: View {
     private var detailNavigationBar:
         some View
     {
-        HStack(
-            spacing: 4
-        ) {
-            Button(
-                action:
-                    navigateDetailBack
-            ) {
-                Image(
-                    systemName:
-                        "chevron.left"
-                )
-                .font(
-                    .system(
-                        size: 12,
-                        weight:
-                            .semibold
-                    )
-                )
-                .frame(
-                    width: 26,
-                    height: 26
-                )
-                .contentShape(
-                    Rectangle()
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(
-                detailBackStack
-                    .isEmpty
-            )
-            .help("Back")
-
-            Button(
-                action:
-                    navigateDetailForward
-            ) {
-                Image(
-                    systemName:
-                        "chevron.right"
-                )
-                .font(
-                    .system(
-                        size: 12,
-                        weight:
-                            .semibold
-                    )
-                )
-                .frame(
-                    width: 26,
-                    height: 26
-                )
-                .contentShape(
-                    Rectangle()
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(
-                detailForwardStack
-                    .isEmpty
-            )
-            .help("Forward")
-
+        HStack {
             Spacer()
-
         }
         .padding(
             .leading,
@@ -934,6 +888,102 @@ struct ContentView: View {
         .background(
             TestudoStyle
                 .contentBackground
+        )
+    }
+
+
+    private var detailNavigationControls:
+        some View
+    {
+        HStack(
+            spacing:
+                7
+        ) {
+            Button(
+                action:
+                    navigateDetailBack
+            ) {
+                Image(
+                    systemName:
+                        "chevron.left"
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight:
+                            .semibold
+                    )
+                )
+                .frame(
+                    width: 14,
+                    height: 14
+                )
+            }
+            .buttonStyle(
+                .glass
+            )
+            .buttonBorderShape(
+                .circle
+            )
+            .controlSize(
+                .small
+            )
+            .disabled(
+                detailBackStack
+                    .isEmpty
+            )
+            .help(
+                "Back"
+            )
+            .accessibilityLabel(
+                "Back"
+            )
+
+            Button(
+                action:
+                    navigateDetailForward
+            ) {
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight:
+                            .semibold
+                    )
+                )
+                .frame(
+                    width: 14,
+                    height: 14
+                )
+            }
+            .buttonStyle(
+                .glass
+            )
+            .buttonBorderShape(
+                .circle
+            )
+            .controlSize(
+                .small
+            )
+            .disabled(
+                detailForwardStack
+                    .isEmpty
+            )
+            .help(
+                "Forward"
+            )
+            .accessibilityLabel(
+                "Forward"
+            )
+        }
+        .fixedSize(
+            horizontal:
+                true,
+            vertical:
+                true
         )
     }
 
@@ -3696,19 +3746,6 @@ private struct EntityListView: View {
 
         if !shortName.isEmpty {
             return shortName
-        }
-
-
-        let code =
-            organization.code?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-            ?? ""
-
-        if !code.isEmpty {
-            return code
         }
 
 

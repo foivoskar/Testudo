@@ -805,6 +805,7 @@ struct PersonDetailView: View {
                         .primary
                 )
             }
+            .personDetailCard()
         }
     }
 
@@ -1460,7 +1461,7 @@ private extension View {
     {
         self
             .padding(
-                14
+                16
             )
             .background(
                 Color.primary
@@ -1470,7 +1471,7 @@ private extension View {
                 in:
                     RoundedRectangle(
                         cornerRadius:
-                            11,
+                            12,
                         style:
                             .continuous
                     )
@@ -1478,7 +1479,7 @@ private extension View {
             .overlay {
                 RoundedRectangle(
                     cornerRadius:
-                        11,
+                        12,
                     style:
                         .continuous
                 )
