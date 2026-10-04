@@ -12,7 +12,7 @@ Testudo combines work management, professional context, organizational structure
 
 It is intended for work that cannot be represented well by a flat task list: scientific research, research software engineering, academic collaboration, technical operations, laboratories, infrastructure, multi-institution projects, committees, and other long-running professional activity.
 
-**Current documented version: Testudo 0.1.5 (build 6).**
+**Current documented version: Testudo 0.1.6 (build 7).**
 
 ---
 
@@ -85,7 +85,7 @@ cd Testudo
 The resulting installer is written to `dist/`, normally as:
 
 ```text
-dist/Testudo-0.1.5-macOS-arm64.dmg
+dist/Testudo-0.1.6-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -230,6 +230,8 @@ The creation form can create:
 
 It also exposes the relevant Theme, Parent Task, dates, time zones and Work relationships.
 
+The same Work editor is also used when editing an existing Task, Note or Activity. Existing Work opens with its current values pre-filled, while the normal detail page remains read-only.
+
 New Entry is repeatable: after cancelling a creation form, selecting New Entry again opens a fresh form.
 
 ---
@@ -249,6 +251,12 @@ Tasks can contain further Tasks to arbitrary depth.
 
 They can also participate in Theme membership, relationships, deadlines, chronology and history.
 
+The normal Task detail page is read-only and provides one **Edit** action. Editing opens the same complete Work editor used by New Entry, pre-filled with the Task's content, Themes, Parent, status, lifecycle dates and relationships.
+
+`Created` remains an audit timestamp describing when the Task entered Testudo. `Started` describes when the work actually began and is editable independently, including historical dates earlier than `Created`.
+
+When a Task changes from **To Do** to **In Progress** without an existing `Started` value, Testudo records the transition time automatically. A manually supplied `Started` value is preserved.
+
 ---
 
 ## Notes
@@ -256,6 +264,8 @@ They can also participate in Theme membership, relationships, deadlines, chronol
 Notes preserve contextual or durable information without requiring Task status.
 
 Notes can live inside the Work hierarchy and can use reminders and relationships where appropriate.
+
+The normal Note detail page is read-only. A single **Edit** action opens the shared Work editor with the Note's current values, including reminder and relationships, already populated.
 
 ---
 
@@ -274,6 +284,8 @@ Examples include:
 - a resolved problem
 
 Activities are chronological work-log objects.
+
+The normal Activity detail page is read-only. A single **Edit** action opens the shared Work editor with the Activity's existing values, including its occurrence time and relationships.
 
 They are deliberately different from Calendar Events:
 
@@ -563,7 +575,7 @@ The complete English user manual is maintained in this repository:
 - [LaTeX source](Documentation/TestudoManual/Testudo_manual.tex)
 - [LaTeX document class](Documentation/TestudoManual/testudomanual.cls)
 
-The current documentation edition is **Testudo User Manual 1.2**, documenting Testudo **0.1.5 (build 6)**.
+The current documentation edition is **Testudo User Manual 1.2**, documenting Testudo **0.1.6 (build 7)**.
 
 ---
 

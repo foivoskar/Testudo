@@ -1318,6 +1318,10 @@ struct WorkItemDetailView: View {
     }
 
     @State
+    private var showingEditor =
+        false
+
+    @State
     private var editingField:
         EditableField?
 
@@ -1589,6 +1593,17 @@ struct WorkItemDetailView: View {
                 "The Parent Task has been saved. Copying will replace this Task's current Related People, Groups & Organizations with the Parent's relationships marked “Inherited by child items”. The copied relationships can be edited normally afterward."
             )
         }
+        .sheet(
+            isPresented:
+                $showingEditor
+        ) {
+            WorkEntryEditorView(
+                itemID:
+                    itemID,
+                selectedWorkItemID:
+                    $selectedWorkItemID
+            )
+        }
     }
 
     private var taskDetailDivider:
@@ -1605,8 +1620,10 @@ struct WorkItemDetailView: View {
         _ item: WorkItem
     ) -> some View {
         HStack(
-            alignment: .top,
-            spacing: 14
+            alignment:
+                .top,
+            spacing:
+                14
         ) {
             Image(
                 systemName:
@@ -1616,80 +1633,326 @@ struct WorkItemDetailView: View {
             )
             .testudoTaskStatusSymbolColor(
                 largeIcon(
-                        item
-                    )
+                    item
+                )
             )
-            .font(.title2)
-            .frame(width: 28)
+            .font(
+                .title2
+            )
+            .frame(
+                width:
+                    28
+            )
 
             VStack(
-                alignment: .leading,
-                spacing: 7
+                alignment:
+                    .leading,
+                spacing:
+                    7
             ) {
-                if
-                    editingField
-                        == .title
-                {
-                    TextField(
-                        "Title",
-                        text:
-                            $textDraft
+                Text(
+                    displayTitle(
+                        item
                     )
-                    .font(.title2)
+                )
+                .font(
+                    .title2
+                )
+                .fontWeight(
+                    .semibold
+                )
+                .textSelection(
+                    .enabled
+                )
 
-                    InlineEditActions(
-                        onCancel: cancelEdit,
-                        onSave: {
-                            saveTitle(
-                                item
-                            )
-                        }
-                    )
-                } else {
-                    HStack(
-                        alignment:
-                            .firstTextBaseline,
-                        spacing: 8
-                    ) {
-                        Text(
-                            displayTitle(
-                                item
-                            )
-                        )
-                        .font(.title2)
-                        .fontWeight(
-                            .semibold
-                        )
-                        .textSelection(
-                            .enabled
-                        )
-
-                        InlineEditButton {
-                            beginTextEdit(
-                                .title,
-                                value:
-                                    item.title
-                                    ?? ""
-                            )
-                        }
-                    }
-                }
-
-                HStack(spacing: 8) {
+                HStack(
+                    spacing:
+                        8
+                ) {
                     Text(
                         typeLabel(
                             item
                         )
                     )
 
+                    let themes =
+                        store.workThemes(
+                            for:
+                                item.id
+                        )
+
                     if
-                        let theme =
-                            store.theme(
-                                id:
-                                    item.themeID
-                            )
+                        let firstTheme =
+                            themes.first
                     {
-                        Text("·")
+                        Text(
+                            "·"
+                        )
+
+                        TestudoDestinationLink(
+                            title:
+                                firstTheme.name,
+                            destination:
+                                .theme(
+                                    firstTheme.id
+                                ),
+                            color:
+                                .secondary
+                        )
+
+                        if themes.count > 1 {
+                            Text(
+                                "+\(themes.count - 1)"
+                            )
+                        }
+                    }
+
+                    if
+                        item.kind == .task,
+                        let status =
+                            item.status
+                    {
+                        Text(
+                            "·"
+                        )
+
+                        Text(
+                            status.displayName
+                        )
+                    }
+                }
+                .font(
+                    .callout
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+
+            Button {
+                showingEditor =
+                    true
+            } label: {
+                Label(
+                    "Edit",
+                    systemImage:
+                        "pencil"
+                )
+            }
+            .padding(
+                .trailing,
+                80
+            )
+        }
+    }
+
+
+    @ViewBuilder
+    private func descriptionSection(
+        _ item: WorkItem
+    ) -> some View {
+        InspectorSection(
+            title:
+                "Description"
+        ) {
+            if
+                item.body
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty
+            {
+                Text(
+                    "No description"
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+            } else {
+                Text(
+                    item.body
+                )
+                .textSelection(
+                    .enabled
+                )
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
+                )
+            }
+        }
+    }
+
+
+    private func detailsSection(
+        _ item: WorkItem
+    ) -> some View {
+        InspectorSection(
+            title:
+                "Details"
+        ) {
+            VStack(
+                spacing:
+                    9
+            ) {
+                readOnlyThemesRow(
+                    item
+                )
+
+                readOnlyParentRow(
+                    item
+                )
+
+                if item.kind == .task {
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Status",
+                        value:
+                            item.status?
+                                .displayName
+                            ?? "To Do"
+                    )
+
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Started",
+                        value:
+                            item.startedAt
+                                .map {
+                                    TestudoTime
+                                        .displayDateTime(
+                                            $0,
+                                            sourceTimeZoneID:
+                                                item
+                                                    .startedTimeZoneID
+                                        )
+                                }
+                            ?? "None"
+                    )
+
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Deadline",
+                        value:
+                            item.deadlineAt
+                                .map {
+                                    TestudoTime
+                                        .displayDateTime(
+                                            $0,
+                                            sourceTimeZoneID:
+                                                item
+                                                    .deadlineTimeZoneID
+                                        )
+                                }
+                            ?? "None"
+                    )
+                }
+
+                if item.kind == .note {
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Reminder",
+                        value:
+                            item.reminderAt
+                                .map {
+                                    TestudoTime
+                                        .displayDateTime(
+                                            $0,
+                                            sourceTimeZoneID:
+                                                item
+                                                    .reminderTimeZoneID
+                                        )
+                                }
+                            ?? "None"
+                    )
+                }
+
+                if item.kind == .activity {
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Occurred",
+                        value:
+                            item.loggedAt
+                                .map {
+                                    TestudoTime
+                                        .displayDateTime(
+                                            $0,
+                                            sourceTimeZoneID:
+                                                item
+                                                    .loggedTimeZoneID
+                                        )
+                                }
+                            ?? "Unknown"
+                    )
+                }
+            }
+        }
+    }
+
+
+    private func readOnlyThemesRow(
+        _ item: WorkItem
+    ) -> some View {
+        let themes =
+            store.workThemes(
+                for:
+                    item.id
+            )
+
+        return HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                16
+        ) {
+            Text(
+                "Themes"
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    110,
+                alignment:
+                    .leading
+            )
+
+            if themes.isEmpty {
+                Text(
+                    "None"
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+            } else {
+                HStack(
+                    spacing:
+                        6
+                ) {
+                    ForEach(
+                        Array(
+                            themes.enumerated()
+                        ),
+                        id:
+                            \.element.id
+                    ) {
+                        index,
+                        theme in
+
+                        if index > 0 {
+                            Text(
+                                "·"
+                            )
+                            .foregroundStyle(
+                                .tertiary
+                            )
+                        }
 
                         TestudoDestinationLink(
                             title:
@@ -1699,218 +1962,80 @@ struct WorkItemDetailView: View {
                                     theme.id
                                 ),
                             color:
-                                .secondary
-                        )
-                    }
-
-                    if
-                        item.kind
-                            == .task,
-                        let status =
-                            item.status
-                    {
-                        Text("·")
-                        Text(
-                            status.displayName
+                                .primary
                         )
                     }
                 }
-                .font(.callout)
+            }
+
+            Spacer()
+        }
+        .font(
+            .callout
+        )
+    }
+
+
+    private func readOnlyParentRow(
+        _ item: WorkItem
+    ) -> some View {
+        let parent =
+            item.parentWorkItemID
+                .flatMap {
+                    store.workItem(
+                        id:
+                            $0
+                    )
+                }
+
+        return HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                16
+        ) {
+            Text(
+                "Parent"
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    110,
+                alignment:
+                    .leading
+            )
+
+            if let parent {
+                TestudoDestinationLink(
+                    title:
+                        displayTitle(
+                            parent
+                        ),
+                    destination:
+                        .work(
+                            parent.id
+                        ),
+                    color:
+                        .primary
+                )
+            } else {
+                Text(
+                    "None"
+                )
                 .foregroundStyle(
-                    .secondary
+                    .tertiary
                 )
             }
 
             Spacer()
         }
+        .font(
+            .callout
+        )
     }
 
-    @ViewBuilder
-    private func descriptionSection(
-        _ item: WorkItem
-    ) -> some View {
-        InspectorSection(
-            title: "Description"
-        ) {
-            if
-                editingField
-                    == .body
-            {
-                VStack(
-                    alignment: .leading,
-                    spacing: 12
-                ) {
-                    TextEditor(
-                        text:
-                            $textDraft
-                    )
-                    .font(.body)
-                    .scrollContentBackground(
-                        .hidden
-                    )
-                    .padding(
-                        .horizontal,
-                        10
-                    )
-                    .padding(
-                        .vertical,
-                        8
-                    )
-                    .frame(
-                        minHeight: 96,
-                        idealHeight: 110,
-                        maxHeight: 140
-                    )
-                    .background(
-                        Color(
-                            nsColor:
-                                .textBackgroundColor
-                        ),
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 10,
-                                style:
-                                    .continuous
-                            )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 10,
-                            style:
-                                .continuous
-                        )
-                        .stroke(
-                            Color.primary
-                                .opacity(0.12),
-                            lineWidth: 1
-                        )
-                    }
-
-                    HStack(
-                        spacing: 10
-                    ) {
-                        Spacer()
-
-                        Button(
-                            "Cancel"
-                        ) {
-                            cancelEdit()
-                        }
-                        .keyboardShortcut(
-                            .cancelAction
-                        )
-
-                        Button(
-                            "Save"
-                        ) {
-                            saveBody(
-                                item
-                            )
-                        }
-                        .buttonStyle(
-                            .borderedProminent
-                        )
-                        .keyboardShortcut(
-                            .defaultAction
-                        )
-                    }
-                }
-                .padding(
-                    .top,
-                    2
-                )
-            } else {
-                HStack(
-                    alignment: .top,
-                    spacing: 10
-                ) {
-                    Group {
-                        if
-                            item.body
-                                .trimmingCharacters(
-                                    in:
-                                        .whitespacesAndNewlines
-                                )
-                                .isEmpty
-                        {
-                            Text(
-                                "No description"
-                            )
-                            .foregroundStyle(
-                                .tertiary
-                            )
-                        } else {
-                            TestudoDestinationLink(
-                                title:
-                                    item.body,
-                                destination:
-                                    .work(
-                                        item.id
-                                    ),
-                                color:
-                                    .primary
-                            )
-                        }
-                    }
-
-                    Spacer()
-
-                    InlineEditButton {
-                        beginTextEdit(
-                            .body,
-                            value:
-                                item.body
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    private func detailsSection(
-        _ item: WorkItem
-    ) -> some View {
-        InspectorSection(
-            title: "Details"
-        ) {
-            VStack(spacing: 9) {
-                themeRow(item)
-
-                parentRow(item)
-
-                if
-                    item.kind
-                        == .task
-                {
-                    statusRow(item)
-                    deadlineRow(item)
-                }
-
-                if
-                    item.kind
-                        == .note
-                {
-                    reminderRow(item)
-                }
-
-                if
-                    item.kind
-                        == .activity
-                {
-                    occurredRow(item)
-                }
-            }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .red
-                    )
-                    .padding(.top, 4)
-            }
-        }
-    }
 
     @ViewBuilder
     private func themeRow(
@@ -3404,14 +3529,18 @@ struct WorkItemDetailView: View {
                 "Related People, Groups & Organizations"
         ) {
             VStack(
-                alignment: .leading,
-                spacing: 11
+                alignment:
+                    .leading,
+                spacing:
+                    11
             ) {
                 ForEach(
                     WorkRelationshipRole
                         .allCases
-                ) { role in
-                    relationshipGroupRow(
+                ) {
+                    role in
+
+                    readOnlyRelationshipRow(
                         item:
                             item,
                         role:
@@ -3420,6 +3549,82 @@ struct WorkItemDetailView: View {
                 }
             }
         }
+    }
+
+
+    private func readOnlyRelationshipRow(
+        item:
+            WorkItem,
+        role:
+            WorkRelationshipRole
+    ) -> some View {
+        let current =
+            relationships(
+                for:
+                    item.id,
+                role:
+                    role
+            )
+
+        let entities =
+            current.compactMap {
+                store.entity(
+                    id:
+                        $0.entityID
+                )
+            }
+
+        return HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing:
+                12
+        ) {
+            Text(
+                role.displayName
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    145,
+                alignment:
+                    .leading
+            )
+
+            if current.isEmpty {
+                Text(
+                    "—"
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+            } else if !entities.isEmpty {
+                TestudoEntityLinks(
+                    entities:
+                        entities,
+                    font:
+                        .callout,
+                    color:
+                        .primary
+                )
+            } else {
+                Text(
+                    relationshipNames(
+                        current
+                    )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+        }
+        .font(
+            .callout
+        )
     }
 
 

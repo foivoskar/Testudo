@@ -2855,6 +2855,200 @@ final class TestudoStore: ObservableObject {
         save()
     }
 
+    @discardableResult
+    func updateTaskStartedAt(
+        workItemID: UUID,
+        startedAt: Date?,
+        startedTimeZoneID: String?,
+        recordAudit: Bool = true
+    ) -> String? {
+        guard
+            let index =
+                data.workItems.firstIndex(
+                    where: {
+                        $0.id
+                            == workItemID
+                    }
+                ),
+            data.workItems[index]
+                .kind
+                == .task
+        else {
+            return "Task not found."
+        }
+
+        let now =
+            Date()
+
+        let currentTimeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+        if let startedAt {
+            guard
+                startedAt <= now
+            else {
+                return
+                    "Started date cannot be in the future."
+            }
+
+            if
+                let completedAt =
+                    data.workItems[index]
+                        .completedAt,
+                startedAt > completedAt
+            {
+                return
+                    "Started date cannot be later than the completed date."
+            }
+        }
+
+        let previousStartedAt =
+            data.workItems[index]
+                .startedAt
+
+        let previousTimeZoneID =
+            data.workItems[index]
+                .startedTimeZoneID
+
+        let normalizedTimeZoneID:
+            String?
+
+        if startedAt == nil {
+            normalizedTimeZoneID =
+                nil
+        } else {
+            normalizedTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        startedTimeZoneID
+                    )
+                ?? previousTimeZoneID
+                ?? currentTimeZoneID
+        }
+
+        if
+            previousStartedAt == startedAt,
+            previousTimeZoneID
+                == normalizedTimeZoneID
+        {
+            return nil
+        }
+
+        data.workItems[index]
+            .startedAt =
+            startedAt
+
+        data.workItems[index]
+            .startedTimeZoneID =
+            normalizedTimeZoneID
+
+        data.workItems[index]
+            .updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            currentTimeZoneID
+
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        // There should be one canonical lifecycle-start event.
+        // Its timestamp is the real-world Started value.
+        data.historyEvents.removeAll {
+            $0.workItemID
+                == workItemID
+            && $0.kind
+                == .started
+        }
+
+        let updatedTask =
+            data.workItems[index]
+
+        if let startedAt {
+            data.historyEvents.append(
+                HistoryEvent(
+                    workItemID:
+                        workItemID,
+                    kind:
+                        .started,
+                    timestamp:
+                        startedAt,
+                    text:
+                        "\(taskHistoryTitle(updatedTask)) started",
+                    actorMembershipID:
+                        currentEnvironmentMembership?
+                            .id,
+                    timeZoneID:
+                        normalizedTimeZoneID,
+                    valueTimeZoneID:
+                        normalizedTimeZoneID
+                )
+            )
+        }
+
+        if recordAudit {
+            let auditText:
+                String
+
+            if
+                previousStartedAt == nil,
+                startedAt != nil
+            {
+                auditText =
+                    "Started date set"
+            } else if startedAt == nil {
+                auditText =
+                    "Started date cleared"
+            } else {
+                auditText =
+                    "Started date changed"
+            }
+
+            data.historyEvents.append(
+                HistoryEvent(
+                    workItemID:
+                        workItemID,
+                    kind:
+                        .edited,
+                    timestamp:
+                        now,
+                    text:
+                        auditText,
+                    previousValue:
+                        previousStartedAt.map {
+                            TestudoTime
+                                .utcString(
+                                    $0
+                                )
+                        },
+                    newValue:
+                        startedAt.map {
+                            TestudoTime
+                                .utcString(
+                                    $0
+                                )
+                        },
+                    actorMembershipID:
+                        currentEnvironmentMembership?
+                            .id,
+                    timeZoneID:
+                        currentTimeZoneID,
+                    valueTimeZoneID:
+                        normalizedTimeZoneID
+                )
+            )
+        }
+
+        save()
+
+        return nil
+    }
+
+
     func deleteWorkItem(
         id: UUID
     ) {
@@ -3606,6 +3800,8 @@ extension TestudoStore {
             if
                 newStatus
                     == .inProgress,
+                oldStatus
+                    != .inProgress,
                 data.workItems[index]
                     .startedAt == nil
             {
@@ -3763,6 +3959,8 @@ extension TestudoStore {
             if
                 updatedTask.status
                     == .inProgress,
+                oldStatus
+                    != .inProgress,
                 !hadStarted
             {
                 appendTaskLifecycleHistory(
@@ -3924,7 +4122,8 @@ extension TestudoStore {
     func updateWorkRelationshipDetails(
         relationshipID: UUID,
         entityID: UUID,
-        role: WorkRelationshipRole
+        role: WorkRelationshipRole,
+        inheritedByChildren: Bool? = nil
     ) -> String? {
         guard
             let index =
@@ -3956,6 +4155,12 @@ extension TestudoStore {
         data.workEntityRelationships[index]
             .role =
             role
+
+        if let inheritedByChildren {
+            data.workEntityRelationships[index]
+                .inheritedByChildren =
+                inheritedByChildren
+        }
 
         save()
 

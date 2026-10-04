@@ -1,8 +1,8 @@
 \documentclass{testudomanual}
 
 \newcommand{\ManualVersion}{1.2}
-\newcommand{\DocumentedTestudoVersion}{0.1.5}
-\newcommand{\DocumentedTestudoBuild}{6}
+\newcommand{\DocumentedTestudoVersion}{0.1.6}
+\newcommand{\DocumentedTestudoBuild}{7}
 \newcommand{\ManualDate}{October 2026}
 
 \newcommand{\TestudoIconPath}{
@@ -842,6 +842,12 @@ The editor can create a Task, Note or Activity and exposes the
 relevant Theme, Parent Task, timing, time-zone and relationship
 controls.
 
+The same SwiftUI Work editor is used when editing an existing Task,
+Note or Activity. In Edit mode the existing item's values are loaded
+into the form, while its Work type remains fixed. The normal Work
+detail inspector is read-only and provides a single Edit action rather
+than separate per-property edit controls.
+
 After cancelling a creation form, selecting New Entry again opens a
 fresh creation form.
 
@@ -937,6 +943,20 @@ such as:
 These timestamps are stored as absolute instants while preserving
 relevant source time-zone information.
 
+The \term{Created} timestamp is an audit value describing when the
+Task was entered into Testudo and is not edited through the Work
+editor.
+
+The \term{Started} timestamp describes when the work actually began.
+It is user-editable and may intentionally predate Created, which
+allows older work to be entered retrospectively without falsifying
+the application's creation audit trail.
+
+When a Task moves from \term{To Do} to \term{In Progress} and does
+not already have a Started value, Testudo automatically records the
+transition time as Started. An existing manually supplied Started
+value is preserved.
+
 
 \section{Sub-tasks}
 
@@ -968,6 +988,10 @@ context that is not itself an actionable Task.
 Notes may also participate in date/reminder workflows where supported
 by the interface.
 
+A Note's normal detail inspector is read-only. The single Edit action
+opens the shared Work editor with the existing Note content, hierarchy,
+Theme membership, reminder and relationships pre-filled.
+
 
 \section{Activities}
 
@@ -985,6 +1009,11 @@ Examples include:
 \end{itemize}
 
 An Activity is a work-log object, not a scheduled Calendar Event.
+
+An Activity's normal detail inspector is read-only. The single Edit
+action opens the shared Work editor with the Activity's current
+content, hierarchy, Theme membership, occurrence time and
+relationships pre-filled.
 
 This distinction is fundamental:
 

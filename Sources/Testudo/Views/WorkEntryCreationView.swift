@@ -1,9 +1,17 @@
 import SwiftUI
 
-struct WorkEntryCreationView: View {
-    @EnvironmentObject
-    private var store: TestudoStore
 
+// ============================================================
+// MARK: - Existing New Entry entry point
+//
+// The router keeps using WorkEntryCreationView.
+// Internally it now uses the exact same editor as existing
+// Tasks / Notes / Activities.
+// ============================================================
+
+struct WorkEntryCreationView:
+    View
+{
     let request:
         WorkCreationRequest
 
@@ -15,27 +23,113 @@ struct WorkEntryCreationView: View {
     var selectedWorkItemID:
         UUID?
 
-    @State
-    private var kind:
-        WorkItemKind
+
+    var body:
+        some View
+    {
+        WorkEntryEditorView(
+            request:
+                request,
+            workCreationRequest:
+                $workCreationRequest,
+            selectedWorkItemID:
+                $selectedWorkItemID
+        )
+    }
+}
+
+
+// ============================================================
+// MARK: - Shared Work Editor
+// ============================================================
+
+struct WorkEntryEditorView:
+    View
+{
+    @EnvironmentObject
+    private var store:
+        TestudoStore
+
+    @Environment(
+        \.dismiss
+    )
+    private var dismiss
+
+
+    private enum Mode
+    {
+        case create(
+            WorkCreationRequest
+        )
+
+        case edit(
+            UUID
+        )
+    }
+
+
+    private let mode:
+        Mode
+
+
+    @Binding
+    private var workCreationRequest:
+        WorkCreationRequest?
+
+    @Binding
+    private var selectedWorkItemID:
+        UUID?
+
 
     @State
-    private var themeID:
-        UUID?
+    private var didLoad =
+        false
+
+    @State
+    private var kind:
+        WorkItemKind = .task
+
+    @State
+    private var themeIDs:
+        Set<UUID> = []
 
     @State
     private var parentWorkItemID:
         UUID?
 
     @State
-    private var title = ""
+    private var originalParentWorkItemID:
+        UUID?
 
     @State
-    private var bodyText = ""
+    private var title =
+        ""
+
+    @State
+    private var bodyText =
+        ""
 
     @State
     private var status:
         TaskStatus = .todo
+
+
+    // --------------------------------------------------------
+    // Task lifecycle
+    // --------------------------------------------------------
+
+    @State
+    private var hasStarted =
+        false
+
+    @State
+    private var startedAt =
+        Date()
+
+    @State
+    private var startedTimeZoneID =
+        TestudoTime
+            .deviceTimeZoneID
 
     @State
     private var hasDeadline =
@@ -43,20 +137,27 @@ struct WorkEntryCreationView: View {
 
     @State
     private var deadlineAt =
-        Calendar.current.date(
-            byAdding:
-                .day,
-            value:
-                1,
-            to:
-                Date()
-        )
+        Calendar
+            .autoupdatingCurrent
+            .date(
+                byAdding:
+                    .day,
+                value:
+                    1,
+                to:
+                    Date()
+            )
         ?? Date()
 
     @State
     private var deadlineTimeZoneID =
         TestudoTime
             .deviceTimeZoneID
+
+
+    // --------------------------------------------------------
+    // Note
+    // --------------------------------------------------------
 
     @State
     private var hasReminder =
@@ -71,6 +172,11 @@ struct WorkEntryCreationView: View {
         TestudoTime
             .deviceTimeZoneID
 
+
+    // --------------------------------------------------------
+    // Activity / Event
+    // --------------------------------------------------------
+
     @State
     private var occurredAt =
         Date()
@@ -80,6 +186,11 @@ struct WorkEntryCreationView: View {
         TestudoTime
             .deviceTimeZoneID
 
+
+    // --------------------------------------------------------
+    // Relationships
+    // --------------------------------------------------------
+
     @State
     private var relationships:
         [RelationshipDraft] = []
@@ -88,22 +199,67 @@ struct WorkEntryCreationView: View {
     private var errorMessage:
         String?
 
+    @State
+    private var showingParentRelationshipChoice =
+        false
+
+    @State
+    private var pendingParentRelationshipSourceID:
+        UUID?
+
+
     private struct RelationshipDraft:
         Identifiable
     {
-        let id =
-            UUID()
+        var id:
+            UUID
+
+        var existingRelationshipID:
+            UUID?
 
         var role:
-            WorkRelationshipRole =
-            .relatedTo
+            WorkRelationshipRole
 
         var entityID:
             UUID?
 
-        var inheritedByChildren =
-            true
+        var inheritedByChildren:
+            Bool
+
+
+        init(
+            id:
+                UUID = UUID(),
+            existingRelationshipID:
+                UUID? = nil,
+            role:
+                WorkRelationshipRole = .relatedTo,
+            entityID:
+                UUID? = nil,
+            inheritedByChildren:
+                Bool = true
+        ) {
+            self.id =
+                id
+
+            self.existingRelationshipID =
+                existingRelationshipID
+
+            self.role =
+                role
+
+            self.entityID =
+                entityID
+
+            self.inheritedByChildren =
+                inheritedByChildren
+        }
     }
+
+
+    // ========================================================
+    // MARK: Initializers
+    // ========================================================
 
     init(
         request:
@@ -113,8 +269,10 @@ struct WorkEntryCreationView: View {
         selectedWorkItemID:
             Binding<UUID?>
     ) {
-        self.request =
-            request
+        self.mode =
+            .create(
+                request
+            )
 
         self._workCreationRequest =
             workCreationRequest
@@ -125,13 +283,21 @@ struct WorkEntryCreationView: View {
         self._kind =
             State(
                 initialValue:
-                    request.initialKind
+                    request
+                        .initialKind
             )
 
-        self._themeID =
+        self._themeIDs =
             State(
                 initialValue:
-                    request.themeID
+                    Set(
+                        request
+                            .themeID
+                            .map {
+                                [$0]
+                            }
+                        ?? []
+                    )
             )
 
         self._parentWorkItemID =
@@ -142,7 +308,53 @@ struct WorkEntryCreationView: View {
             )
     }
 
-    var body: some View {
+
+    init(
+        itemID:
+            UUID,
+        selectedWorkItemID:
+            Binding<UUID?>
+    ) {
+        self.mode =
+            .edit(
+                itemID
+            )
+
+        self._workCreationRequest =
+            .constant(
+                nil
+            )
+
+        self._selectedWorkItemID =
+            selectedWorkItemID
+    }
+
+
+    // ========================================================
+    // MARK: Body
+    // ========================================================
+
+    @ViewBuilder
+    var body:
+        some View
+    {
+        if isEditing {
+            editorBody
+                .frame(
+                    width:
+                        860,
+                    height:
+                        780
+                )
+        } else {
+            editorBody
+        }
+    }
+
+
+    private var editorBody:
+        some View
+    {
         ZStack {
             TestudoStyle
                 .contentBackground
@@ -179,153 +391,7 @@ struct WorkEntryCreationView: View {
                         title:
                             "Content"
                     ) {
-                        VStack(
-                            alignment:
-                                .leading,
-                            spacing:
-                                16
-                        ) {
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing:
-                                    7
-                            ) {
-                                Text(
-                                    "Title"
-                                )
-                                .font(
-                                    .caption
-                                        .weight(
-                                            .medium
-                                        )
-                                )
-                                .foregroundStyle(
-                                    .secondary
-                                )
-
-                                TextField(
-                                    "Optional title",
-                                    text:
-                                        $title
-                                )
-                                .textFieldStyle(
-                                    .plain
-                                )
-                                .padding(
-                                    .horizontal,
-                                    11
-                                )
-                                .frame(
-                                    height:
-                                        36
-                                )
-                                .background(
-                                    Color(
-                                        nsColor:
-                                            .textBackgroundColor
-                                    ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                8,
-                                            style:
-                                                .continuous
-                                        )
-                                )
-                                .overlay {
-                                    RoundedRectangle(
-                                        cornerRadius:
-                                            8,
-                                        style:
-                                            .continuous
-                                    )
-                                    .stroke(
-                                        Color.primary
-                                            .opacity(
-                                                0.12
-                                            ),
-                                        lineWidth:
-                                            1
-                                    )
-                                }
-                            }
-
-
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing:
-                                    7
-                            ) {
-                                Text(
-                                    kind == .note
-                                    ? "Note"
-                                    : (
-                                        kind == .activity
-                                        ? "What happened?"
-                                        : "Description"
-                                    )
-                                )
-                                .font(
-                                    .caption
-                                        .weight(
-                                            .medium
-                                        )
-                                )
-                                .foregroundStyle(
-                                    .secondary
-                                )
-
-
-                                TextEditor(
-                                    text:
-                                        $bodyText
-                                )
-                                .font(
-                                    .body
-                                )
-                                .scrollContentBackground(
-                                    .hidden
-                                )
-                                .padding(
-                                    8
-                                )
-                                .frame(
-                                    minHeight:
-                                        120
-                                )
-                                .background(
-                                    Color(
-                                        nsColor:
-                                            .textBackgroundColor
-                                    ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                10,
-                                            style:
-                                                .continuous
-                                        )
-                                )
-                                .overlay {
-                                    RoundedRectangle(
-                                        cornerRadius:
-                                            10,
-                                        style:
-                                            .continuous
-                                    )
-                                    .stroke(
-                                        Color.primary
-                                            .opacity(
-                                                0.12
-                                            ),
-                                        lineWidth:
-                                            1
-                                    )
-                                }
-                            }
-                        }
+                        contentFields
                     }
 
                     timingSection
@@ -333,11 +399,15 @@ struct WorkEntryCreationView: View {
                     relationshipSection
 
                     if let errorMessage {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundStyle(
-                                .red
-                            )
+                        Text(
+                            errorMessage
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .red
+                        )
                     }
 
                     actionBar
@@ -369,7 +439,7 @@ struct WorkEntryCreationView: View {
             }
         }
         .onAppear {
-            synchroniseInitialParent()
+            loadIfNeeded()
         }
         .onChange(
             of:
@@ -378,46 +448,53 @@ struct WorkEntryCreationView: View {
             _,
             newValue in
 
-            guard
-                let newValue,
-                let parent =
-                    store.workItem(
-                        id:
-                            newValue
-                    )
-            else {
-                return
-            }
-
-            themeID =
-                parent.themeID
+            parentDidChange(
+                newValue
+            )
         }
         .onChange(
             of:
-                themeID
+                themeIDs
         ) {
             _,
             newValue in
 
-            guard
-                let parentWorkItemID,
-                let parent =
-                    store.workItem(
-                        id:
-                            parentWorkItemID
-                    )
-            else {
-                return
+            themesDidChange(
+                newValue
+            )
+        }
+        .confirmationDialog(
+            "Use Parent Relationships?",
+            isPresented:
+                $showingParentRelationshipChoice,
+            titleVisibility:
+                .visible
+        ) {
+            Button(
+                "Copy Parent Relationships"
+            ) {
+                copyParentRelationshipsAndClose()
             }
 
-            if parent.themeID
-                != newValue
-            {
-                self.parentWorkItemID =
+            Button(
+                "Keep Current Relationships"
+            ) {
+                pendingParentRelationshipSourceID =
                     nil
+
+                dismiss()
             }
+        } message: {
+            Text(
+                "The Parent Task has changed. Copying will replace this item's current related People, Groups and Organizations with the Parent's relationships marked “Inherited by child items”."
+            )
         }
     }
+
+
+    // ========================================================
+    // MARK: Header
+    // ========================================================
 
     private var header:
         some View
@@ -430,10 +507,17 @@ struct WorkEntryCreationView: View {
         ) {
             Image(
                 systemName:
-                    "square.and.pencil"
+                    isEditing
+                    ? editorIcon
+                    : "square.and.pencil"
             )
-            .font(.title2)
-            .frame(width: 28)
+            .font(
+                .title2
+            )
+            .frame(
+                width:
+                    28
+            )
 
             VStack(
                 alignment:
@@ -442,17 +526,21 @@ struct WorkEntryCreationView: View {
                     5
             ) {
                 Text(
-                    "New Work Entry"
+                    editorTitle
                 )
-                .font(.title2)
+                .font(
+                    .title2
+                )
                 .fontWeight(
                     .semibold
                 )
 
                 Text(
-                    "Create a Task, Note or Event"
+                    editorSubtitle
                 )
-                .font(.callout)
+                .font(
+                    .callout
+                )
                 .foregroundStyle(
                     .secondary
                 )
@@ -462,63 +550,134 @@ struct WorkEntryCreationView: View {
         }
     }
 
+
+    private var editorTitle:
+        String
+    {
+        if !isEditing {
+            return
+                "New Work Entry"
+        }
+
+        switch kind {
+        case .task:
+            return
+                "Edit Task"
+
+        case .note:
+            return
+                "Edit Note"
+
+        case .activity:
+            return
+                "Edit Activity"
+        }
+    }
+
+
+    private var editorSubtitle:
+        String
+    {
+        if !isEditing {
+            return
+                "Create a Task, Note or Event"
+        }
+
+        return
+            "Edit the complete \(kind.displayName.lowercased())"
+    }
+
+
+    private var editorIcon:
+        String
+    {
+        switch kind {
+        case .task:
+            return
+                "checkmark.circle"
+
+        case .note:
+            return
+                "note.text"
+
+        case .activity:
+            return
+                "waveform.path.ecg"
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Type / Theme / Parent
+    // ========================================================
+
+    @ViewBuilder
     private var typeRow:
         some View
     {
-        LabeledContent(
-            "Type"
-        ) {
-            Picker(
-                "",
-                selection:
-                    $kind
+        if isEditing {
+            LabeledContent(
+                "Type"
             ) {
-                ForEach(
-                    WorkItemKind
-                        .allCases
-                ) { candidate in
-                    Text(
-                        candidate
-                            .displayName
-                    )
-                    .tag(candidate)
-                }
+                Text(
+                    kind.displayName
+                )
+                .foregroundStyle(
+                    .secondary
+                )
             }
-            .labelsHidden()
-            .pickerStyle(
-                .segmented
-            )
-            .frame(
-                maxWidth:
-                    330
-            )
+        } else {
+            LabeledContent(
+                "Type"
+            ) {
+                Picker(
+                    "",
+                    selection:
+                        $kind
+                ) {
+                    ForEach(
+                        WorkItemKind
+                            .allCases
+                    ) {
+                        candidate in
+
+                        Text(
+                            candidate
+                                .displayName
+                        )
+                        .tag(
+                            candidate
+                        )
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(
+                    .segmented
+                )
+                .frame(
+                    maxWidth:
+                        330
+                )
+            }
         }
     }
+
 
     private var themeRow:
         some View
     {
         HierarchicalSelectionSummaryRow(
             label:
-                "Theme",
+                "Themes",
             selectedTitles:
-                themeID
-                    .flatMap {
-                        store.theme(
-                            id:
-                                $0
-                        )
-                    }
-                    .map {
-                        [
-                            $0.name
-                        ]
-                    }
-                ?? [],
+                selectedThemes
+                    .map(
+                        \.name
+                    ),
             selectorTitle:
-                "Theme",
+                "Themes",
             selectorMessage:
-                "Choose a Theme from the existing Theme hierarchy.",
+                "Choose one or more Themes from the existing Theme hierarchy.",
             nodes:
                 HierarchySelectionData
                     .themeNodes(
@@ -526,22 +685,14 @@ struct WorkEntryCreationView: View {
                             store
                     ),
             initialSelection:
-                Set(
-                    themeID
-                        .map {
-                            [$0]
-                        }
-                    ?? []
-                ),
+                themeIDs,
             buttonSystemImage:
                 "chevron.right",
-            maximumSelectionCount:
-                1,
             onSave: {
                 selection in
 
-                themeID =
-                    selection.first
+                themeIDs =
+                    selection
 
                 return nil
             }
@@ -552,72 +703,225 @@ struct WorkEntryCreationView: View {
     private var parentRow:
         some View
     {
-        HierarchicalSelectionSummaryRow(
-            label:
-                "Parent",
-            selectedTitles:
-                parentWorkItemID
-                    .flatMap {
-                        store.workItem(
-                            id:
-                                $0
-                        )
-                    }
-                    .map {
-                        [
-                            parentLabel(
-                                $0
-                            )
-                        ]
-                    }
-                ?? [],
-            selectorTitle:
-                "Parent Task",
-            selectorMessage:
-                "Choose a Parent Task from the Task hierarchy. Sub-tasks are shown beneath their immediate Parent.",
-            nodes:
-                HierarchySelectionData
-                    .taskNodes(
-                        store:
-                            store,
-                        themeID:
-                            themeID
-                    ),
-            initialSelection:
-                Set(
-                    parentWorkItemID
-                        .map {
-                            [$0]
-                        }
-                    ?? []
-                ),
-            buttonSystemImage:
-                "chevron.right",
-            maximumSelectionCount:
-                1,
-            onSave: {
-                selection in
-
-                parentWorkItemID =
-                    selection.first
-
-                if
-                    let parentWorkItemID,
-                    let parent =
-                        store.workItem(
-                            id:
-                                parentWorkItemID
-                        )
-                {
-                    themeID =
-                        parent.themeID
+        let currentParent =
+            parentWorkItemID
+                .flatMap {
+                    store.workItem(
+                        id:
+                            $0
+                    )
                 }
 
-                return nil
-            }
-        )
+        return
+            HierarchicalSelectionSummaryRow(
+                label:
+                    "Parent",
+                selectedTitles:
+                    currentParent
+                        .map {
+                            [
+                                displayTitle(
+                                    $0
+                                )
+                            ]
+                        }
+                    ?? [],
+                selectorTitle:
+                    "Parent Task",
+                selectorMessage:
+                    "Choose a Parent Task. The current item and its descendants cannot become its Parent.",
+                nodes:
+                    HierarchySelectionData
+                        .taskNodes(
+                            store:
+                                store,
+                            excludingWorkItemIDs:
+                                excludedParentIDs,
+                            themeID:
+                                primaryThemeID
+                        ),
+                initialSelection:
+                    Set(
+                        currentParent
+                            .map {
+                                [$0.id]
+                            }
+                        ?? []
+                    ),
+                buttonSystemImage:
+                    "chevron.right",
+                maximumSelectionCount:
+                    1,
+                onSave: {
+                    selection in
+
+                    parentWorkItemID =
+                        selection.first
+
+                    return nil
+                }
+            )
     }
 
+
+    // ========================================================
+    // MARK: Content
+    // ========================================================
+
+    private var contentFields:
+        some View
+    {
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                16
+        ) {
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    7
+            ) {
+                Text(
+                    "Title"
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .medium
+                        )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                TextField(
+                    "Optional title",
+                    text:
+                        $title
+                )
+                .textFieldStyle(
+                    .plain
+                )
+                .padding(
+                    .horizontal,
+                    11
+                )
+                .frame(
+                    height:
+                        36
+                )
+                .background(
+                    Color(
+                        nsColor:
+                            .textBackgroundColor
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius:
+                                8,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius:
+                            8,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        Color.primary
+                            .opacity(
+                                0.12
+                            ),
+                        lineWidth:
+                            1
+                    )
+                }
+            }
+
+            VStack(
+                alignment:
+                    .leading,
+                spacing:
+                    7
+            ) {
+                Text(
+                    kind == .note
+                    ? "Note"
+                    : (
+                        kind == .activity
+                        ? "What happened?"
+                        : "Description"
+                    )
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .medium
+                        )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                TextEditor(
+                    text:
+                        $bodyText
+                )
+                .font(
+                    .body
+                )
+                .scrollContentBackground(
+                    .hidden
+                )
+                .padding(
+                    8
+                )
+                .frame(
+                    minHeight:
+                        120
+                )
+                .background(
+                    Color(
+                        nsColor:
+                            .textBackgroundColor
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius:
+                                10,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius:
+                            10,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        Color.primary
+                            .opacity(
+                                0.12
+                            ),
+                        lineWidth:
+                            1
+                    )
+                }
+            }
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Timing
+    // ========================================================
 
     @ViewBuilder
     private var timingSection:
@@ -645,7 +949,17 @@ struct WorkEntryCreationView: View {
                             ForEach(
                                 TaskStatus
                                     .allCases
-                            ) { candidate in
+                                    .filter {
+                                        candidate in
+
+                                        candidate
+                                            != .closed
+                                        || parentWorkItemID
+                                            == nil
+                                    }
+                            ) {
+                                candidate in
+
                                 Text(
                                     candidate
                                         .displayName
@@ -659,6 +973,23 @@ struct WorkEntryCreationView: View {
                         .frame(
                             maxWidth:
                                 240
+                        )
+                    }
+
+                    Toggle(
+                        "Started",
+                        isOn:
+                            $hasStarted
+                    )
+
+                    if hasStarted {
+                        TimeZoneAwareDateEditor(
+                            label:
+                                "Started",
+                            date:
+                                $startedAt,
+                            timeZoneID:
+                                $startedTimeZoneID
                         )
                     }
 
@@ -730,6 +1061,11 @@ struct WorkEntryCreationView: View {
         }
     }
 
+
+    // ========================================================
+    // MARK: Relationships
+    // ========================================================
+
     private var relationshipSection:
         some View
     {
@@ -743,9 +1079,7 @@ struct WorkEntryCreationView: View {
                 spacing:
                     12
             ) {
-                if relationships
-                    .isEmpty
-                {
+                if relationships.isEmpty {
                     Text(
                         "No relationships"
                     )
@@ -772,7 +1106,8 @@ struct WorkEntryCreationView: View {
                             Picker(
                                 "Role",
                                 selection:
-                                    $relationship.role
+                                    $relationship
+                                        .role
                             ) {
                                 ForEach(
                                     WorkRelationshipRole
@@ -784,7 +1119,9 @@ struct WorkEntryCreationView: View {
                                         role
                                             .displayName
                                     )
-                                    .tag(role)
+                                    .tag(
+                                        role
+                                    )
                                 }
                             }
                             .frame(
@@ -795,7 +1132,8 @@ struct WorkEntryCreationView: View {
                             Picker(
                                 "Entity",
                                 selection:
-                                    $relationship.entityID
+                                    $relationship
+                                        .entityID
                             ) {
                                 Text(
                                     "Choose…"
@@ -840,7 +1178,9 @@ struct WorkEntryCreationView: View {
                                         "minus.circle"
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(
+                                .plain
+                            )
                         }
 
                         Toggle(
@@ -849,7 +1189,9 @@ struct WorkEntryCreationView: View {
                                 $relationship
                                     .inheritedByChildren
                         )
-                        .font(.caption)
+                        .font(
+                            .caption
+                        )
                     }
                     .padding(
                         .vertical,
@@ -858,10 +1200,9 @@ struct WorkEntryCreationView: View {
                 }
 
                 Button {
-                    relationships
-                        .append(
-                            RelationshipDraft()
-                        )
+                    relationships.append(
+                        RelationshipDraft()
+                    )
                 } label: {
                     Label(
                         "Add Relationship",
@@ -876,6 +1217,11 @@ struct WorkEntryCreationView: View {
         }
     }
 
+
+    // ========================================================
+    // MARK: Actions
+    // ========================================================
+
     private var actionBar:
         some View
     {
@@ -885,14 +1231,18 @@ struct WorkEntryCreationView: View {
             Button(
                 "Cancel"
             ) {
-                workCreationRequest =
-                    nil
+                cancel()
             }
+            .keyboardShortcut(
+                .cancelAction
+            )
 
             Button(
-                "Create"
+                isEditing
+                ? "Save"
+                : "Create"
             ) {
-                create()
+                save()
             }
             .buttonStyle(
                 .borderedProminent
@@ -901,16 +1251,25 @@ struct WorkEntryCreationView: View {
                 .defaultAction
             )
             .disabled(
-                !canCreate
+                !canSave
             )
         }
     }
 
+
+    // ========================================================
+    // MARK: Section shell
+    // ========================================================
+
     @ViewBuilder
-    private func section<Content: View>(
+    private func section<
+        Content:
+            View
+    >(
         title:
             String,
-        @ViewBuilder content:
+        @ViewBuilder
+        content:
             () -> Content
     ) -> some View {
         VStack(
@@ -962,140 +1321,201 @@ struct WorkEntryCreationView: View {
         }
     }
 
-    private var sortedThemes:
-        [Theme]
-    {
-        store.data.themes
-            .sorted {
-                $0.name
-                    .localizedCaseInsensitiveCompare(
-                        $1.name
-                    )
-                    == .orderedAscending
-            }
-    }
 
-    private var availableParents:
-        [WorkItem]
-    {
-        store.data.workItems
-            .filter {
-                item in
+    // ========================================================
+    // MARK: Loading
+    // ========================================================
 
-                guard
-                    item.kind
-                        == .task
-                else {
-                    return false
-                }
-
-                if let themeID {
-                    return
-                        item.themeID
-                        == themeID
-                }
-
-                return true
-            }
-            .sorted {
-                parentLabel($0)
-                    .localizedCaseInsensitiveCompare(
-                        parentLabel($1)
-                    )
-                    == .orderedAscending
-            }
-    }
-
-    private var sortedEntities:
-        [Entity]
-    {
-        store.data.entities
-            .sorted {
-                $0.name
-                    .localizedCaseInsensitiveCompare(
-                        $1.name
-                    )
-                    == .orderedAscending
-            }
-    }
-
-    private var canCreate:
-        Bool
-    {
-        let hasText =
-            !title
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .isEmpty
-            || !bodyText
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .isEmpty
-
-        let relationshipsValid =
-            relationships.allSatisfy {
-                $0.entityID != nil
-            }
-
-        return
-            hasText
-            && relationshipsValid
-    }
-
-    private func parentLabel(
-        _ item:
-            WorkItem
-    ) -> String {
-        let value =
-            item.title?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-
-        let title =
-            value?.isEmpty == false
-            ? value!
-            : (
-                item.body.isEmpty
-                ? "Untitled Task"
-                : item.body
-            )
-
-        if
-            let theme =
-                store.theme(
-                    id:
-                        item.themeID
-                )
-        {
+    private func loadIfNeeded() {
+        guard !didLoad
+        else {
             return
-                "\(title) — \(theme.name)"
         }
 
-        return title
-    }
+        didLoad =
+            true
 
-    private func entityLabel(
-        _ entity:
-            Entity
-    ) -> String {
-        "\(entity.name) — \(entity.kind.rawValue.capitalized)"
-    }
+        switch mode {
+        case .create:
+            synchroniseInitialParent()
 
-    private func removeRelationship(
-        _ id:
-            UUID
-    ) {
-        relationships
-            .removeAll {
-                $0.id == id
+        case
+            .edit(
+                let itemID
+            ):
+
+            guard
+                let item =
+                    store.workItem(
+                        id:
+                            itemID
+                    )
+            else {
+                errorMessage =
+                    "Work item not found."
+
+                return
             }
+
+            kind =
+                item.kind
+
+            title =
+                item.title
+                ?? ""
+
+            bodyText =
+                item.body
+
+            themeIDs =
+                Set(
+                    store
+                        .workThemes(
+                            for:
+                                item.id
+                        )
+                        .map(
+                            \.id
+                        )
+                )
+
+            parentWorkItemID =
+                item.parentWorkItemID
+
+            originalParentWorkItemID =
+                item.parentWorkItemID
+
+            status =
+                item.status
+                ?? .todo
+
+            hasStarted =
+                item.startedAt
+                != nil
+
+            startedAt =
+                item.startedAt
+                ?? Date()
+
+            startedTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .startedTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
+            hasDeadline =
+                item.deadlineAt
+                != nil
+
+            deadlineAt =
+                item.deadlineAt
+                ?? (
+                    Calendar
+                        .autoupdatingCurrent
+                        .date(
+                            byAdding:
+                                .day,
+                            value:
+                                1,
+                            to:
+                                Date()
+                        )
+                    ?? Date()
+                )
+
+            deadlineTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .deadlineTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
+            hasReminder =
+                item.reminderAt
+                != nil
+
+            reminderAt =
+                item.reminderAt
+                ?? Date()
+
+            reminderTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .reminderTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
+            occurredAt =
+                item.loggedAt
+                ?? item.createdAt
+
+            occurredTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .loggedTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
+            relationships =
+                store.data
+                    .workEntityRelationships
+                    .filter {
+                        $0.workItemID
+                            == item.id
+                    }
+                    .sorted {
+                        left,
+                        right in
+
+                        if left.role
+                            == right.role
+                        {
+                            return
+                                entityName(
+                                    left.entityID
+                                )
+                                .localizedCaseInsensitiveCompare(
+                                    entityName(
+                                        right.entityID
+                                    )
+                                )
+                                == .orderedAscending
+                        }
+
+                        return
+                            left.role.rawValue
+                            < right.role.rawValue
+                    }
+                    .map {
+                        relationship in
+
+                        RelationshipDraft(
+                            id:
+                                relationship.id,
+                            existingRelationshipID:
+                                relationship.id,
+                            role:
+                                relationship.role,
+                            entityID:
+                                relationship
+                                    .entityID,
+                            inheritedByChildren:
+                                relationship
+                                    .inheritedByChildren
+                        )
+                    }
+        }
     }
+
 
     private func synchroniseInitialParent() {
         guard
@@ -1109,30 +1529,138 @@ struct WorkEntryCreationView: View {
             return
         }
 
-        themeID =
-            parent.themeID
+        let parentThemeIDs =
+            Set(
+                store
+                    .workThemes(
+                        for:
+                            parent.id
+                    )
+                    .map(
+                        \.id
+                    )
+            )
+
+        themeIDs.formUnion(
+            parentThemeIDs
+        )
     }
 
-    private func create() {
+
+    private func parentDidChange(
+        _ newValue:
+            UUID?
+    ) {
+        guard
+            let newValue,
+            let parent =
+                store.workItem(
+                    id:
+                        newValue
+                )
+        else {
+            return
+        }
+
+        let parentThemeIDs =
+            Set(
+                store
+                    .workThemes(
+                        for:
+                            parent.id
+                    )
+                    .map(
+                        \.id
+                    )
+            )
+
+        themeIDs.formUnion(
+            parentThemeIDs
+        )
+    }
+
+
+    private func themesDidChange(
+        _ newValue:
+            Set<UUID>
+    ) {
+        guard
+            let parentWorkItemID,
+            let parent =
+                store.workItem(
+                    id:
+                        parentWorkItemID
+                )
+        else {
+            return
+        }
+
+        let parentThemeIDs =
+            Set(
+                store
+                    .workThemes(
+                        for:
+                            parent.id
+                    )
+                    .map(
+                        \.id
+                    )
+            )
+
+        if
+            !parentThemeIDs.isEmpty,
+            !parentThemeIDs
+                .isSubset(
+                    of:
+                        newValue
+                )
+        {
+            self.parentWorkItemID =
+                nil
+        }
+    }
+
+
+    // ========================================================
+    // MARK: Save
+    // ========================================================
+
+    private func save() {
         errorMessage =
             nil
 
-        let effectiveThemeID =
-            parentWorkItemID
-                .flatMap {
-                    store.workItem(
-                        id:
-                            $0
-                    )?
-                    .themeID
-                }
-            ?? themeID
+        if
+            let validationError =
+                validateDraft()
+        {
+            errorMessage =
+                validationError
 
+            return
+        }
+
+        switch mode {
+        case .create:
+            createNewItem()
+
+        case
+            .edit(
+                let itemID
+            ):
+            saveExistingItem(
+                itemID:
+                    itemID
+            )
+        }
+    }
+
+
+    private func createNewItem() {
         guard
             let newID =
                 store.createWorkItem(
                     themeID:
-                        effectiveThemeID,
+                        primaryThemeID,
                     parentWorkItemID:
                         parentWorkItemID,
                     kind:
@@ -1149,6 +1677,7 @@ struct WorkEntryCreationView: View {
         else {
             errorMessage =
                 "Enter a title or description."
+
             return
         }
 
@@ -1162,7 +1691,7 @@ struct WorkEntryCreationView: View {
                     body:
                         bodyText,
                     themeID:
-                        effectiveThemeID,
+                        primaryThemeID,
                     parentWorkItemID:
                         parentWorkItemID,
                     status:
@@ -1202,48 +1731,78 @@ struct WorkEntryCreationView: View {
                 )
 
         if let updateError {
-            errorMessage =
-                updateError
+            failNewItem(
+                newID,
+                error:
+                    updateError
+            )
+
             return
         }
 
-        for relationship
-            in relationships
+        if
+            let themeError =
+                store
+                    .setWorkThemes(
+                        workItemID:
+                            newID,
+                        themeIDs:
+                            themeIDs
+                    )
         {
-            guard
-                let entityID =
-                    relationship.entityID
-            else {
-                continue
-            }
+            failNewItem(
+                newID,
+                error:
+                    themeError
+            )
 
+            return
+        }
+
+        if
+            kind == .task,
+            hasStarted
+        {
             if
-                let relationshipError =
+                let startedError =
                     store
-                        .addWorkRelationship(
+                        .updateTaskStartedAt(
                             workItemID:
                                 newID,
-                            entityID:
-                                entityID,
-                            role:
-                                relationship.role,
-                            inheritedByChildren:
-                                relationship
-                                    .inheritedByChildren
+                            startedAt:
+                                startedAt,
+                            startedTimeZoneID:
+                                startedTimeZoneID,
+                            recordAudit:
+                                false
                         )
             {
-                errorMessage =
-                    relationshipError
+                failNewItem(
+                    newID,
+                    error:
+                        startedError
+                )
+
                 return
             }
         }
 
-        // If this is a newly created Sub-task, merge any
-        // inheritable relationships from its immediate Parent.
-        //
-        // Explicit relationships entered in this form already
-        // exist, so they take precedence over identical inherited
-        // relationships.
+        if
+            let relationshipError =
+                addNewRelationships(
+                    to:
+                        newID
+                )
+        {
+            failNewItem(
+                newID,
+                error:
+                    relationshipError
+            )
+
+            return
+        }
+
         if
             kind == .task,
             let parentWorkItemID
@@ -1260,18 +1819,692 @@ struct WorkEntryCreationView: View {
                                 false
                         )
             {
-                errorMessage =
-                    inheritanceError
+                failNewItem(
+                    newID,
+                    error:
+                        inheritanceError
+                )
 
                 return
             }
         }
-
 
         selectedWorkItemID =
             newID
 
         workCreationRequest =
             nil
+    }
+
+
+    private func saveExistingItem(
+        itemID:
+            UUID
+    ) {
+        guard
+            let item =
+                store.workItem(
+                    id:
+                        itemID
+                )
+        else {
+            errorMessage =
+                "Work item not found."
+
+            return
+        }
+
+        let previousParentID =
+            item.parentWorkItemID
+
+        let updateError =
+            store
+                .updateWorkItemDetails(
+                    itemID:
+                        item.id,
+                    title:
+                        title,
+                    body:
+                        bodyText,
+                    themeID:
+                        primaryThemeID,
+                    parentWorkItemID:
+                        parentWorkItemID,
+                    status:
+                        kind == .task
+                        ? status
+                        : nil,
+                    deadlineAt:
+                        kind == .task
+                        && hasDeadline
+                        ? deadlineAt
+                        : nil,
+                    reminderAt:
+                        kind == .note
+                        && hasReminder
+                        ? reminderAt
+                        : nil,
+                    scheduledAt:
+                        nil,
+                    loggedAt:
+                        kind == .activity
+                        ? occurredAt
+                        : item.loggedAt,
+                    deadlineTimeZoneID:
+                        kind == .task
+                        && hasDeadline
+                        ? deadlineTimeZoneID
+                        : nil,
+                    reminderTimeZoneID:
+                        kind == .note
+                        && hasReminder
+                        ? reminderTimeZoneID
+                        : nil,
+                    loggedTimeZoneID:
+                        kind == .activity
+                        ? occurredTimeZoneID
+                        : item.loggedTimeZoneID
+                )
+
+        if let updateError {
+            errorMessage =
+                updateError
+
+            return
+        }
+
+        if
+            let themeError =
+                store
+                    .setWorkThemes(
+                        workItemID:
+                            item.id,
+                        themeIDs:
+                            themeIDs
+                    )
+        {
+            errorMessage =
+                themeError
+
+            return
+        }
+
+        if kind == .task {
+            // Started has two sources:
+            //
+            // 1. A manual value from this editor.
+            // 2. The automatic timestamp generated by the Store
+            //    when a Task transitions into In Progress.
+            //
+            // If this Task previously had no Started value and
+            // the user leaves the Started toggle disabled, do
+            // NOT write nil after updateWorkItemDetails(). That
+            // would erase a Started timestamp that may just have
+            // been generated by To Do -> In Progress.
+            //
+            // We only clear Started when the Task already had
+            // one when the editor opened and the user has now
+            // disabled it.
+
+            let shouldWriteStarted =
+                hasStarted
+                || item.startedAt != nil
+
+            if shouldWriteStarted {
+                if
+                    let startedError =
+                        store
+                            .updateTaskStartedAt(
+                                workItemID:
+                                    item.id,
+                                startedAt:
+                                    hasStarted
+                                    ? startedAt
+                                    : nil,
+                                startedTimeZoneID:
+                                    hasStarted
+                                    ? startedTimeZoneID
+                                    : nil
+                            )
+                {
+                    errorMessage =
+                        startedError
+
+                    return
+                }
+            }
+        }
+
+        if
+            let relationshipError =
+                syncExistingRelationships(
+                    for:
+                        item.id
+                )
+        {
+            errorMessage =
+                relationshipError
+
+            return
+        }
+
+        if
+            kind == .task,
+            let newParentID =
+                parentWorkItemID,
+            newParentID
+                != previousParentID
+        {
+            pendingParentRelationshipSourceID =
+                newParentID
+
+            showingParentRelationshipChoice =
+                true
+
+            return
+        }
+
+        originalParentWorkItemID =
+            parentWorkItemID
+
+        dismiss()
+    }
+
+
+    // ========================================================
+    // MARK: Relationship persistence
+    // ========================================================
+
+    private func addNewRelationships(
+        to workItemID:
+            UUID
+    ) -> String? {
+        for draft in relationships {
+            guard
+                let entityID =
+                    draft.entityID
+            else {
+                continue
+            }
+
+            if
+                let error =
+                    store
+                        .addWorkRelationship(
+                            workItemID:
+                                workItemID,
+                            entityID:
+                                entityID,
+                            role:
+                                draft.role,
+                            inheritedByChildren:
+                                draft
+                                    .inheritedByChildren
+                        )
+            {
+                return error
+            }
+        }
+
+        return nil
+    }
+
+
+    private func syncExistingRelationships(
+        for workItemID:
+            UUID
+    ) -> String? {
+        let existing =
+            store.data
+                .workEntityRelationships
+                .filter {
+                    $0.workItemID
+                        == workItemID
+                }
+
+        let existingByID =
+            Dictionary(
+                uniqueKeysWithValues:
+                    existing.map {
+                        (
+                            $0.id,
+                            $0
+                        )
+                    }
+            )
+
+        let retainedIDs =
+            Set(
+                relationships
+                    .compactMap(
+                        \.existingRelationshipID
+                    )
+            )
+
+        for draft in relationships {
+            guard
+                let existingID =
+                    draft
+                        .existingRelationshipID
+            else {
+                continue
+            }
+
+            guard
+                existingByID[
+                    existingID
+                ] != nil
+            else {
+                return
+                    "A relationship changed while the editor was open."
+            }
+
+            guard
+                let entityID =
+                    draft.entityID
+            else {
+                return
+                    "Choose an entity for every relationship."
+            }
+
+            if
+                let error =
+                    store
+                        .updateWorkRelationshipDetails(
+                            relationshipID:
+                                existingID,
+                            entityID:
+                                entityID,
+                            role:
+                                draft.role,
+                            inheritedByChildren:
+                                draft
+                                    .inheritedByChildren
+                        )
+            {
+                return error
+            }
+        }
+
+        for relationship in existing
+        where
+            !retainedIDs
+                .contains(
+                    relationship.id
+                )
+        {
+            store
+                .removeWorkRelationship(
+                    relationshipID:
+                        relationship.id
+                )
+        }
+
+        for draft in relationships
+        where
+            draft
+                .existingRelationshipID
+                == nil
+        {
+            guard
+                let entityID =
+                    draft.entityID
+            else {
+                return
+                    "Choose an entity for every relationship."
+            }
+
+            if
+                let error =
+                    store
+                        .addWorkRelationship(
+                            workItemID:
+                                workItemID,
+                            entityID:
+                                entityID,
+                            role:
+                                draft.role,
+                            inheritedByChildren:
+                                draft
+                                    .inheritedByChildren
+                        )
+            {
+                return error
+            }
+        }
+
+        return nil
+    }
+
+
+    // ========================================================
+    // MARK: Validation
+    // ========================================================
+
+    private func validateDraft()
+        -> String?
+    {
+        let cleanedTitle =
+            title.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        let cleanedBody =
+            bodyText.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        if
+            cleanedTitle.isEmpty,
+            cleanedBody.isEmpty
+        {
+            return
+                "Enter a title or description."
+        }
+
+        if
+            kind == .task,
+            hasStarted,
+            startedAt > Date()
+        {
+            return
+                "Started date cannot be in the future."
+        }
+
+        var relationshipKeys =
+            Set<String>()
+
+        for draft in relationships {
+            guard
+                let entityID =
+                    draft.entityID
+            else {
+                return
+                    "Choose an entity for every relationship."
+            }
+
+            guard
+                store.entity(
+                    id:
+                        entityID
+                ) != nil
+            else {
+                return
+                    "A related entity no longer exists."
+            }
+
+            let key =
+                "\(draft.role.rawValue)|\(entityID.uuidString)"
+
+            guard
+                relationshipKeys
+                    .insert(
+                        key
+                    )
+                    .inserted
+            else {
+                return
+                    "The same relationship is listed more than once."
+            }
+        }
+
+        return nil
+    }
+
+
+    // ========================================================
+    // MARK: Parent relationship decision
+    // ========================================================
+
+    private func copyParentRelationshipsAndClose() {
+        guard
+            let parentID =
+                pendingParentRelationshipSourceID
+        else {
+            dismiss()
+
+            return
+        }
+
+        let error =
+            store
+                .copyInheritedWorkRelationships(
+                    fromParentTaskID:
+                        parentID,
+                    toWorkItemID:
+                        editingItemID
+                        ?? UUID(),
+                    replacingExisting:
+                        true
+                )
+
+        if let error {
+            errorMessage =
+                error
+
+            showingParentRelationshipChoice =
+                false
+
+            return
+        }
+
+        pendingParentRelationshipSourceID =
+            nil
+
+        dismiss()
+    }
+
+
+    // ========================================================
+    // MARK: Helpers
+    // ========================================================
+
+    private var isEditing:
+        Bool
+    {
+        switch mode {
+        case .create:
+            return false
+
+        case .edit:
+            return true
+        }
+    }
+
+
+    private var editingItemID:
+        UUID?
+    {
+        switch mode {
+        case .create:
+            return nil
+
+        case
+            .edit(
+                let id
+            ):
+            return id
+        }
+    }
+
+
+    private var canSave:
+        Bool
+    {
+        !title
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .isEmpty
+        ||
+        !bodyText
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .isEmpty
+    }
+
+
+    private var selectedThemes:
+        [Theme]
+    {
+        store.data.themes
+            .filter {
+                themeIDs
+                    .contains(
+                        $0.id
+                    )
+            }
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+
+    private var primaryThemeID:
+        UUID?
+    {
+        selectedThemes
+            .first?
+            .id
+    }
+
+
+    private var excludedParentIDs:
+        Set<UUID>
+    {
+        guard
+            let itemID =
+                editingItemID
+        else {
+            return []
+        }
+
+        return
+            Set(
+                store
+                    .workItemDescendantIDs(
+                        of:
+                            itemID
+                    )
+            )
+            .union(
+                [
+                    itemID
+                ]
+            )
+    }
+
+
+    private var sortedEntities:
+        [Entity]
+    {
+        store.data.entities
+            .sorted {
+                $0.name
+                    .localizedCaseInsensitiveCompare(
+                        $1.name
+                    )
+                    == .orderedAscending
+            }
+    }
+
+
+    private func entityLabel(
+        _ entity:
+            Entity
+    ) -> String {
+        "\(entity.name) · \(entity.kind.displayName)"
+    }
+
+
+    private func entityName(
+        _ id:
+            UUID
+    ) -> String {
+        store.entity(
+            id:
+                id
+        )?
+        .name
+        ?? "Unknown"
+    }
+
+
+    private func displayTitle(
+        _ item:
+            WorkItem
+    ) -> String {
+        if
+            let title =
+                item.title?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !title.isEmpty
+        {
+            return title
+        }
+
+        let body =
+            item.body
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !body.isEmpty {
+            return body
+        }
+
+        return
+            item.kind
+                .displayName
+    }
+
+
+    private func removeRelationship(
+        _ id:
+            UUID
+    ) {
+        relationships.removeAll {
+            $0.id
+                == id
+        }
+    }
+
+
+    private func failNewItem(
+        _ id:
+            UUID,
+        error:
+            String
+    ) {
+        store.deleteWorkItem(
+            id:
+                id
+        )
+
+        errorMessage =
+            error
+    }
+
+
+    private func cancel() {
+        if isEditing {
+            dismiss()
+        } else {
+            workCreationRequest =
+                nil
+        }
     }
 }
