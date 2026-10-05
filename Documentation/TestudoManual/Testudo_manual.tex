@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.5}
-\newcommand{\DocumentedTestudoVersion}{0.1.9}
-\newcommand{\DocumentedTestudoBuild}{10}
+\newcommand{\ManualVersion}{1.6}
+\newcommand{\DocumentedTestudoVersion}{0.1.10}
+\newcommand{\DocumentedTestudoBuild}{11}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.1.9. This release improves iCal credential handling for Work Environments used across multiple Macs. Secret iCal addresses remain machine-local in macOS Keychain, missing credentials no longer create machine-specific errors inside the shared \fileext{.testudoenv} package, and an existing subscription can restore its Secret address on another Mac without replacing its Calendar identity or imported-event relationships. Keychain failures are reported more precisely. The About Testudo window also allows its descriptive text to wrap fully instead of truncating it.
+This edition is aligned with Testudo 0.1.10. The release expands full-pane creation and editing for People, Themes, Organizations and Groups; extends Parent Task relationship inheritance to child Notes and Activities as well as Sub-tasks; adds explicit historical Completed date, time and time-zone editing for Tasks; and introduces native Markdown rendering for Work descriptions and structural Notes. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
 }
 
 \manualwarning{Early-release software}{
@@ -1138,7 +1138,7 @@ Recovery answers are stored only as salted hashes. Administrators cannot view ot
 
 \section{External calendar secrets}
 
-Secret iCal URLs use macOS Keychain integration rather than ordinary Environment data. The Secret value is machine-local; it is not transferred merely because a \fileext{.testudoenv} package is synchronized to another Mac. Testudo 0.1.9 can restore the credential for an existing subscription without changing that Calendar's identity.
+Secret iCal URLs use macOS Keychain integration rather than ordinary Environment data. The Secret value is machine-local; it is not transferred merely because a \fileext{.testudoenv} package is synchronized to another Mac. Since Testudo 0.1.9, the credential for an existing subscription can be restored without changing that Calendar's identity.
 
 \section{Sensitive portable files}
 
@@ -1391,8 +1391,8 @@ Scripts/version.sh
 
 \filepath{Scripts/version.sh} is the build scripts' central version source. For this manual:
 \begin{lstlisting}
-TESTUDO_VERSION="0.1.7"
-TESTUDO_BUILD_NUMBER="8"
+TESTUDO_VERSION="0.1.10"
+TESTUDO_BUILD_NUMBER="11"
 \end{lstlisting}
 
 \section{Task status persistence compatibility}

@@ -2543,27 +2543,35 @@ final class TestudoStore: ObservableObject {
         }
     }
 
+    @discardableResult
     func createTheme(
         name: String,
         parentThemeID: UUID?
-    ) {
+    ) -> UUID? {
         let cleaned =
             name.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
 
         guard !cleaned.isEmpty else {
-            return
+            return nil
         }
 
-        data.themes.append(
+        let theme =
             Theme(
-                parentThemeID: parentThemeID,
-                name: cleaned
+                parentThemeID:
+                    parentThemeID,
+                name:
+                    cleaned
             )
+
+        data.themes.append(
+            theme
         )
 
         save()
+
+        return theme.id
     }
 
     func deleteTheme(
@@ -3209,6 +3217,198 @@ final class TestudoStore: ObservableObject {
                                     $0
                                 )
                         },
+                    actorMembershipID:
+                        currentEnvironmentMembership?
+                            .id,
+                    timeZoneID:
+                        currentTimeZoneID,
+                    valueTimeZoneID:
+                        normalizedTimeZoneID
+                )
+            )
+        }
+
+        save()
+
+        return nil
+    }
+
+
+
+    @discardableResult
+    func updateTaskCompletedAt(
+        workItemID: UUID,
+        completedAt: Date,
+        completedTimeZoneID: String?,
+        recordAudit: Bool = true
+    ) -> String? {
+        guard
+            let index =
+                data.workItems.firstIndex(
+                    where: {
+                        $0.id
+                            == workItemID
+                    }
+                ),
+            data.workItems[index]
+                .kind
+                == .task
+        else {
+            return "Task not found."
+        }
+
+        guard
+            data.workItems[index]
+                .status
+                == .completed
+        else {
+            return
+                "Completed date requires a Completed Task."
+        }
+
+        let now =
+            Date()
+
+        guard completedAt <= now
+        else {
+            return
+                "Completed date cannot be in the future."
+        }
+
+        if
+            let startedAt =
+                data.workItems[index]
+                    .startedAt,
+            completedAt < startedAt
+        {
+            return
+                "Completed date cannot be earlier than Started."
+        }
+
+        let currentTimeZoneID =
+            TestudoTime
+                .deviceTimeZoneID
+
+        let normalizedTimeZoneID =
+            TestudoTime
+                .validTimeZoneIdentifier(
+                    completedTimeZoneID
+                )
+            ?? data.workItems[index]
+                .completedTimeZoneID
+            ?? currentTimeZoneID
+
+        let previousCompletedAt =
+            data.workItems[index]
+                .completedAt
+
+        let previousTimeZoneID =
+            data.workItems[index]
+                .completedTimeZoneID
+
+        let changed =
+            previousCompletedAt
+                != completedAt
+            || previousTimeZoneID
+                != normalizedTimeZoneID
+
+        if !changed {
+            return nil
+        }
+
+        data.workItems[index]
+            .completedAt =
+            completedAt
+
+        data.workItems[index]
+            .completedTimeZoneID =
+            normalizedTimeZoneID
+
+        data.workItems[index]
+            .updatedAt =
+            now
+
+        data.workItems[index]
+            .updatedTimeZoneID =
+            currentTimeZoneID
+
+        data.workItems[index]
+            .updatedByMembershipID =
+            currentEnvironmentMembership?
+                .id
+
+        // Replace only the lifecycle event representing the
+        // CURRENT completion instance. Older Completed ->
+        // reopened / changed-status -> Completed cycles remain
+        // preserved in history.
+        if
+            let previousCompletedAt,
+            let eventIndex =
+                data.historyEvents
+                    .lastIndex(
+                        where: {
+                            $0.workItemID
+                                == workItemID
+                            && $0.kind
+                                == .completed
+                            && $0.timestamp
+                                == previousCompletedAt
+                        }
+                    )
+        {
+            data.historyEvents
+                .remove(
+                    at:
+                        eventIndex
+                )
+        }
+
+        let updatedTask =
+            data.workItems[index]
+
+        data.historyEvents.append(
+            HistoryEvent(
+                workItemID:
+                    workItemID,
+                kind:
+                    .completed,
+                timestamp:
+                    completedAt,
+                text:
+                    "\(taskHistoryTitle(updatedTask)) completed",
+                actorMembershipID:
+                    currentEnvironmentMembership?
+                        .id,
+                timeZoneID:
+                    normalizedTimeZoneID,
+                valueTimeZoneID:
+                    normalizedTimeZoneID
+            )
+        )
+
+        if recordAudit {
+            data.historyEvents.append(
+                HistoryEvent(
+                    workItemID:
+                        workItemID,
+                    kind:
+                        .edited,
+                    timestamp:
+                        now,
+                    text:
+                        "Completed date changed",
+                    previousValue:
+                        previousCompletedAt.map {
+                            TestudoTime
+                                .utcString(
+                                    $0
+                                )
+                        },
+                    newValue:
+                        TestudoTime
+                            .utcString(
+                                completedAt
+                            ),
                     actorMembershipID:
                         currentEnvironmentMembership?
                             .id,
@@ -5191,19 +5391,19 @@ extension TestudoStore {
         save()
 
 
-        // A newly created Sub-task automatically receives
-        // inheritable relationships from its immediate Parent.
-        if kind == .task {
-            _ =
-                copyInheritedWorkRelationships(
-                    fromParentTaskID:
-                        parentTaskID,
-                    toWorkItemID:
-                        item.id,
-                    replacingExisting:
-                        false
-                )
-        }
+        // Every newly created child Work item automatically
+        // receives inheritable relationships from its immediate
+        // Parent Task. This applies equally to Sub-tasks, Notes
+        // and Activities.
+        _ =
+            copyInheritedWorkRelationships(
+                fromParentTaskID:
+                    parentTaskID,
+                toWorkItemID:
+                    item.id,
+                replacingExisting:
+                    false
+            )
 
 
         return (

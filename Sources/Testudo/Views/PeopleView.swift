@@ -399,14 +399,17 @@ struct PersonDetailView: View {
                 TestudoStyle
                     .contentBackground
             )
-            .sheet(
-                isPresented:
-                    $showingEditor
-            ) {
-                PersonEditView(
-                    personID:
-                        personID
-                )
+            .overlay {
+                if showingEditor {
+                    PersonEditView(
+                        personID:
+                            personID,
+                        onClose: {
+                            showingEditor =
+                                false
+                        }
+                    )
+                }
             }
             .sheet(
                 isPresented:
@@ -794,15 +797,18 @@ struct PersonDetailView: View {
                 Text("Notes")
                     .font(.headline)
 
-                TestudoDestinationLink(
-                    title:
-                        profile.notes,
-                    destination:
-                        .person(
-                            personID
-                        ),
-                    color:
-                        .primary
+                TestudoMarkdownView(
+                    markdown:
+                        profile.notes
+                )
+                .textSelection(
+                    .enabled
+                )
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
                 )
             }
             .personDetailCard()
@@ -1571,40 +1577,94 @@ private struct ReadOnlyValueRow: View {
     }
 }
 
-private struct PersonEditView: View {
+struct PersonEditView: View {
     @EnvironmentObject
     private var store: TestudoStore
 
-    @Environment(\.dismiss)
-    private var dismiss
+    let personID:
+        UUID?
 
-    let personID: UUID
+    let onClose:
+        () -> Void
+
+    let onCreated:
+        ((UUID) -> Void)?
 
     @State
     private var draft:
         PersonProfile?
 
+    @State
+    private var organizationIDs:
+        Set<UUID> = []
+
+    @State
+    private var groupIDs:
+        Set<UUID> = []
+
+    @State
+    private var errorMessage:
+        String?
+
+
+    init(
+        personID:
+            UUID?,
+        onClose:
+            @escaping () -> Void,
+        onCreated:
+            ((UUID) -> Void)? = nil
+    ) {
+        self.personID =
+            personID
+
+        self.onClose =
+            onClose
+
+        self.onCreated =
+            onCreated
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Edit Person")
+                Text(
+                    personID == nil
+                    ? "New Person"
+                    : "Edit Person"
+                )
                     .font(.title2)
                     .fontWeight(.semibold)
 
                 Spacer()
 
                 Button("Cancel") {
-                    dismiss()
+                    onClose()
                 }
 
-                Button("Save") {
+                Button(
+                    personID == nil
+                    ? "Create"
+                    : "Save"
+                ) {
                     save()
                 }
                 .keyboardShortcut(
                     .defaultAction
                 )
             }
-            .padding()
+            .padding(
+                .leading,
+                16
+            )
+            .padding(
+                .trailing,
+                96
+            )
+            .padding(
+                .vertical,
+                16
+            )
 
             Divider()
 
@@ -1620,6 +1680,18 @@ private struct PersonEditView: View {
                                     \.avatarData
                                 )
                         )
+
+                        if let errorMessage {
+                            Text(
+                                errorMessage
+                            )
+                            .font(
+                                .caption
+                            )
+                            .foregroundStyle(
+                                .red
+                            )
+                        }
 
                         editSection(
                             "Identity"
@@ -1905,8 +1977,14 @@ private struct PersonEditView: View {
             }
         }
         .frame(
-            width: 680,
-            height: 720
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
+        )
+        .background(
+            TestudoStyle
+                .contentBackground
         )
         .onAppear {
             load()
@@ -1948,15 +2026,10 @@ private struct PersonEditView: View {
         title: String,
         kind: EntityKind
     ) -> some View {
-        let current =
-            store.containers(
-                for:
-                    personID
-            )
-            .filter {
-                $0.kind
-                    == kind
-            }
+        let selectedIDs =
+            kind == .organization
+            ? organizationIDs
+            : groupIDs
 
         let candidates =
             store.entities(
@@ -1978,11 +2051,7 @@ private struct PersonEditView: View {
             label:
                 title,
             selectedIDs:
-                Set(
-                    current.map(
-                        \.id
-                    )
-                ),
+                selectedIDs,
             tabs:
                 tabs,
             candidateIDs:
@@ -1995,8 +2064,8 @@ private struct PersonEditView: View {
                 title,
             selectorMessage:
                 kind == .organization
-                ? "Choose Organizations affiliated with this Person. Sub-organizations are shown hierarchically and existing affiliations remain visible in Selected."
-                : "Choose Groups affiliated with this Person. Subgroups are shown hierarchically and existing affiliations remain visible in Selected.",
+                ? "Choose Organizations affiliated with this Person."
+                : "Choose Groups affiliated with this Person.",
             emptyText:
                 "None",
             buttonSystemImage:
@@ -2004,15 +2073,15 @@ private struct PersonEditView: View {
             onSave: {
                 selection in
 
-                store
-                    .updatePersonAffiliations(
-                        personID:
-                            personID,
-                        containerKind:
-                            kind,
-                        containerIDs:
-                            selection
-                    )
+                if kind == .organization {
+                    organizationIDs =
+                        selection
+                } else {
+                    groupIDs =
+                        selection
+                }
+
+                return nil
             }
         )
     }
@@ -2022,12 +2091,10 @@ private struct PersonEditView: View {
         [Entity]
     {
         let current =
-            Set(
-                store.containers(
-                    for: personID
+            organizationIDs
+                .union(
+                    groupIDs
                 )
-                .map(\.id)
-            )
 
         return store.data.entities
             .filter {
@@ -2067,29 +2134,214 @@ private struct PersonEditView: View {
     }
 
     private func load() {
+        errorMessage =
+            nil
+
+        guard
+            let personID
+        else {
+            draft =
+                PersonProfile(
+                    entityID:
+                        UUID()
+                )
+
+            organizationIDs =
+                []
+
+            groupIDs =
+                []
+
+            return
+        }
+
         draft =
             store.personProfile(
-                for: personID
+                for:
+                    personID
             )
             ?? PersonProfile(
                 entityID:
                     personID
             )
+
+        let affiliations =
+            store.containers(
+                for:
+                    personID
+            )
+
+        organizationIDs =
+            Set(
+                affiliations
+                    .filter {
+                        $0.kind
+                            == .organization
+                    }
+                    .map(
+                        \.id
+                    )
+            )
+
+        groupIDs =
+            Set(
+                affiliations
+                    .filter {
+                        $0.kind
+                            == .group
+                    }
+                    .map(
+                        \.id
+                    )
+            )
     }
+
 
     private func save() {
         guard
-            let draft
+            var draft
         else {
             return
+        }
+
+        errorMessage =
+            nil
+
+        let cleanedName =
+            draft.displayName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard
+            !cleanedName.isEmpty
+        else {
+            errorMessage =
+                "Enter a Person name."
+
+            return
+        }
+
+        let targetID:
+            UUID
+
+        let isNew =
+            personID == nil
+
+        if let personID {
+            targetID =
+                personID
+
+            draft.entityID =
+                personID
+
+        } else {
+            guard
+                let newID =
+                    store.createEntity(
+                        kind:
+                            .person,
+                        name:
+                            cleanedName,
+                        initialContainerID:
+                            nil
+                    )
+            else {
+                errorMessage =
+                    "The Person could not be created."
+
+                return
+            }
+
+            targetID =
+                newID
+
+            draft.entityID =
+                newID
+
+            if
+                let createdProfile =
+                    store.personProfile(
+                        for:
+                            newID
+                    )
+            {
+                draft.id =
+                    createdProfile.id
+
+                draft.createdAt =
+                    createdProfile.createdAt
+            }
         }
 
         store.savePersonProfile(
             draft
         )
 
-        dismiss()
+        if
+            let error =
+                store.updatePersonAffiliations(
+                    personID:
+                        targetID,
+                    containerKind:
+                        .organization,
+                    containerIDs:
+                        organizationIDs
+                )
+        {
+            if isNew {
+                _ =
+                    store.deleteEntityProtected(
+                        id:
+                            targetID
+                    )
+            }
+
+            errorMessage =
+                error
+
+            return
+        }
+
+        if
+            let error =
+                store.updatePersonAffiliations(
+                    personID:
+                        targetID,
+                    containerKind:
+                        .group,
+                    containerIDs:
+                        groupIDs
+                )
+        {
+            if isNew {
+                _ =
+                    store.deleteEntityProtected(
+                        id:
+                            targetID
+                    )
+            }
+
+            errorMessage =
+                error
+
+            return
+        }
+
+        if isNew {
+            if let onCreated {
+                onCreated(
+                    targetID
+                )
+            } else {
+                onClose()
+            }
+        } else {
+            onClose()
+        }
     }
+
 
     private func binding(
         _ keyPath:

@@ -1886,8 +1886,9 @@ struct WorkItemDetailView: View {
                     .tertiary
                 )
             } else {
-                Text(
-                    item.body
+                TestudoMarkdownView(
+                    markdown:
+                        item.body
                 )
                 .textSelection(
                     .enabled
@@ -7067,6 +7068,26 @@ struct WorkDetailRouterView: View {
     var workCreationRequest:
         WorkCreationRequest?
 
+    @Binding
+    var personCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationParentID:
+        UUID?
+
+    @Binding
+    var organizationCreationRequested:
+        Bool
+
+    @Binding
+    var groupCreationRequested:
+        Bool
+
 
     var body: some View {
         ZStack {
@@ -7076,6 +7097,112 @@ struct WorkDetailRouterView: View {
 
             Group {
                 if
+                    section == .groups,
+                    groupCreationRequested
+                {
+                    StructureEntityEditView(
+                        entityID:
+                            nil,
+                        onClose: {
+                            groupCreationRequested =
+                                false
+                        },
+                        creationKind:
+                            .group,
+                        onCreated: {
+                            id in
+
+                            groupCreationRequested =
+                                false
+
+                            selectedGroupID =
+                                id
+                        }
+                    )
+
+                } else if
+                    section == .organizations,
+                    organizationCreationRequested
+                {
+                    StructureEntityEditView(
+                        entityID:
+                            nil,
+                        onClose: {
+                            organizationCreationRequested =
+                                false
+                        },
+                        creationKind:
+                            .organization,
+                        onCreated: {
+                            id in
+
+                            organizationCreationRequested =
+                                false
+
+                            selectedOrganizationID =
+                                id
+                        }
+                    )
+
+                } else if
+                    section == .themes,
+                    themeCreationRequested
+                {
+                    ThemeStructureEditView(
+                        themeID:
+                            nil,
+                        onClose: {
+                            let parentID =
+                                themeCreationParentID
+
+                            themeCreationRequested =
+                                false
+
+                            themeCreationParentID =
+                                nil
+
+                            selectedThemeID =
+                                parentID
+                        },
+                        initialParentThemeID:
+                            themeCreationParentID,
+                        onCreated: {
+                            id in
+
+                            themeCreationRequested =
+                                false
+
+                            themeCreationParentID =
+                                nil
+
+                            selectedThemeID =
+                                id
+                        }
+                    )
+
+                } else if
+                    section == .people,
+                    personCreationRequested
+                {
+                    PersonEditView(
+                        personID:
+                            nil,
+                        onClose: {
+                            personCreationRequested =
+                                false
+                        },
+                        onCreated: {
+                            id in
+
+                            personCreationRequested =
+                                false
+
+                            selectedPersonID =
+                                id
+                        }
+                    )
+
+                } else if
                     section == .calendar,
                     let request =
                         calendarEventCreationRequest

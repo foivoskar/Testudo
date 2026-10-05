@@ -316,6 +316,86 @@ private struct StructureEntityLinksRow:
 
 
 // ============================================================
+// MARK: - Markdown Notes Row
+// ============================================================
+
+private struct StructureMarkdownNotesRow:
+    View
+{
+    let label:
+        String
+
+    let markdown:
+        String?
+
+
+    var body:
+        some View
+    {
+        HStack(
+            alignment:
+                .top,
+            spacing:
+                14
+        ) {
+            Text(
+                label
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .frame(
+                width:
+                    120,
+                alignment:
+                    .leading
+            )
+
+            let value =
+                markdown?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                ?? ""
+
+            if value.isEmpty {
+                Text(
+                    "None"
+                )
+                .foregroundStyle(
+                    .tertiary
+                )
+            } else {
+                TestudoMarkdownView(
+                    markdown:
+                        markdown
+                        ?? ""
+                )
+                .textSelection(
+                    .enabled
+                )
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
+                )
+            }
+
+            Spacer(
+                minLength:
+                    0
+            )
+        }
+        .font(
+            .callout
+        )
+    }
+}
+
+
+// ============================================================
 // MARK: - Rich Theme Inspector
 // ============================================================
 
@@ -331,6 +411,8 @@ struct RichThemeDetailView: View {
 
     init<DeleteFooter: View>(
         themeID: UUID,
+        showingEditor:
+            Binding<Bool>,
         @ViewBuilder
         deleteFooter:
             () -> DeleteFooter
@@ -338,15 +420,18 @@ struct RichThemeDetailView: View {
         self.themeID =
             themeID
 
+        self._showingEditor =
+            showingEditor
+
         self.detailDeleteFooter =
             AnyView(
                 deleteFooter()
             )
     }
 
-    @State
-    private var showingEditor =
-        false
+    @Binding
+    var showingEditor:
+        Bool
 
     @State
     private var editingField:
@@ -449,16 +534,11 @@ struct RichThemeDetailView: View {
                                         .summary
                                 )
 
-                                textRow(
-                                    theme,
+                                StructureMarkdownNotesRow(
                                     label:
                                         "Notes",
-                                    value:
-                                        theme.notes,
-                                    field:
-                                        .notes,
-                                    multiline:
-                                        true
+                                    markdown:
+                                        theme.notes
                                 )
                             }
                         }
@@ -614,16 +694,7 @@ struct RichThemeDetailView: View {
                 )
             }
         }
-        .sheet(
-            isPresented:
-                $showingEditor
-        ) {
-            ThemeStructureEditView(
-                themeID:
-                    themeID
-            )
-        }
-    }
+     }
 
 
     private func relatedEntitiesSection(
@@ -2159,6 +2230,10 @@ struct OrganizationDetailView:
     private let detailDeleteFooter:
         AnyView
 
+    @State
+    private var showingEditor =
+        false
+
 
     init<DeleteFooter: View>(
         organizationID:
@@ -2186,9 +2261,26 @@ struct OrganizationDetailView:
         ) {
             RichStructureEntityDetailView(
                 entityID:
-                    organizationID
+                    organizationID,
+                showingEditor:
+                    $showingEditor
             ) {
                 detailDeleteFooter
+            }
+        }
+        .overlay {
+            if showingEditor {
+                StructureEntityEditView(
+                    entityID:
+                        organizationID,
+                    onClose: {
+                        showingEditor =
+                            false
+                    }
+                )
+                .zIndex(
+                    10
+                )
             }
         }
     }
@@ -2207,6 +2299,10 @@ struct GroupDetailView:
 
     private let detailDeleteFooter:
         AnyView
+
+    @State
+    private var showingEditor =
+        false
 
 
     init<DeleteFooter: View>(
@@ -2235,9 +2331,26 @@ struct GroupDetailView:
         ) {
             RichStructureEntityDetailView(
                 entityID:
-                    groupID
+                    groupID,
+                showingEditor:
+                    $showingEditor
             ) {
                 detailDeleteFooter
+            }
+        }
+        .overlay {
+            if showingEditor {
+                StructureEntityEditView(
+                    entityID:
+                        groupID,
+                    onClose: {
+                        showingEditor =
+                            false
+                    }
+                )
+                .zIndex(
+                    10
+                )
             }
         }
     }
@@ -2260,6 +2373,10 @@ struct ThemeRelatedTasksDetailView:
 
     private let detailDeleteFooter:
         AnyView
+
+    @State
+    private var showingEditor =
+        false
 
 
     init<DeleteFooter: View>(
@@ -2288,9 +2405,26 @@ struct ThemeRelatedTasksDetailView:
         ) {
             RichThemeDetailView(
                 themeID:
-                    themeID
+                    themeID,
+                showingEditor:
+                    $showingEditor
             ) {
                 detailDeleteFooter
+            }
+        }
+        .overlay {
+            if showingEditor {
+                ThemeStructureEditView(
+                    themeID:
+                        themeID,
+                    onClose: {
+                        showingEditor =
+                            false
+                    }
+                )
+                .zIndex(
+                    10
+                )
             }
         }
     }
@@ -2375,6 +2509,8 @@ struct RichStructureEntityDetailView:
 
     init<DeleteFooter: View>(
         entityID: UUID,
+        showingEditor:
+            Binding<Bool>,
         @ViewBuilder
         deleteFooter:
             () -> DeleteFooter
@@ -2382,15 +2518,18 @@ struct RichStructureEntityDetailView:
         self.entityID =
             entityID
 
+        self._showingEditor =
+            showingEditor
+
         self.detailDeleteFooter =
             AnyView(
                 deleteFooter()
             )
     }
 
-    @State
-    private var showingEditor =
-        false
+    @Binding
+    var showingEditor:
+        Bool
 
     @State
     private var editingField:
@@ -2658,16 +2797,11 @@ struct RichStructureEntityDetailView:
                                         .symbol
                                 )
 
-                                textRow(
-                                    entity,
+                                StructureMarkdownNotesRow(
                                     label:
                                         "Notes",
-                                    value:
-                                        entity.notes,
-                                    field:
-                                        .notes,
-                                    multiline:
-                                        true
+                                    markdown:
+                                        entity.notes
                                 )
                             }
                         }
@@ -2751,16 +2885,7 @@ struct RichStructureEntityDetailView:
                 )
             }
         }
-        .sheet(
-            isPresented:
-                $showingEditor
-        ) {
-            StructureEntityEditView(
-                entityID:
-                    entityID
-            )
-        }
-    }
+     }
 
 
     private func header(
@@ -3546,20 +3671,48 @@ struct RichStructureEntityDetailView:
 // MARK: - Whole-object Theme Editor
 // ============================================================
 
-private struct ThemeStructureEditView:
+struct ThemeStructureEditView:
     View
 {
     @EnvironmentObject
     private var store:
         TestudoStore
 
-    @Environment(
-        \.dismiss
-    )
-    private var dismiss
-
     let themeID:
-        UUID
+        UUID?
+
+    let onClose:
+        () -> Void
+
+    let initialParentThemeID:
+        UUID?
+
+    let onCreated:
+        ((UUID) -> Void)?
+
+
+    init(
+        themeID:
+            UUID?,
+        onClose:
+            @escaping () -> Void,
+        initialParentThemeID:
+            UUID? = nil,
+        onCreated:
+            ((UUID) -> Void)? = nil
+    ) {
+        self.themeID =
+            themeID
+
+        self.onClose =
+            onClose
+
+        self.initialParentThemeID =
+            initialParentThemeID
+
+        self.onCreated =
+            onCreated
+    }
 
     @State
     private var draft:
@@ -3754,10 +3907,14 @@ private struct ThemeStructureEditView:
             }
         }
         .frame(
-            width:
-                680,
-            height:
-                720
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
+        )
+        .background(
+            TestudoStyle
+                .contentBackground
         )
         .onAppear {
             load()
@@ -3770,7 +3927,9 @@ private struct ThemeStructureEditView:
     {
         HStack {
             Text(
-                "Edit Theme"
+                themeID == nil
+                ? "New Theme"
+                : "Edit Theme"
             )
             .font(
                 .title2
@@ -3784,11 +3943,13 @@ private struct ThemeStructureEditView:
             Button(
                 "Cancel"
             ) {
-                dismiss()
+                onClose()
             }
 
             Button(
-                "Save"
+                themeID == nil
+                ? "Create"
+                : "Save"
             ) {
                 save()
             }
@@ -3796,7 +3957,18 @@ private struct ThemeStructureEditView:
                 .defaultAction
             )
         }
-        .padding()
+        .padding(
+            .leading,
+            16
+        )
+        .padding(
+            .trailing,
+            96
+        )
+        .padding(
+            .vertical,
+            16
+        )
     }
 
 
@@ -3971,6 +4143,19 @@ private struct ThemeStructureEditView:
     private var availableParentThemes:
         [Theme]
     {
+        guard
+            let themeID
+        else {
+            return store.data.themes
+                .sorted {
+                    $0.name
+                        .localizedCaseInsensitiveCompare(
+                            $1.name
+                        )
+                        == .orderedAscending
+                }
+        }
+
         let descendants =
             Set(
                 store
@@ -3999,6 +4184,26 @@ private struct ThemeStructureEditView:
 
 
     private func load() {
+        errorMessage =
+            nil
+
+        guard
+            let themeID
+        else {
+            draft =
+                Theme(
+                    parentThemeID:
+                        initialParentThemeID,
+                    name:
+                        ""
+                )
+
+            relatedEntityIDs =
+                []
+
+            return
+        }
+
         guard
             let theme =
                 store.theme(
@@ -4023,26 +4228,79 @@ private struct ThemeStructureEditView:
                         \.id
                     )
             )
-
-        errorMessage =
-            nil
     }
 
 
     private func save() {
         guard
-            let draft
+            var draft
         else {
             return
         }
 
+        errorMessage =
+            nil
+
+        let targetID:
+            UUID
+
+        let isNew =
+            themeID == nil
+
+        if let themeID {
+            targetID =
+                themeID
+
+        } else {
+            guard
+                let newID =
+                    store.createTheme(
+                        name:
+                            draft.name,
+                        parentThemeID:
+                            draft.parentThemeID
+                    )
+            else {
+                errorMessage =
+                    "Theme name cannot be empty."
+
+                return
+            }
+
+            targetID =
+                newID
+
+            draft.id =
+                newID
+
+            if
+                let created =
+                    store.theme(
+                        id:
+                            newID
+                    )
+            {
+                draft.createdAt =
+                    created.createdAt
+
+                draft.updatedAt =
+                    created.updatedAt
+            }
+        }
+
         if
             let error =
-                store
-                    .saveThemeMetadata(
-                        draft
-                    )
+                store.saveThemeMetadata(
+                    draft
+                )
         {
+            if isNew {
+                store.deleteTheme(
+                    id:
+                        targetID
+                )
+            }
+
             errorMessage =
                 error
 
@@ -4051,21 +4309,37 @@ private struct ThemeStructureEditView:
 
         if
             let error =
-                store
-                    .setThemeRelatedEntities(
-                        themeID:
-                            themeID,
-                        entityIDs:
-                            relatedEntityIDs
-                    )
+                store.setThemeRelatedEntities(
+                    themeID:
+                        targetID,
+                    entityIDs:
+                        relatedEntityIDs
+                )
         {
+            if isNew {
+                store.deleteTheme(
+                    id:
+                        targetID
+                )
+            }
+
             errorMessage =
                 error
 
             return
         }
 
-        dismiss()
+        if isNew {
+            if let onCreated {
+                onCreated(
+                    targetID
+                )
+            } else {
+                onClose()
+            }
+        } else {
+            onClose()
+        }
     }
 
 
@@ -4128,20 +4402,48 @@ private struct ThemeStructureEditView:
 // MARK: - Whole-object Organization / Group Editor
 // ============================================================
 
-private struct StructureEntityEditView:
+struct StructureEntityEditView:
     View
 {
     @EnvironmentObject
     private var store:
         TestudoStore
 
-    @Environment(
-        \.dismiss
-    )
-    private var dismiss
-
     let entityID:
-        UUID
+        UUID?
+
+    let onClose:
+        () -> Void
+
+    let creationKind:
+        EntityKind?
+
+    let onCreated:
+        ((UUID) -> Void)?
+
+
+    init(
+        entityID:
+            UUID?,
+        onClose:
+            @escaping () -> Void,
+        creationKind:
+            EntityKind? = nil,
+        onCreated:
+            ((UUID) -> Void)? = nil
+    ) {
+        self.entityID =
+            entityID
+
+        self.onClose =
+            onClose
+
+        self.creationKind =
+            creationKind
+
+        self.onCreated =
+            onCreated
+    }
 
     @State
     private var draft:
@@ -4353,10 +4655,14 @@ private struct StructureEntityEditView:
             }
         }
         .frame(
-            width:
-                680,
-            height:
-                720
+            maxWidth:
+                .infinity,
+            maxHeight:
+                .infinity
+        )
+        .background(
+            TestudoStyle
+                .contentBackground
         )
         .onAppear {
             load()
@@ -4383,11 +4689,13 @@ private struct StructureEntityEditView:
             Button(
                 "Cancel"
             ) {
-                dismiss()
+                onClose()
             }
 
             Button(
-                "Save"
+                entityID == nil
+                ? "Create"
+                : "Save"
             ) {
                 save()
             }
@@ -4395,22 +4703,40 @@ private struct StructureEntityEditView:
                 .defaultAction
             )
         }
-        .padding()
+        .padding(
+            .leading,
+            16
+        )
+        .padding(
+            .trailing,
+            96
+        )
+        .padding(
+            .vertical,
+            16
+        )
     }
 
 
     private var editorTitle:
         String
     {
+        let prefix =
+            entityID == nil
+            ? "New"
+            : "Edit"
+
         switch draft?.kind {
         case .organization:
-            return "Edit Organization"
+            return
+                "\(prefix) Organization"
 
         case .group:
-            return "Edit Group"
+            return
+                "\(prefix) Group"
 
         default:
-            return "Edit"
+            return prefix
         }
     }
 
@@ -4676,6 +5002,37 @@ private struct StructureEntityEditView:
 
 
     private func load() {
+        errorMessage =
+            nil
+
+        guard
+            let entityID
+        else {
+            guard
+                let creationKind,
+                creationKind == .organization
+                    || creationKind == .group
+            else {
+                return
+            }
+
+            draft =
+                Entity(
+                    kind:
+                        creationKind,
+                    name:
+                        ""
+                )
+
+            containerIDs =
+                []
+
+            affiliatedPeopleIDs =
+                []
+
+            return
+        }
+
         guard
             let entity =
                 store.entity(
@@ -4710,26 +5067,82 @@ private struct StructureEntityEditView:
                     \.id
                 )
             )
-
-        errorMessage =
-            nil
     }
 
 
     private func save() {
         guard
-            let draft
+            var draft
         else {
             return
         }
 
+        errorMessage =
+            nil
+
+        let targetID:
+            UUID
+
+        let isNew =
+            entityID == nil
+
+        if let entityID {
+            targetID =
+                entityID
+
+        } else {
+            guard
+                let newID =
+                    store.createEntity(
+                        kind:
+                            draft.kind,
+                        name:
+                            draft.name,
+                        initialContainerID:
+                            nil
+                    )
+            else {
+                errorMessage =
+                    "Name cannot be empty."
+
+                return
+            }
+
+            targetID =
+                newID
+
+            draft.id =
+                newID
+
+            if
+                let created =
+                    store.entity(
+                        id:
+                            newID
+                    )
+            {
+                draft.createdAt =
+                    created.createdAt
+
+                draft.updatedAt =
+                    created.updatedAt
+            }
+        }
+
         if
             let error =
-                store
-                    .saveEntityMetadata(
-                        draft
-                    )
+                store.saveEntityMetadata(
+                    draft
+                )
         {
+            if isNew {
+                _ =
+                    store.deleteEntityProtected(
+                        id:
+                            targetID
+                    )
+            }
+
             errorMessage =
                 error
 
@@ -4738,14 +5151,21 @@ private struct StructureEntityEditView:
 
         if
             let error =
-                store
-                    .updateEntityMemberships(
-                        entityID:
-                            entityID,
-                        containerIDs:
-                            containerIDs
-                    )
+                store.updateEntityMemberships(
+                    entityID:
+                        targetID,
+                    containerIDs:
+                        containerIDs
+                )
         {
+            if isNew {
+                _ =
+                    store.deleteEntityProtected(
+                        id:
+                            targetID
+                    )
+            }
+
             errorMessage =
                 error
 
@@ -4754,21 +5174,38 @@ private struct StructureEntityEditView:
 
         if
             let error =
-                store
-                    .updateAffiliatedPeople(
-                        containerID:
-                            entityID,
-                        personIDs:
-                            affiliatedPeopleIDs
-                    )
+                store.updateAffiliatedPeople(
+                    containerID:
+                        targetID,
+                    personIDs:
+                        affiliatedPeopleIDs
+                )
         {
+            if isNew {
+                _ =
+                    store.deleteEntityProtected(
+                        id:
+                            targetID
+                    )
+            }
+
             errorMessage =
                 error
 
             return
         }
 
-        dismiss()
+        if isNew {
+            if let onCreated {
+                onCreated(
+                    targetID
+                )
+            } else {
+                onClose()
+            }
+        } else {
+            onClose()
+        }
     }
 
 

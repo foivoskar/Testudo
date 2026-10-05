@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.1.9 · build 10 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.1.10 · build 11 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,36 +38,43 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.1.9
-Build 10
+Testudo 0.1.10
+Build 11
 ```
 
-### What changed in 0.1.9
+### What changed in 0.1.10
 
-Testudo 0.1.9 improves iCal credential recovery across Macs and refines the About Testudo presentation.
+Testudo 0.1.10 expands the full-pane editing workflow, improves historical Task data, extends relationship inheritance, and introduces native Markdown rendering.
 
-#### iCal credentials across multiple Macs
+#### Full-pane creation and editing
 
-Secret iCal subscription addresses remain private, machine-local credentials stored in macOS Keychain. They are not written into a shared `.testudoenv` package.
+People, Themes, Organizations and Groups now use the right-hand detail pane for creation and whole-object editing instead of popup sheets.
 
-When the same Work Environment is opened on another Mac, Testudo now distinguishes between:
+New Sub-themes use the same full-pane Theme editor, with their Parent Theme preselected.
 
-- a Secret iCal address that is genuinely absent from that Mac;
-- a Keychain item that exists but cannot currently be accessed;
-- invalid Keychain data;
-- ordinary calendar-server or network synchronization errors.
+#### Relationship inheritance
 
-A missing machine-local credential no longer writes a misleading synchronization failure into the shared Work Environment.
+A child Work item now receives inheritable relationships from its immediate Parent Task whether the child is a Sub-task, Note or Activity.
 
-The new **Restore Secret Address** action reconnects an existing iCal subscription on the current Mac without creating a new Calendar identity. It preserves the existing Calendar UUID, imported-event identities and Testudo relationships.
+Inherited relationships remain independent editable copies on the child.
 
-Keychain credential replacement is also non-destructive: Testudo updates an existing Keychain item rather than deleting it before attempting to add a replacement.
+#### Historical completion dates
 
-Because Testudo currently uses source-first local builds with ad-hoc signing, macOS may ask the user to authorize Keychain access again after a rebuilt application receives a different code signature.
+Completed Tasks can now store an explicit Completed date, time and time zone.
 
-#### About Testudo
+This allows historical Tasks to retain their actual completion time instead of using only the moment they were entered into Testudo.
 
-Long descriptive text in the About Testudo window now wraps onto as many lines as required instead of being truncated with an ellipsis.
+The lifecycle history keeps the canonical completion event aligned with that date while preserving earlier completion cycles.
+
+#### Markdown rendering
+
+Task, Note and Activity descriptions now render Markdown in their detail view while continuing to store the original raw Markdown text.
+
+The renderer supports headings, emphasis, links, block quotes, horizontal rules, ordered and unordered lists, checkboxes, fenced code blocks with copy support, and Markdown tables.
+
+Person, Theme, Organization and Group Notes use the same Markdown renderer.
+
+No Work Environment data migration is required because the underlying stored fields remain ordinary strings.
 
 ---
 
@@ -147,7 +154,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.1.9-macOS-arm64.dmg
+dist/Testudo-0.1.10-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -719,11 +726,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.3 documents Testudo 0.1.7 (build 8)**.
+The bundled **Testudo User Manual 1.6 documents Testudo 0.1.10 (build 11)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.1.7 (build 8)** application state.
+This README and the User Manual reflect the current **Testudo 0.1.10 (build 11)** application state.
 
 ---
 
@@ -735,7 +742,7 @@ The interface and data model may continue to evolve between early versions.
 
 Users should keep independent backups of important `.testudoenv` packages, particularly when moving between versions.
 
-Backward compatibility is considered explicitly: Testudo 0.1.7 includes migration handling for the pre-0.1.7 representation of Closed Tasks.
+Backward compatibility is considered explicitly. Testudo 0.1.7 introduced migration handling for the pre-0.1.7 representation of Closed Tasks, and that compatibility remains part of the current application.
 
 ---
 

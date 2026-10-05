@@ -415,6 +415,26 @@ struct ContentView: View {
         WorkCreationRequest?
 
     @State
+    private var personCreationRequested =
+        false
+
+    @State
+    private var themeCreationRequested =
+        false
+
+    @State
+    private var themeCreationParentID:
+        UUID?
+
+    @State
+    private var organizationCreationRequested =
+        false
+
+    @State
+    private var groupCreationRequested =
+        false
+
+    @State
     private var detailBackStack:
         [DetailNavigationEntry] = []
 
@@ -598,7 +618,17 @@ struct ContentView: View {
                 calendarEventCreationRequest:
                     $calendarEventCreationRequest,
                 workCreationRequest:
-                    $workCreationRequest
+                    $workCreationRequest,
+                personCreationRequested:
+                    $personCreationRequested,
+                themeCreationRequested:
+                    $themeCreationRequested,
+                themeCreationParentID:
+                    $themeCreationParentID,
+                organizationCreationRequested:
+                    $organizationCreationRequested,
+                groupCreationRequested:
+                    $groupCreationRequested
             )
             .padding(
                 .top,
@@ -640,7 +670,17 @@ struct ContentView: View {
                     calendarEventCreationRequest:
                         $calendarEventCreationRequest,
                     workCreationRequest:
-                        $workCreationRequest
+                        $workCreationRequest,
+                    personCreationRequested:
+                        $personCreationRequested,
+                    themeCreationRequested:
+                        $themeCreationRequested,
+                    themeCreationParentID:
+                        $themeCreationParentID,
+                    organizationCreationRequested:
+                        $organizationCreationRequested,
+                    groupCreationRequested:
+                        $groupCreationRequested
                 )
                 .environment(
                     \.testudoDetailNavigation,
@@ -760,6 +800,12 @@ struct ContentView: View {
 
                 calendarEventCreationRequest =
                     nil
+
+                themeCreationRequested =
+                    false
+
+                themeCreationParentID =
+                    nil
             }
 
             registerVisibleDetailNavigation()
@@ -776,6 +822,9 @@ struct ContentView: View {
 
                 calendarEventCreationRequest =
                     nil
+
+                organizationCreationRequested =
+                    false
             }
 
             registerVisibleDetailNavigation()
@@ -792,6 +841,9 @@ struct ContentView: View {
 
                 calendarEventCreationRequest =
                     nil
+
+                groupCreationRequested =
+                    false
             }
 
             registerVisibleDetailNavigation()
@@ -808,6 +860,9 @@ struct ContentView: View {
 
                 calendarEventCreationRequest =
                     nil
+
+                personCreationRequested =
+                    false
             }
 
             registerVisibleDetailNavigation()
@@ -1315,6 +1370,29 @@ struct ContentView: View {
             return
         }
 
+        if newSection != .people {
+            personCreationRequested =
+                false
+        }
+
+        if newSection != .themes {
+            themeCreationRequested =
+                false
+
+            themeCreationParentID =
+                nil
+        }
+
+        if newSection != .organizations {
+            organizationCreationRequested =
+                false
+        }
+
+        if newSection != .groups {
+            groupCreationRequested =
+                false
+        }
+
         if
             newSection != .newEntry
         {
@@ -1540,6 +1618,21 @@ struct ContentView: View {
         _ entry:
             DetailNavigationEntry
     ) {
+        personCreationRequested =
+            false
+
+        themeCreationRequested =
+            false
+
+        themeCreationParentID =
+            nil
+
+        organizationCreationRequested =
+            false
+
+        groupCreationRequested =
+            false
+
         switch entry {
 
         case
@@ -1778,8 +1871,26 @@ private struct SectionContentView: View {
     var workCreationRequest:
         WorkCreationRequest?
 
-    @State
-    private var showingCreateSheet = false
+    @Binding
+    var personCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationParentID:
+        UUID?
+
+    @Binding
+    var organizationCreationRequested:
+        Bool
+
+    @Binding
+    var groupCreationRequested:
+        Bool
+
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1808,7 +1919,7 @@ private struct SectionContentView: View {
 
                 if canCreate {
                     Button {
-                        showingCreateSheet = true
+                        beginCreation()
                     } label: {
                         Image(
                             systemName:
@@ -1848,12 +1959,6 @@ private struct SectionContentView: View {
                 .background(
                     TestudoStyle.contentBackground
                 )
-        }
-        .sheet(
-            isPresented:
-                $showingCreateSheet
-        ) {
-            createSheet
         }
     }
 
@@ -1954,7 +2059,11 @@ private struct SectionContentView: View {
                 selectedWorkItemID:
                     $selectedWorkItemID,
                 workCreationRequest:
-                    $workCreationRequest
+                    $workCreationRequest,
+                themeCreationRequested:
+                    $themeCreationRequested,
+                themeCreationParentID:
+                    $themeCreationParentID
             )
 
         case .organizations:
@@ -1979,40 +2088,115 @@ private struct SectionContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var createSheet: some View {
-        switch section {
-        case .themes:
-            CreateThemeView(
-                isPresented:
-                    $showingCreateSheet
-            )
+    private func beginCreation() {
+        if section == .people {
+            selectedPersonID =
+                nil
 
-        case .organizations:
-            CreateEntityView(
-                kind: .organization,
-                isPresented:
-                    $showingCreateSheet
-            )
+            selectedWorkItemID =
+                nil
 
-        case .groups:
-            CreateEntityView(
-                kind: .group,
-                isPresented:
-                    $showingCreateSheet
-            )
+            workCreationRequest =
+                nil
 
-        case .people:
-            CreateEntityView(
-                kind: .person,
-                isPresented:
-                    $showingCreateSheet
-            )
+            calendarEventCreationRequest =
+                nil
 
-        default:
-            EmptyView()
+            themeCreationRequested =
+                false
+
+            personCreationRequested =
+                true
+
+            return
         }
+
+        if section == .themes {
+            selectedThemeID =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            personCreationRequested =
+                false
+
+            organizationCreationRequested =
+                false
+
+            themeCreationParentID =
+                nil
+
+            themeCreationRequested =
+                true
+
+            return
+        }
+
+        if section == .organizations {
+            selectedOrganizationID =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            personCreationRequested =
+                false
+
+            themeCreationRequested =
+                false
+
+            groupCreationRequested =
+                false
+
+            organizationCreationRequested =
+                true
+
+            return
+        }
+
+        if section == .groups {
+            selectedGroupID =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            personCreationRequested =
+                false
+
+            themeCreationRequested =
+                false
+
+            organizationCreationRequested =
+                false
+
+            groupCreationRequested =
+                true
+
+            return
+        }
+
     }
+
 
     private var canCreate: Bool {
         switch section {
@@ -2215,6 +2399,14 @@ private struct ThemeListView: View {
     var workCreationRequest:
         WorkCreationRequest?
 
+    @Binding
+    var themeCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationParentID:
+        UUID?
+
 
     var body: some View {
         let roots =
@@ -2246,7 +2438,11 @@ private struct ThemeListView: View {
                         selectedWorkItemID:
                             $selectedWorkItemID,
                         workCreationRequest:
-                            $workCreationRequest
+                            $workCreationRequest,
+                        themeCreationRequested:
+                            $themeCreationRequested,
+                        themeCreationParentID:
+                            $themeCreationParentID
                     )
                 }
             }
@@ -2271,6 +2467,14 @@ private struct ThemeNodeView: View {
     var workCreationRequest:
         WorkCreationRequest?
 
+    @Binding
+    var themeCreationRequested:
+        Bool
+
+    @Binding
+    var themeCreationParentID:
+        UUID?
+
     @State
     private var isExpanded = true
 
@@ -2278,11 +2482,7 @@ private struct ThemeNodeView: View {
     private var createKind:
         WorkItemKind?
 
-    @State
-    private var showingCreateSubtheme =
-        false
-
-    private var hierarchyDepth:
+     private var hierarchyDepth:
         Int
     {
         var depth =
@@ -2362,7 +2562,11 @@ private struct ThemeNodeView: View {
                     selectedWorkItemID:
                         $selectedWorkItemID,
                     workCreationRequest:
-                        $workCreationRequest
+                        $workCreationRequest,
+                    themeCreationRequested:
+                        $themeCreationRequested,
+                    themeCreationParentID:
+                        $themeCreationParentID
                 )
             }
         } label: {
@@ -2379,7 +2583,19 @@ private struct ThemeNodeView: View {
                     Button(
                         "New Sub-theme"
                     ) {
-                        showingCreateSubtheme =
+                        selectedWorkItemID =
+                            nil
+
+                        workCreationRequest =
+                            nil
+
+                        selection =
+                            nil
+
+                        themeCreationParentID =
+                            theme.id
+
+                        themeCreationRequested =
                             true
                     }
 
@@ -2460,18 +2676,7 @@ private struct ThemeNodeView: View {
                     )
             )
         }
-        .sheet(
-            isPresented:
-                $showingCreateSubtheme
-        ) {
-            CreateThemeView(
-                isPresented:
-                    $showingCreateSubtheme,
-                initialParentID:
-                    theme.id
-            )
-        }
-    }
+     }
 }
 
 private struct WorkItemNodeView: View {
@@ -4122,251 +4327,6 @@ private struct EntityListView: View {
     }
 }
 
-
-private struct CreateThemeView: View {
-    @EnvironmentObject
-    private var store: TestudoStore
-
-    @Binding
-    var isPresented: Bool
-
-    @State
-    private var name = ""
-
-    @State
-    private var parentID: UUID?
-
-    init(
-        isPresented:
-            Binding<Bool>,
-        initialParentID:
-            UUID? = nil
-    ) {
-        self._isPresented =
-            isPresented
-
-        self._parentID =
-            State(
-                initialValue:
-                    initialParentID
-            )
-    }
-
-
-    var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 20
-        ) {
-            Text("New Theme")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            TextField(
-                "Theme name",
-                text: $name
-            )
-
-            Picker(
-                "Parent theme",
-                selection: $parentID
-            ) {
-                Text("None")
-                    .tag(
-                        Optional<UUID>.none
-                    )
-
-                ForEach(
-                    store.data.themes
-                        .sorted {
-                            $0.name
-                                .localizedCaseInsensitiveCompare(
-                                    $1.name
-                                )
-                                == .orderedAscending
-                        }
-                ) { theme in
-                    Text(theme.name)
-                        .tag(
-                            Optional(
-                                theme.id
-                            )
-                        )
-                }
-            }
-
-            HStack {
-                Spacer()
-
-                Button("Cancel") {
-                    isPresented = false
-                }
-
-                Button("Create") {
-                    store.createTheme(
-                        name: name,
-                        parentThemeID:
-                            parentID
-                    )
-
-                    isPresented = false
-                }
-                .keyboardShortcut(
-                    .defaultAction
-                )
-                .disabled(
-                    name
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .isEmpty
-                )
-            }
-        }
-        .padding(24)
-        .frame(width: 440)
-    }
-}
-
-private struct CreateEntityView: View {
-    @EnvironmentObject
-    private var store: TestudoStore
-
-    let kind: EntityKind
-
-    @Binding
-    var isPresented: Bool
-
-    @State
-    private var name = ""
-
-    @State
-    private var containerID: UUID?
-
-    var body: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 20
-        ) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            TextField(
-                namePrompt,
-                text: $name
-            )
-
-            Picker(
-                containerLabel,
-                selection: $containerID
-            ) {
-                Text("None")
-                    .tag(
-                        Optional<UUID>.none
-                    )
-
-                ForEach(
-                    store.possibleContainers(
-                        for: kind
-                    )
-                ) { entity in
-                    Text(
-                        containerDescription(
-                            entity
-                        )
-                    )
-                    .tag(
-                        Optional(entity.id)
-                    )
-                }
-            }
-
-            HStack {
-                Spacer()
-
-                Button("Cancel") {
-                    isPresented = false
-                }
-
-                Button("Create") {
-                    store.createEntity(
-                        kind: kind,
-                        name: name,
-                        initialContainerID:
-                            containerID
-                    )
-
-                    isPresented = false
-                }
-                .keyboardShortcut(
-                    .defaultAction
-                )
-                .disabled(
-                    name
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .isEmpty
-                )
-            }
-        }
-        .padding(24)
-        .frame(width: 460)
-    }
-
-    private var title: String {
-        switch kind {
-        case .organization:
-            return "New Organization"
-        case .group:
-            return "New Group"
-        case .person:
-            return "New Person"
-        }
-    }
-
-    private var namePrompt: String {
-        switch kind {
-        case .organization:
-            return "Organization name"
-        case .group:
-            return "Group name"
-        case .person:
-            return "Person name"
-        }
-    }
-
-    private var containerLabel: String {
-        switch kind {
-        case .organization:
-            return "Parent organization"
-        case .group:
-            return "Organization or group"
-        case .person:
-            return "Initial affiliation"
-        }
-    }
-
-    private func containerDescription(
-        _ entity: Entity
-    ) -> String {
-        switch entity.kind {
-        case .organization:
-            return
-                "\(entity.name) — Organization"
-
-        case .group:
-            return
-                "\(entity.name) — Group"
-
-        case .person:
-            return entity.name
-        }
-    }
-}
 
 struct DetailPlaceholderView: View {
     var body: some View {

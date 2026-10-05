@@ -132,6 +132,15 @@ struct WorkEntryEditorView:
             .deviceTimeZoneID
 
     @State
+    private var completedAt =
+        Date()
+
+    @State
+    private var completedTimeZoneID =
+        TestudoTime
+            .deviceTimeZoneID
+
+    @State
     private var hasDeadline =
         false
 
@@ -985,6 +994,17 @@ struct WorkEntryEditorView:
                         )
                     }
 
+                    if status == .completed {
+                        TimeZoneAwareDateEditor(
+                            label:
+                                "Completed",
+                            date:
+                                $completedAt,
+                            timeZoneID:
+                                $completedTimeZoneID
+                        )
+                    }
+
                     if status == .discontinued {
                         VStack(
                             alignment:
@@ -1492,6 +1512,19 @@ struct WorkEntryEditorView:
                 ?? TestudoTime
                     .deviceTimeZoneID
 
+            completedAt =
+                item.completedAt
+                ?? Date()
+
+            completedTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item
+                            .completedTimeZoneID
+                    )
+                ?? TestudoTime
+                    .deviceTimeZoneID
+
             hasDeadline =
                 item.deadlineAt
                 != nil
@@ -1895,6 +1928,34 @@ struct WorkEntryEditorView:
 
         if
             kind == .task,
+            status == .completed
+        {
+            if
+                let completedError =
+                    store
+                        .updateTaskCompletedAt(
+                            workItemID:
+                                newID,
+                            completedAt:
+                                completedAt,
+                            completedTimeZoneID:
+                                completedTimeZoneID,
+                            recordAudit:
+                                false
+                        )
+            {
+                failNewItem(
+                    newID,
+                    error:
+                        completedError
+                )
+
+                return
+            }
+        }
+
+        if
+            kind == .task,
             status == .discontinued,
             let discontinuationReason
         {
@@ -1943,7 +2004,6 @@ struct WorkEntryEditorView:
         }
 
         if
-            kind == .task,
             let parentWorkItemID
         {
             if
@@ -2111,6 +2171,29 @@ struct WorkEntryEditorView:
 
                     return
                 }
+            }
+        }
+
+        if
+            kind == .task,
+            status == .completed
+        {
+            if
+                let completedError =
+                    store
+                        .updateTaskCompletedAt(
+                            workItemID:
+                                item.id,
+                            completedAt:
+                                completedAt,
+                            completedTimeZoneID:
+                                completedTimeZoneID
+                        )
+            {
+                errorMessage =
+                    completedError
+
+                return
             }
         }
 
@@ -2378,6 +2461,24 @@ struct WorkEntryEditorView:
         {
             return
                 "Started date cannot be in the future."
+        }
+
+        if
+            kind == .task,
+            status == .completed
+        {
+            if completedAt > Date() {
+                return
+                    "Completed date cannot be in the future."
+            }
+
+            if
+                hasStarted,
+                completedAt < startedAt
+            {
+                return
+                    "Completed date cannot be earlier than Started."
+            }
         }
 
         if
