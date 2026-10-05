@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.2.0 · build 13 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.2.1 · build 14 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,68 +38,27 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.2.0
-Build 13
+Testudo 0.2.1
+Build 14
 ```
 
-### What changed in 0.2.0
+### What changed in 0.2.1
 
-Testudo 0.2.0 introduces the Day workspace as a first-class part of the Calendar workflow.
+Testudo 0.2.1 refines Day History and introduces native printing for the active detail content.
 
-#### Day workspace
+#### Day History count
 
-Selecting a date in Calendar now opens a complete Day workspace in the detail pane.
+The Day History heading now shows a small secondary count representing the number of Work-history entries recorded for the selected day.
 
-The Day workspace combines:
+The count is derived from the same Day History collection shown immediately below it, so lifecycle events and other displayed Work-history entries are counted individually.
 
-- Schedule;
-- Planned Work;
-- Due & Reminders;
-- Day History;
-- App Log.
+#### Detail-pane printing
 
-Day pages participate in Testudo's normal browser-style Back and Forward navigation.
+Press Command-P or choose Print… to open the native macOS Print dialog for the current right-hand detail content.
 
-#### Planned Work
+Scrollable detail views are captured across their complete length and automatically paginated across as many printed pages as required rather than being limited to the currently visible viewport.
 
-Planned Work is generated deterministically from the current Work state.
-
-It considers Task hierarchy, deadlines, In Progress work and links to Calendar Events while limiting unnecessary context switching.
-
-Overdue work remains relevant on Today. Future Day plans do not repeatedly carry Tasks whose deadlines have already passed, whether those Tasks remain To Do or In Progress.
-
-Past Day pages do not fabricate historical plan snapshots when none were stored.
-
-#### Day History
-
-Day History shows real Work events for the selected date, newest first.
-
-It can include:
-
-- Tasks created as To Do;
-- Tasks entering In Progress with their Started time;
-- Completed Tasks with their completion time;
-- Discontinued Tasks with their time and reason;
-- Activities by Occurred time;
-- Notes by creation time.
-
-Lifecycle status transitions are retained where available.
-
-#### App Log
-
-The recorded Testudo Work audit remains available separately as App Log.
-
-App Log is collapsed by default, can be expanded with its disclosure control, and displays its newest entries first.
-
-#### Navigable dates
-
-Read-only dates and date-times throughout the application can now open the corresponding Day page where appropriate.
-
-This navigation participates in the same Back and Forward history as other detail destinations.
-
-#### Calendar refinements
-
-Calendar Day selection now participates fully in detail navigation, and the month grid reserves sufficient width for selected two-digit day numbers without truncation.
+Printed detail content uses a 90 percent scale while retaining the normal system print-margin behaviour.
 
 No Work Environment schema migration is required for this release.
 
@@ -181,7 +140,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.2.0-macOS-arm64.dmg
+dist/Testudo-0.2.1-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -767,11 +726,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.8 documents Testudo 0.2.0 (build 13)**.
+The bundled **Testudo User Manual 1.9 documents Testudo 0.2.1 (build 14)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.2.0 (build 13)** application state.
+This README and the User Manual reflect the current **Testudo 0.2.1 (build 14)** application state.
 
 ---
 

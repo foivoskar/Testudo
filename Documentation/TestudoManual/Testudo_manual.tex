@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.8}
-\newcommand{\DocumentedTestudoVersion}{0.2.0}
-\newcommand{\DocumentedTestudoBuild}{13}
+\newcommand{\ManualVersion}{1.9}
+\newcommand{\DocumentedTestudoVersion}{0.2.1}
+\newcommand{\DocumentedTestudoBuild}{14}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.2.0. The release introduces the Day workspace as a first-class Calendar destination, adds deterministic hierarchy-aware Planned Work, separates real Work-domain Day History from the application audit log, makes read-only dates navigable to their corresponding Day, and integrates Day pages with browser-style Back and Forward navigation. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
+This edition is aligned with Testudo 0.2.1. The release adds an entry count to Day History and introduces native Command-P printing of the current right-hand detail content. Long scrollable detail views are captured across their complete length and paginated automatically, with printed content rendered at 90 percent scale. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
 }
 
 \manualwarning{Early-release software}{
@@ -181,7 +181,7 @@ cd Testudo
 
 The resulting DMG is written under \filepath{dist/}. For this release the expected name is normally:
 \begin{lstlisting}
-dist/Testudo-0.1.7-macOS-arm64.dmg
+dist/Testudo-0.2.1-macOS-arm64.dmg
 \end{lstlisting}
 
 \section{Updating}
@@ -433,6 +433,19 @@ Archived Tasks participate in the same history as active Work.
 
 \manualtip{Try it: verify three-column history}{
 Open an active Task, then open \menu{Archive} and select a Closed Task, then open a Person. Use Back and Forward or the trackpad gesture. Verify that each step restores not only the right pane but also the corresponding sidebar section and middle-column selection.
+}
+
+
+\section{Printing the detail pane}
+
+Press Command-P to open the native macOS Print dialog for the current right-hand detail content.
+
+Testudo prints the detail content rather than the navigation sidebar or middle-column collection. When the current detail view is scrollable, Testudo captures the complete scrollable content and exposes it to the print system as one continuous document. macOS can therefore paginate a long Task, Day, Person, Theme or other supported detail view across as many pages as required.
+
+Printed detail content uses a 90 percent scale. Testudo otherwise retains the normal print-margin behaviour supplied by the macOS print system and selected printer.
+
+\manualtip{Try it: print a long detail view}{
+Open a Task or Day whose detail content requires substantial scrolling and press Command-P. Confirm that the native Print dialog opens, that the sidebar and middle column are absent, and that the complete detail content continues across multiple pages rather than stopping at the visible viewport.
 }
 
 % ============================================================
@@ -954,6 +967,8 @@ Past dates do not reconstruct a fictional historical plan when no persisted plan
 \subsection{Day History}
 
 Day History is a reverse-chronological record of real Work events, with the newest event first.
+
+The Day History heading also displays a small secondary count. This number is the number of entries in the Day History collection for the selected date and therefore matches the entries presented below the heading.
 
 It can include Tasks created as To Do, Tasks entering In Progress with their Started time, Completed and Discontinued Tasks with their lifecycle time, Activities by Occurred time, and Notes by creation time.
 
@@ -1569,6 +1584,8 @@ Use this checklist after installing a new Testudo build:
     \item Archive preserves the actual Completed/Discontinued status.
     \item Reopen returns the subtree to active views.
     \item Back/Forward restores all three columns, including Archive destinations.
+    \item Day History shows a count matching the entries displayed for the selected day.
+    \item Command-P opens native printing for the right-hand detail content and long detail views paginate across multiple pages.
     \item Today reflects current-day Work lifecycle activity.
     \item Calendar shows Events, deadlines and reminders.
     \item External calendar events remain read-only except for Testudo relationships.

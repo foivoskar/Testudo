@@ -94,7 +94,9 @@ struct DayWorkspaceView: View {
                     dayDivider
 
                     daySection(
-                        "Day History"
+                        "Day History",
+                        count:
+                            workDayLogEntries.count
                     ) {
                         workDayLog
                     }
@@ -174,6 +176,7 @@ struct DayWorkspaceView: View {
 
     private func daySection<Content: View>(
         _ title: String,
+        count: Int? = nil,
         @ViewBuilder
         content: () -> Content
     ) -> some View {
@@ -181,8 +184,26 @@ struct DayWorkspaceView: View {
             alignment: .leading,
             spacing: 11
         ) {
-            Text(title)
-                .font(.headline)
+            HStack(
+                alignment: .firstTextBaseline,
+                spacing: 7
+            ) {
+                Text(title)
+                    .font(.headline)
+
+                if let count {
+                    Text(
+                        "\(count)"
+                    )
+                    .font(
+                        .caption2
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
 
             content()
         }
