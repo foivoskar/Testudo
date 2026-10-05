@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.1.11 · build 12 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.2.0 · build 13 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,48 +38,70 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.1.11
-Build 12
+Testudo 0.2.0
+Build 13
 ```
 
-### What changed in 0.1.11
+### What changed in 0.2.0
 
-Testudo 0.1.11 refines Task prioritisation, chronological child Work, relationship scope and structural editing.
+Testudo 0.2.0 introduces the Day workspace as a first-class part of the Calendar workflow.
 
-#### Deadline-driven Task ordering
+#### Day workspace
 
-Task-oriented middle-column views now prioritise Tasks with deadlines.
+Selecting a date in Calendar now opens a complete Day workspace in the detail pane.
 
-Earlier deadlines appear above later deadlines, while Tasks without deadlines follow dated Tasks. The same rule applies recursively to Sub-task siblings.
+The Day workspace combines:
 
-All Tasks uses this ordering throughout the expandable Task hierarchy, and Today applies it to active In Progress work.
+- Schedule;
+- Planned Work;
+- Due & Reminders;
+- Day History;
+- App Log.
 
-#### Newest-first Contains chronology
+Day pages participate in Testudo's normal browser-style Back and Forward navigation.
 
-The Contains section of a Task is now a single newest-first chronological sequence.
+#### Planned Work
 
-Activities use their Occurred time when available. Tasks and Notes use their Created time. This ordering is intentionally independent from Task deadline ordering.
+Planned Work is generated deterministically from the current Work state.
 
-#### Explicit Related Work for Organizations and Groups
+It considers Task hierarchy, deadlines, In Progress work and links to Calendar Events while limiting unnecessary context switching.
 
-Organization and Group Related Work now shows Work related directly to the exact selected entity.
+Overdue work remains relevant on Today. Future Day plans do not repeatedly carry Tasks whose deadlines have already passed, whether those Tasks remain To Do or In Progress.
 
-It no longer aggregates Work merely because that Work belongs to affiliated People, descendant Groups, descendant Organizations or other structurally related entities.
+Past Day pages do not fabricate historical plan snapshots when none were stored.
 
-A relationship that has actually been copied onto a child Work item remains a real relationship of that child and therefore remains visible.
+#### Day History
 
-#### Clearer structural Notes editors
+Day History shows real Work events for the selected date, newest first.
 
-People, Themes, Organizations and Groups now use a larger, clearly bounded Notes writing surface with improved spacing and contrast.
+It can include:
 
-#### Native Work relationship selection
+- Tasks created as To Do;
+- Tasks entering In Progress with their Started time;
+- Completed Tasks with their completion time;
+- Discontinued Tasks with their time and reason;
+- Activities by Occurred time;
+- Notes by creation time.
 
-The Work creation and editing interface now uses Testudo's native People, Groups and Organizations selector for relationship entities instead of a generic Entity dropdown.
+Lifecycle status transitions are retained where available.
 
-The relationship Role remains a compact role selector.
+#### App Log
 
-No Work Environment data migration is required for this release.
+The recorded Testudo Work audit remains available separately as App Log.
 
+App Log is collapsed by default, can be expanded with its disclosure control, and displays its newest entries first.
+
+#### Navigable dates
+
+Read-only dates and date-times throughout the application can now open the corresponding Day page where appropriate.
+
+This navigation participates in the same Back and Forward history as other detail destinations.
+
+#### Calendar refinements
+
+Calendar Day selection now participates fully in detail navigation, and the month grid reserves sufficient width for selected two-digit day numbers without truncation.
+
+No Work Environment schema migration is required for this release.
 
 ---
 
@@ -159,7 +181,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.1.11-macOS-arm64.dmg
+dist/Testudo-0.2.0-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -430,6 +452,20 @@ Its data can include work associated with current-day lifecycle and activity eve
 - completion;
 - discontinuation;
 - logged Activity.
+
+---
+
+## Day workspace
+
+Selecting a Calendar date opens a dedicated Day workspace in the detail pane.
+
+The workspace combines Schedule, Planned Work, Due & Reminders, Day History and a collapsible App Log.
+
+Planned Work is calculated from the current Work state. Today can surface overdue Tasks, while future days do not inherit Tasks whose deadlines have already passed merely because they remain open.
+
+Day History represents real Work chronology rather than application editing chronology.
+
+Read-only dates elsewhere in Testudo can navigate directly to the corresponding Day page.
 
 ---
 
@@ -731,11 +767,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.7 documents Testudo 0.1.11 (build 12)**.
+The bundled **Testudo User Manual 1.8 documents Testudo 0.2.0 (build 13)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.1.11 (build 12)** application state.
+This README and the User Manual reflect the current **Testudo 0.2.0 (build 13)** application state.
 
 ---
 

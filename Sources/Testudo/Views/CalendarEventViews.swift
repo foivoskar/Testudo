@@ -1123,7 +1123,9 @@ struct CalendarEventDetailView:
                                         TestudoTime
                                             .dateTime(
                                                 event.createdAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        event.createdAt
                                 )
 
                                 readonlyRow(
@@ -1132,7 +1134,9 @@ struct CalendarEventDetailView:
                                         TestudoTime
                                             .dateTime(
                                                 event.updatedAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        event.updatedAt
                                 )
                             }
                         }
@@ -1552,6 +1556,10 @@ struct CalendarEventDetailView:
                         timeZoneID:
                             timeZoneID
                     ),
+                navigationDestination:
+                    .calendarDay(
+                        value
+                    ),
                 editable:
                     !store
                         .isReadOnlyCalendarEvent(
@@ -1775,7 +1783,9 @@ struct CalendarEventDetailView:
 
     private func readonlyRow(
         label: String,
-        value: String
+        value: String,
+        dateDestination:
+            Date? = nil
     ) -> some View {
         HStack(
             spacing: 14
@@ -1789,10 +1799,19 @@ struct CalendarEventDetailView:
                     alignment: .leading
                 )
 
-            Text(value)
-                .textSelection(
-                    .enabled
+            if let dateDestination {
+                TestudoDateLink(
+                    title:
+                        value,
+                    date:
+                        dateDestination
                 )
+            } else {
+                Text(value)
+                    .textSelection(
+                        .enabled
+                    )
+            }
 
             Spacer()
         }

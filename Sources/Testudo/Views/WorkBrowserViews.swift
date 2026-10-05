@@ -2019,7 +2019,9 @@ struct WorkItemDetailView: View {
                                                     .startedTimeZoneID
                                         )
                                 }
-                            ?? "None"
+                            ?? "None",
+                        dateDestination:
+                            item.startedAt
                     )
 
                     if
@@ -2039,7 +2041,9 @@ struct WorkItemDetailView: View {
                                                         .discontinuedTimeZoneID
                                             )
                                     }
-                                ?? "Unknown"
+                                ?? "Unknown",
+                            dateDestination:
+                                item.discontinuedAt
                         )
 
                         ReadOnlyInspectorRow(
@@ -2079,7 +2083,9 @@ struct WorkItemDetailView: View {
                                                     .deadlineTimeZoneID
                                         )
                                 }
-                            ?? "None"
+                            ?? "None",
+                        dateDestination:
+                            item.deadlineAt
                     )
                 }
 
@@ -2098,7 +2104,9 @@ struct WorkItemDetailView: View {
                                                     .reminderTimeZoneID
                                         )
                                 }
-                            ?? "None"
+                            ?? "None",
+                        dateDestination:
+                            item.reminderAt
                     )
                 }
 
@@ -2117,7 +2125,9 @@ struct WorkItemDetailView: View {
                                                     .loggedTimeZoneID
                                         )
                                 }
-                            ?? "Unknown"
+                            ?? "Unknown",
+                        dateDestination:
+                            item.loggedAt
                     )
                 }
             }
@@ -4633,7 +4643,9 @@ struct WorkItemDetailView: View {
                                 item.createdAt,
                                 sourceTimeZoneID:
                                     item.createdTimeZoneID
-                            )
+                            ),
+                    dateDestination:
+                        item.createdAt
                 )
 
                 ReadOnlyInspectorRow(
@@ -4644,7 +4656,9 @@ struct WorkItemDetailView: View {
                                 item.updatedAt,
                                 sourceTimeZoneID:
                                     item.updatedTimeZoneID
-                            )
+                            ),
+                    dateDestination:
+                        item.updatedAt
                 )
 
                 if
@@ -4659,7 +4673,9 @@ struct WorkItemDetailView: View {
                                     started,
                                     sourceTimeZoneID:
                                         item.startedTimeZoneID
-                                )
+                                ),
+                        dateDestination:
+                            started
                     )
                 }
 
@@ -4676,7 +4692,9 @@ struct WorkItemDetailView: View {
                                     completed,
                                     sourceTimeZoneID:
                                         item.completedTimeZoneID
-                                )
+                                ),
+                        dateDestination:
+                            completed
                     )
                 }
 
@@ -4694,7 +4712,9 @@ struct WorkItemDetailView: View {
                                     sourceTimeZoneID:
                                         item
                                             .discontinuedTimeZoneID
-                                )
+                                ),
+                        dateDestination:
+                            discontinued
                     )
                 }
 
@@ -4712,7 +4732,9 @@ struct WorkItemDetailView: View {
                                     logged,
                                     sourceTimeZoneID:
                                         item.loggedTimeZoneID
-                                )
+                                ),
+                        dateDestination:
+                            logged
                     )
                 }
 
@@ -4796,19 +4818,21 @@ struct WorkItemDetailView: View {
                                     minLength: 12
                                 )
 
-                                Text(
-                                    TestudoTime
-                                        .displayDateTime(
-                                            entry.timestamp,
-                                            sourceTimeZoneID:
-                                                entry.timeZoneID
-                                        )
+                                TestudoDateLink(
+                                    title:
+                                        TestudoTime
+                                            .displayDateTime(
+                                                entry.timestamp,
+                                                sourceTimeZoneID:
+                                                    entry.timeZoneID
+                                            ),
+                                    date:
+                                        entry.timestamp,
+                                    color:
+                                        .secondary
                                 )
                                 .font(
                                     .caption2
-                                )
-                                .foregroundStyle(
-                                    .secondary
                                 )
                                 .multilineTextAlignment(
                                     .trailing
@@ -6027,6 +6051,9 @@ private struct ReadOnlyInspectorRow:
     let label: String
     let value: String
 
+    var dateDestination:
+        Date? = nil
+
     var body: some View {
         HStack(
             alignment:
@@ -6042,10 +6069,19 @@ private struct ReadOnlyInspectorRow:
                     alignment: .leading
                 )
 
-            Text(value)
-                .textSelection(
-                    .enabled
+            if let dateDestination {
+                TestudoDateLink(
+                    title:
+                        value,
+                    date:
+                        dateDestination
                 )
+            } else {
+                Text(value)
+                    .textSelection(
+                        .enabled
+                    )
+            }
 
             Spacer()
         }
@@ -7168,6 +7204,9 @@ struct WorkDetailRouterView: View {
     var selectedCalendarEventID: UUID?
 
     @Binding
+    var selectedCalendarDate: Date
+
+    @Binding
     var selectedPersonID: UUID?
 
     @Binding
@@ -7440,6 +7479,22 @@ struct WorkDetailRouterView: View {
                     .id(
                         selectedWorkItemID
                     )
+
+                } else if
+                    section == .calendar
+                {
+                    DayWorkspaceView(
+                        date:
+                            selectedCalendarDate,
+                        selectedWorkItemID:
+                            $selectedWorkItemID,
+                        selectedCalendarEventID:
+                            $selectedCalendarEventID
+                    )
+                    .id(
+                        selectedCalendarDate
+                    )
+
                 } else {
                     DetailPlaceholderView()
                 }

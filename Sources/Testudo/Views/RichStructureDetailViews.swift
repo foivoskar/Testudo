@@ -225,6 +225,9 @@ private struct StructureReadOnlyRow:
     let label: String
     let value: String
 
+    var dateDestination:
+        Date? = nil
+
     var body: some View {
         HStack(
             alignment:
@@ -241,10 +244,19 @@ private struct StructureReadOnlyRow:
                         .leading
                 )
 
-            Text(value)
-                .textSelection(
-                    .enabled
+            if let dateDestination {
+                TestudoDateLink(
+                    title:
+                        value,
+                    date:
+                        dateDestination
                 )
+            } else {
+                Text(value)
+                    .textSelection(
+                        .enabled
+                    )
+            }
 
             Spacer()
         }
@@ -637,7 +649,9 @@ struct RichThemeDetailView: View {
                                         TestudoTime
                                             .dateTime(
                                                 theme.createdAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        theme.createdAt
                                 )
 
                                 StructureReadOnlyRow(
@@ -647,7 +661,9 @@ struct RichThemeDetailView: View {
                                         TestudoTime
                                             .dateTime(
                                                 theme.updatedAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        theme.updatedAt
                                 )
                             }
                         }
@@ -1231,6 +1247,12 @@ struct RichThemeDetailView: View {
                         )
                     }
                     ?? "None",
+                navigationDestination:
+                    value.map {
+                        .calendarDay(
+                            $0
+                        )
+                    },
                 onEdit: {
                     dateEnabledDraft =
                         value != nil
@@ -2731,7 +2753,9 @@ struct RichStructureEntityDetailView:
                                         TestudoTime
                                             .dateTime(
                                                 entity.createdAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        entity.createdAt
                                 )
 
                                 StructureReadOnlyRow(
@@ -2741,7 +2765,9 @@ struct RichStructureEntityDetailView:
                                         TestudoTime
                                             .dateTime(
                                                 entity.updatedAt
-                                            )
+                                            ),
+                                    dateDestination:
+                                        entity.updatedAt
                                 )
                             }
                         }
@@ -3222,6 +3248,12 @@ struct RichStructureEntityDetailView:
                         )
                     }
                     ?? "None",
+                navigationDestination:
+                    value.map {
+                        .calendarDay(
+                            $0
+                        )
+                    },
                 onEdit: {
                     dateEnabledDraft =
                         value != nil

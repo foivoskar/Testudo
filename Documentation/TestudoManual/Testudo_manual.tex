@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.7}
-\newcommand{\DocumentedTestudoVersion}{0.1.11}
-\newcommand{\DocumentedTestudoBuild}{12}
+\newcommand{\ManualVersion}{1.8}
+\newcommand{\DocumentedTestudoVersion}{0.2.0}
+\newcommand{\DocumentedTestudoBuild}{13}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.1.11. The release introduces deadline-driven Task ordering in the middle column and recursive Sub-task hierarchy, changes Task \menu{Contains} to a newest-first chronological sequence, makes Organization and Group Related Work explicit to the selected entity, improves structural Notes editing, and replaces the generic Work relationship Entity dropdown with Testudo's native People, Groups and Organizations selector. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
+This edition is aligned with Testudo 0.2.0. The release introduces the Day workspace as a first-class Calendar destination, adds deterministic hierarchy-aware Planned Work, separates real Work-domain Day History from the application audit log, makes read-only dates navigable to their corresponding Day, and integrates Day pages with browser-style Back and Forward navigation. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
 }
 
 \manualwarning{Early-release software}{
@@ -926,6 +926,51 @@ The Calendar combines several scheduling concepts:
 \end{itemize}
 
 The month view includes navigation for previous/next month and \button{Today}. Day summaries distinguish Events, Deadlines and Reminders.
+
+Selecting a date opens that date as a first-class Day workspace in the right-hand detail pane.
+
+\section{Day workspace}
+
+The Day workspace combines several views of the selected date:
+
+\begin{itemize}
+    \item \textbf{Schedule} --- Calendar Events on that date;
+    \item \textbf{Planned Work} --- automatically selected actionable Tasks;
+    \item \textbf{Due \& Reminders} --- Task deadlines and Note reminders belonging to the date;
+    \item \textbf{Day History} --- real Work-domain events that happened on the date;
+    \item \textbf{App Log} --- the recorded Testudo Work audit for the date.
+\end{itemize}
+
+Day pages participate in the same browser-style Back and Forward history as Tasks, Calendar Events, Themes and professional entities.
+
+\subsection{Planned Work}
+
+Planned Work is deterministic and derived from the current Work state. It considers Task hierarchy, deadlines, In Progress work and relationships to Calendar Events on the selected day.
+
+Today may surface overdue work because it requires current attention. Future days do not repeatedly inherit Tasks whose deadlines have already passed merely because those Tasks remain To Do or In Progress.
+
+Past dates do not reconstruct a fictional historical plan when no persisted plan snapshot exists.
+
+\subsection{Day History}
+
+Day History is a reverse-chronological record of real Work events, with the newest event first.
+
+It can include Tasks created as To Do, Tasks entering In Progress with their Started time, Completed and Discontinued Tasks with their lifecycle time, Activities by Occurred time, and Notes by creation time.
+
+Discontinued entries preserve the recorded reason and outcome where available.
+
+\subsection{App Log}
+
+App Log remains separate from Day History because it describes actions recorded by Testudo rather than the real-world Work chronology.
+
+It is collapsed by default and can be expanded or collapsed with its disclosure control. When expanded, the newest recorded actions appear first.
+
+\section{Date navigation}
+
+Read-only dates and date-times throughout Testudo can open the corresponding Day page where appropriate.
+
+Date navigation participates in normal detail-pane Back and Forward history. Editing controls such as date selectors remain editing controls rather than navigation links.
+
 
 Toolbar actions include:
 \begin{itemize}

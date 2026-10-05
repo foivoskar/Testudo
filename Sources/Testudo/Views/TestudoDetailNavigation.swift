@@ -21,6 +21,7 @@ enum TestudoDetailDestination:
     case group(UUID)
     case person(UUID)
     case calendarEvent(UUID)
+    case calendarDay(Date)
 }
 
 
@@ -81,6 +82,18 @@ struct TestudoDetailNavigationAction:
         handler(
             .calendarEvent(
                 event.id
+            )
+        )
+    }
+
+
+    func open(
+        _ date:
+            Date
+    ) {
+        handler(
+            .calendarDay(
+                date
             )
         )
     }
@@ -357,6 +370,59 @@ struct TestudoEntityLinks:
         }
         .font(
             font
+        )
+    }
+}
+
+
+
+// ============================================================
+// MARK: - Shared clickable dates
+// ============================================================
+
+struct TestudoDateLink:
+    View
+{
+    @Environment(
+        \.testudoDetailNavigation
+    )
+    private var detailNavigation
+
+    let title:
+        String
+
+    let date:
+        Date
+
+    var color:
+        Color = .primary
+
+    var body:
+        some View
+    {
+        Button {
+            detailNavigation(
+                .calendarDay(
+                    date
+                )
+            )
+
+        } label: {
+            Text(
+                title
+            )
+            .foregroundStyle(
+                color
+            )
+        }
+        .buttonStyle(
+            .plain
+        )
+        .contentShape(
+            Rectangle()
+        )
+        .help(
+            "Open day"
         )
     }
 }

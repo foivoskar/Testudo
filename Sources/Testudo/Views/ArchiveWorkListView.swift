@@ -300,14 +300,36 @@ struct ArchiveWorkListView:
                                 entry.item
                         )
                     {
-                        Text(context)
+                        if
+                            let date =
+                                contextDate(
+                                    for:
+                                        entry.item
+                                )
+                        {
+                            TestudoDateLink(
+                                title:
+                                    context,
+                                date:
+                                    date,
+                                color:
+                                    .secondary
+                            )
                             .font(
                                 .caption2
                             )
-                            .foregroundStyle(
-                                .secondary
-                            )
                             .lineLimit(1)
+
+                        } else {
+                            Text(context)
+                                .font(
+                                    .caption2
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .lineLimit(1)
+                        }
                     }
                 }
 
@@ -464,6 +486,46 @@ struct ArchiveWorkListView:
         case .activity:
             return "waveform.path.ecg"
         }
+    }
+
+
+    private func contextDate(
+        for item:
+            WorkItem
+    ) -> Date? {
+        if
+            item.kind == .task,
+            let closedAt =
+                item.closedAt
+        {
+            return closedAt
+        }
+
+        if
+            item.kind == .task,
+            let deadline =
+                item.deadlineAt
+        {
+            return deadline
+        }
+
+        if
+            item.kind == .note,
+            let reminder =
+                item.reminderAt
+        {
+            return reminder
+        }
+
+        if
+            item.kind == .activity,
+            let occurred =
+                item.loggedAt
+        {
+            return occurred
+        }
+
+        return nil
     }
 
 

@@ -358,6 +358,10 @@ private enum DetailNavigationEntry:
         id: UUID
     )
 
+    case calendarDay(
+        date: Date
+    )
+
     case workCreation(
         request: WorkCreationRequest
     )
@@ -405,6 +409,13 @@ struct ContentView: View {
     @State
     private var selectedCalendarEventID:
         UUID?
+
+    @State
+    private var selectedCalendarDate =
+        Calendar.autoupdatingCurrent
+            .startOfDay(
+                for: Date()
+            )
 
     @State
     private var calendarEventCreationRequest:
@@ -615,6 +626,8 @@ struct ContentView: View {
                     $selectedWorkItemID,
                 selectedCalendarEventID:
                     $selectedCalendarEventID,
+                selectedCalendarDate:
+                    $selectedCalendarDate,
                 calendarEventCreationRequest:
                     $calendarEventCreationRequest,
                 workCreationRequest:
@@ -665,6 +678,8 @@ struct ContentView: View {
                         $selectedWorkItemID,
                     selectedCalendarEventID:
                         $selectedCalendarEventID,
+                    selectedCalendarDate:
+                        $selectedCalendarDate,
                     selectedPersonID:
                         $selectedPersonID,
                     calendarEventCreationRequest:
@@ -748,6 +763,16 @@ struct ContentView: View {
             )
         }
         .navigationSplitViewStyle(.balanced)
+        .environment(
+            \.testudoDetailNavigation,
+            TestudoDetailNavigationAction {
+                destination in
+
+                navigateFromDetail(
+                    destination
+                )
+            }
+        )
         .onChange(
             of: selectedWorkItemID
         ) {
@@ -785,6 +810,14 @@ struct ContentView: View {
                 selection =
                     .calendar
             }
+
+            registerVisibleDetailNavigation()
+        }
+        .onChange(
+            of: selectedCalendarDate
+        ) {
+            _,
+            _ in
 
             registerVisibleDetailNavigation()
         }
@@ -1241,6 +1274,14 @@ struct ContentView: View {
                 )
         }
 
+        if section == .calendar {
+            return
+                .calendarDay(
+                    date:
+                        selectedCalendarDate
+                )
+        }
+
         return nil
     }
 
@@ -1601,6 +1642,18 @@ struct ContentView: View {
                     id:
                         id
                 )
+
+        case .calendarDay(
+            let date
+        ):
+            entry =
+                .calendarDay(
+                    date:
+                        Calendar.autoupdatingCurrent
+                            .startOfDay(
+                                for: date
+                            )
+                )
         }
 
 
@@ -1680,6 +1733,33 @@ struct ContentView: View {
 
             selectedCalendarEventID =
                 id
+
+            selection =
+                .calendar
+
+
+        case
+            .calendarDay(
+                let date
+            ):
+
+            workCreationRequest =
+                nil
+
+            calendarEventCreationRequest =
+                nil
+
+            selectedWorkItemID =
+                nil
+
+            selectedCalendarEventID =
+                nil
+
+            selectedCalendarDate =
+                Calendar.autoupdatingCurrent
+                    .startOfDay(
+                        for: date
+                    )
 
             selection =
                 .calendar
@@ -1864,6 +1944,9 @@ private struct SectionContentView: View {
     var selectedCalendarEventID: UUID?
 
     @Binding
+    var selectedCalendarDate: Date
+
+    @Binding
     var calendarEventCreationRequest:
         CalendarEventCreationRequest?
 
@@ -2007,7 +2090,9 @@ private struct SectionContentView: View {
                 selectedCalendarEventID:
                     $selectedCalendarEventID,
                 calendarEventCreationRequest:
-                    $calendarEventCreationRequest
+                    $calendarEventCreationRequest,
+                selectedDate:
+                    $selectedCalendarDate
             )
 
         case .allTasks:
@@ -2862,23 +2947,25 @@ private struct WorkItemNodeView: View {
                         if let deadline =
                             item.deadlineAt
                         {
-                            Text(
-                                "Deadline: \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))"
+                            TestudoDateLink(
+                                title:
+                                    "Deadline: \(TestudoTime.displayDateTime(deadline, sourceTimeZoneID: item.deadlineTimeZoneID))",
+                                date:
+                                    deadline,
+                                color:
+                                    isSelectedWorkItem
+                                    ? Color.white.opacity(0.85)
+                                    : (
+                                        deadline < Date()
+                                        && (
+                                            status == .todo
+                                            || status == .inProgress
+                                        )
+                                        ? Color.red
+                                        : Color.secondary
+                                    )
                             )
                             .font(.caption2)
-                            .foregroundStyle(
-                                isSelectedWorkItem
-                                ? Color.white.opacity(0.85)
-                                : (
-                                    deadline < Date()
-                                    && (
-                                        status == .todo
-                                        || status == .inProgress
-                                    )
-                                    ? Color.red
-                                    : Color.secondary
-                                )
-                            )
                         }
                     } else {
                         Text(
@@ -3292,8 +3379,13 @@ private struct WorkSummaryRow: View {
                     if let deadline =
                         item.deadlineAt
                     {
-                        Text(
-                            "Due \(deadline.formatted(date: .abbreviated, time: .omitted))"
+                        TestudoDateLink(
+                            title:
+                                "Due \(deadline.formatted(date: .abbreviated, time: .omitted))",
+                            date:
+                                deadline,
+                            color:
+                                .secondary
                         )
                     }
                 }
@@ -3432,19 +3524,21 @@ private struct TimelineView: View {
 
                     Spacer()
 
-                    Text(
-                        event.timestamp,
-                        format:
-                            .dateTime
-                            .day()
-                            .month()
-                            .hour()
-                            .minute()
+                    TestudoDateLink(
+                        title:
+                            event.timestamp.formatted(
+                                .dateTime
+                                    .day()
+                                    .month()
+                                    .hour()
+                                    .minute()
+                            ),
+                        date:
+                            event.timestamp,
+                        color:
+                            .secondary
                     )
                     .font(.caption)
-                    .foregroundStyle(
-                        .tertiary
-                    )
                 }
                 .padding(
                     .vertical,

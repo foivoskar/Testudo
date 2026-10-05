@@ -15,8 +15,8 @@ struct WorkCalendarView: View {
     var calendarEventCreationRequest:
         CalendarEventCreationRequest?
 
-    @State
-    private var selectedDate = Date()
+    @Binding
+    var selectedDate: Date
 
     @State
     private var visibleMonth = Date()
@@ -114,15 +114,26 @@ struct WorkCalendarView: View {
             TestudoStyle.contentBackground
         )
         .onAppear {
-            selectedDate =
-                calendar.startOfDay(
-                    for: Date()
-                )
-
             visibleMonth =
                 startOfMonth(
-                    Date()
+                    selectedDate
                 )
+        }
+        .onChange(
+            of: selectedDate
+        ) {
+            _,
+            newValue in
+
+            let month =
+                startOfMonth(
+                    newValue
+                )
+
+            if month != visibleMonth {
+                visibleMonth =
+                    month
+            }
         }
         .sheet(
             isPresented:
@@ -470,6 +481,15 @@ struct WorkCalendarView: View {
                 calendar.startOfDay(
                     for: date
                 )
+
+            calendarEventCreationRequest =
+                nil
+
+            selectedCalendarEventID =
+                nil
+
+            selectedWorkItemID =
+                nil
         } label: {
             ZStack {
                 RoundedRectangle(
@@ -494,7 +514,9 @@ struct WorkCalendarView: View {
                 VStack(
                     spacing: 4
                 ) {
-                    HStack {
+                    HStack(
+                        spacing: 3
+                    ) {
                         Text(
                             "\(calendar.component(.day, from: date))"
                         )
@@ -508,8 +530,20 @@ struct WorkCalendarView: View {
                                     : .regular
                             )
                         )
+                        .lineLimit(1)
+                        .fixedSize(
+                            horizontal: true,
+                            vertical: false
+                        )
+                        .frame(
+                            minWidth: 18,
+                            alignment: .leading
+                        )
+                        .layoutPriority(1)
 
-                        Spacer()
+                        Spacer(
+                            minLength: 2
+                        )
 
                         if summary.total > 0 {
                             Text(
@@ -521,6 +555,11 @@ struct WorkCalendarView: View {
                                     weight:
                                         .medium
                                 )
+                            )
+                            .lineLimit(1)
+                            .fixedSize(
+                                horizontal: true,
+                                vertical: false
                             )
                             .opacity(
                                 0.8
@@ -1141,6 +1180,15 @@ struct WorkCalendarView: View {
 
         selectedDate =
             today
+
+        calendarEventCreationRequest =
+            nil
+
+        selectedCalendarEventID =
+            nil
+
+        selectedWorkItemID =
+            nil
 
         visibleMonth =
             startOfMonth(
