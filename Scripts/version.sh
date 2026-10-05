@@ -5,5 +5,5 @@
 # This is the single source of truth for the default application
 # version and build number used by the build scripts.
 
-TESTUDO_VERSION="0.1.10"
-TESTUDO_BUILD_NUMBER="11"
+TESTUDO_VERSION="0.1.11"
+TESTUDO_BUILD_NUMBER="12"

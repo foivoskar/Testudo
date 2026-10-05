@@ -2805,6 +2805,113 @@ final class TestudoStore: ObservableObject {
         }
     }
 
+    // --------------------------------------------------------
+    // Middle-column hierarchy ordering
+    //
+    // A Task carrying a deadline is promoted ahead of items
+    // without a Task deadline, with the nearest deadline first.
+    //
+    // When neither item has a Task deadline, preserve the
+    // hierarchy's historical Created ordering.
+    // --------------------------------------------------------
+
+    private func hierarchyWorkItemPrecedes(
+        _ lhs: WorkItem,
+        _ rhs: WorkItem
+    ) -> Bool {
+        if
+            lhs.kind == .task,
+            rhs.kind != .task
+        {
+            return true
+        }
+
+        if
+            lhs.kind != .task,
+            rhs.kind == .task
+        {
+            return false
+        }
+
+        if
+            lhs.kind == .task,
+            rhs.kind == .task
+        {
+            switch (
+                lhs.deadlineAt,
+                rhs.deadlineAt
+            ) {
+            case let (left?, right?):
+                if left != right {
+                    return left < right
+                }
+
+            case (_?, nil):
+                return true
+
+            case (nil, _?):
+                return false
+
+            case (nil, nil):
+                break
+            }
+        }
+
+        if lhs.createdAt != rhs.createdAt {
+            return
+                lhs.createdAt
+                < rhs.createdAt
+        }
+
+        return
+            lhs.id.uuidString
+            < rhs.id.uuidString
+    }
+
+
+    // --------------------------------------------------------
+    // Flat Task-list ordering
+    //
+    // Dedicated status lists previously used Updated descending
+    // order. Keep that behaviour as the fallback when no usable
+    // deadline distinguishes the Tasks.
+    // --------------------------------------------------------
+
+    private func taskListPrecedes(
+        _ lhs: WorkItem,
+        _ rhs: WorkItem
+    ) -> Bool {
+        switch (
+            lhs.deadlineAt,
+            rhs.deadlineAt
+        ) {
+        case let (left?, right?):
+            if left != right {
+                return left < right
+            }
+
+        case (_?, nil):
+            return true
+
+        case (nil, _?):
+            return false
+
+        case (nil, nil):
+            break
+        }
+
+        if lhs.updatedAt != rhs.updatedAt {
+            return
+                lhs.updatedAt
+                > rhs.updatedAt
+        }
+
+        return
+            lhs.id.uuidString
+            < rhs.id.uuidString
+    }
+
+
     func rootWorkItems(
         for themeID: UUID
     ) -> [WorkItem] {
@@ -2814,9 +2921,13 @@ final class TestudoStore: ObservableObject {
                 && $0.parentWorkItemID == nil
             }
             .sorted {
-                $0.createdAt < $1.createdAt
+                hierarchyWorkItemPrecedes(
+                    $0,
+                    $1
+                )
             }
     }
+
 
     func childWorkItems(
         of parentID: UUID
@@ -2827,7 +2938,10 @@ final class TestudoStore: ObservableObject {
                 == parentID
             }
             .sorted {
-                $0.createdAt < $1.createdAt
+                hierarchyWorkItemPrecedes(
+                    $0,
+                    $1
+                )
             }
     }
 
@@ -3690,7 +3804,10 @@ final class TestudoStore: ObservableObject {
                 && $0.status == status
             }
             .sorted {
-                $0.updatedAt > $1.updatedAt
+                taskListPrecedes(
+                    $0,
+                    $1
+                )
             }
     }
 

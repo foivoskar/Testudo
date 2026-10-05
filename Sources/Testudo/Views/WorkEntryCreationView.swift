@@ -1235,37 +1235,44 @@ struct WorkEntryEditorView:
                                     170
                             )
 
-                            Picker(
-                                "Entity",
-                                selection:
+                            EntitySelectionButton(
+                                title:
+                                    "Related Entity",
+                                selectedIDs:
+                                    relationship
+                                        .entityID
+                                        .map {
+                                            Set(
+                                                [
+                                                    $0
+                                                ]
+                                            )
+                                        }
+                                    ?? [],
+                                tabs:
+                                    [
+                                        .people,
+                                        .groups,
+                                        .organizations
+                                    ],
+                                maximumSelectionCount:
+                                    1,
+                                placeholder:
+                                    "Choose person, group or organization…",
+                                selectorMessage:
+                                    "Choose the Person, Group or Organization for this relationship.",
+                                onSave: {
+                                    selection in
+
                                     $relationship
                                         .entityID
-                            ) {
-                                Text(
-                                    "Choose…"
-                                )
-                                .tag(
-                                    Optional<UUID>
-                                        .none
-                                )
+                                        .wrappedValue =
+                                        selection
+                                            .first
 
-                                ForEach(
-                                    sortedEntities
-                                ) {
-                                    entity in
-
-                                    Text(
-                                        entityLabel(
-                                            entity
-                                        )
-                                    )
-                                    .tag(
-                                        Optional(
-                                            entity.id
-                                        )
-                                    )
+                                    return nil
                                 }
-                            }
+                            )
                             .frame(
                                 maxWidth:
                                     320

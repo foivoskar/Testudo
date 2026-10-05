@@ -279,8 +279,37 @@ struct TodayDashboardView: View {
                 )
             }
             .sorted {
-                $0.updatedAt
-                    > $1.updatedAt
+                lhs,
+                rhs in
+
+                switch (
+                    lhs.deadlineAt,
+                    rhs.deadlineAt
+                ) {
+                case let (left?, right?):
+                    if left != right {
+                        return left < right
+                    }
+
+                case (_?, nil):
+                    return true
+
+                case (nil, _?):
+                    return false
+
+                case (nil, nil):
+                    break
+                }
+
+                if lhs.updatedAt != rhs.updatedAt {
+                    return
+                        lhs.updatedAt
+                        > rhs.updatedAt
+                }
+
+                return
+                    lhs.id.uuidString
+                    < rhs.id.uuidString
             }
     }
 
@@ -834,6 +863,41 @@ struct WorkListView: View {
     }
 
 
+    private func taskDeadlinePrecedes(
+        _ lhs: WorkItem,
+        _ rhs: WorkItem
+    ) -> Bool {
+        switch (
+            lhs.deadlineAt,
+            rhs.deadlineAt
+        ) {
+        case let (left?, right?):
+            if left != right {
+                return left < right
+            }
+
+        case (_?, nil):
+            return true
+
+        case (nil, _?):
+            return false
+
+        case (nil, nil):
+            break
+        }
+
+        if lhs.updatedAt != rhs.updatedAt {
+            return
+                lhs.updatedAt
+                > rhs.updatedAt
+        }
+
+        return
+            lhs.id.uuidString
+            < rhs.id.uuidString
+    }
+
+
     private var rootTasks:
         [WorkItem]
     {
@@ -866,8 +930,10 @@ struct WorkListView: View {
                     != .task
             }
             .sorted {
-                $0.updatedAt
-                    > $1.updatedAt
+                taskDeadlinePrecedes(
+                    $0,
+                    $1
+                )
             }
     }
 
@@ -945,8 +1011,10 @@ struct WorkListView: View {
                     == parentID
             }
             .sorted {
-                $0.updatedAt
-                    > $1.updatedAt
+                taskDeadlinePrecedes(
+                    $0,
+                    $1
+                )
             }
     }
 
@@ -984,8 +1052,10 @@ struct WorkListView: View {
                     $0.kind == .task
                 }
                 .sorted {
-                    $0.updatedAt
-                        > $1.updatedAt
+                    taskDeadlinePrecedes(
+                        $0,
+                        $1
+                    )
                 }
 
         case .todo:
@@ -1026,8 +1096,10 @@ struct WorkListView: View {
                 && $0.status == status
             }
             .sorted {
-                $0.updatedAt
-                    > $1.updatedAt
+                taskDeadlinePrecedes(
+                    $0,
+                    $1
+                )
             }
     }
 
@@ -5689,8 +5761,46 @@ struct WorkItemDetailView: View {
                     == parentID
             }
             .sorted {
-                $0.createdAt
-                    < $1.createdAt
+                lhs,
+                rhs in
+
+                let lhsChronology =
+                    lhs.kind == .activity
+                    ? (
+                        lhs.loggedAt
+                        ?? lhs.createdAt
+                    )
+                    : lhs.createdAt
+
+                let rhsChronology =
+                    rhs.kind == .activity
+                    ? (
+                        rhs.loggedAt
+                        ?? rhs.createdAt
+                    )
+                    : rhs.createdAt
+
+                if
+                    lhsChronology
+                    != rhsChronology
+                {
+                    return
+                        lhsChronology
+                        > rhsChronology
+                }
+
+                if
+                    lhs.createdAt
+                    != rhs.createdAt
+                {
+                    return
+                        lhs.createdAt
+                        > rhs.createdAt
+                }
+
+                return
+                    lhs.id.uuidString
+                    < rhs.id.uuidString
             }
     }
 

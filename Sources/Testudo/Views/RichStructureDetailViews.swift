@@ -2071,148 +2071,51 @@ private struct EntityRelatedWorkDetail<
 
 
     /*
-     Related Work includes every WorkItem kind:
+     Organization and Group Related Work is intentionally
+     explicit.
 
-       • Task
-       • Note
-       • Activity/Event
+     A Work item appears here only when it has a relationship
+     whose entityID is this exact Organization or Group.
 
-     A parent Entity aggregates Related Work from its complete
-     descendant subtree.
+     We deliberately do not aggregate Work through:
+       • affiliated People;
+       • child Groups or Organizations;
+       • other structurally related entities;
+       • ancestor Task relationships that were never copied
+         onto the Work item itself.
 
-     Example:
-
-       Organization
-         └─ Group
-             └─ Person
-
-     Work related to the Group or Person is also visible in
-     the Organization's Related Work pane.
-
-     Work relationship inheritance through Parent Tasks remains
-     unchanged: inheritedByChildren is still respected.
+     If an inherited relationship has been materialized on a
+     child Work item, it is a real relationship on that child
+     and therefore remains visible.
     */
     private var relatedWork:
         [WorkItem]
     {
-        let entityIDs =
-            relatedEntityIDs
+        let directlyRelatedWorkIDs =
+            Set(
+                store.data
+                    .workEntityRelationships
+                    .filter {
+                        $0.entityID
+                            == entityID
+                    }
+                    .map(
+                        \.workItemID
+                    )
+            )
 
         return store.data
             .workItems
             .filter {
-                workItemIsRelated(
-                    $0,
-                    toAny:
-                        entityIDs
-                )
+                directlyRelatedWorkIDs
+                    .contains(
+                        $0.id
+                    )
             }
             .sorted {
                 $0.updatedAt
                     > $1.updatedAt
             }
-    }
-
-
-    private var relatedEntityIDs:
-        Set<UUID>
-    {
-        var ids =
-            Set(
-                store
-                    .entityDescendantIDs(
-                        of:
-                            entityID
-                    )
-            )
-
-        ids.insert(
-            entityID
-        )
-
-        return ids
-    }
-
-
-    private func workItemIsRelated(
-        _ item:
-            WorkItem,
-        toAny entityIDs:
-            Set<UUID>
-    ) -> Bool {
-
-        if
-            store.data
-                .workEntityRelationships
-                .contains(
-                    where: {
-                        $0.workItemID
-                            == item.id
-                        &&
-                        entityIDs
-                            .contains(
-                                $0.entityID
-                            )
-                    }
-                )
-        {
-            return true
-        }
-
-
-        var currentParent =
-            item.parentWorkItemID
-
-        var visited =
-            Set<UUID>()
-
-
-        while
-            let parentID =
-                currentParent
-        {
-            guard
-                visited
-                    .insert(
-                        parentID
-                    )
-                    .inserted
-            else {
-                break
-            }
-
-
-            if
-                store.data
-                    .workEntityRelationships
-                    .contains(
-                        where: {
-                            $0.workItemID
-                                == parentID
-                            &&
-                            entityIDs
-                                .contains(
-                                    $0.entityID
-                                )
-                            &&
-                            $0.inheritedByChildren
-                        }
-                    )
-            {
-                return true
-            }
-
-
-            currentParent =
-                store.workItem(
-                    id:
-                        parentID
-                )?
-                .parentWorkItemID
-        }
-
-
-        return false
     }
 }
 
@@ -4006,30 +3909,87 @@ struct ThemeStructureEditView:
         text:
             Binding<String>
     ) -> some View {
-        LabeledContent(
-            label
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
         ) {
+            Text(
+                label
+            )
+            .font(
+                .caption
+            )
+            .fontWeight(
+                .medium
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
             TextEditor(
                 text:
                     text
             )
+            .font(
+                .body
+            )
+            .foregroundColor(
+                .black
+            )
+            .scrollContentBackground(
+                .hidden
+            )
+            .padding(
+                .horizontal,
+                10
+            )
+            .padding(
+                .vertical,
+                8
+            )
             .frame(
+                maxWidth:
+                    .infinity,
                 minHeight:
-                    110
+                    170,
+                alignment:
+                    .topLeading
+            )
+            .background(
+                Color.white,
+                in:
+                    RoundedRectangle(
+                        cornerRadius:
+                            10,
+                        style:
+                            .continuous
+                    )
             )
             .overlay {
                 RoundedRectangle(
                     cornerRadius:
-                        6
+                        10,
+                    style:
+                        .continuous
                 )
                 .stroke(
-                    Color.secondary
+                    Color.black
                         .opacity(
-                            0.2
-                        )
+                            0.14
+                        ),
+                    lineWidth:
+                        1
                 )
             }
         }
+        .frame(
+            maxWidth:
+                .infinity,
+            alignment:
+                .leading
+        )
     }
 
 
@@ -4884,30 +4844,87 @@ struct StructureEntityEditView:
         text:
             Binding<String>
     ) -> some View {
-        LabeledContent(
-            label
+        VStack(
+            alignment:
+                .leading,
+            spacing:
+                8
         ) {
+            Text(
+                label
+            )
+            .font(
+                .caption
+            )
+            .fontWeight(
+                .medium
+            )
+            .foregroundStyle(
+                .secondary
+            )
+
             TextEditor(
                 text:
                     text
             )
+            .font(
+                .body
+            )
+            .foregroundColor(
+                .black
+            )
+            .scrollContentBackground(
+                .hidden
+            )
+            .padding(
+                .horizontal,
+                10
+            )
+            .padding(
+                .vertical,
+                8
+            )
             .frame(
+                maxWidth:
+                    .infinity,
                 minHeight:
-                    110
+                    170,
+                alignment:
+                    .topLeading
+            )
+            .background(
+                Color.white,
+                in:
+                    RoundedRectangle(
+                        cornerRadius:
+                            10,
+                        style:
+                            .continuous
+                    )
             )
             .overlay {
                 RoundedRectangle(
                     cornerRadius:
-                        6
+                        10,
+                    style:
+                        .continuous
                 )
                 .stroke(
-                    Color.secondary
+                    Color.black
                         .opacity(
-                            0.2
-                        )
+                            0.14
+                        ),
+                    lineWidth:
+                        1
                 )
             }
         }
+        .frame(
+            maxWidth:
+                .infinity,
+            alignment:
+                .leading
+        )
     }
 
 

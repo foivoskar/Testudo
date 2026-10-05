@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.6}
-\newcommand{\DocumentedTestudoVersion}{0.1.10}
-\newcommand{\DocumentedTestudoBuild}{11}
+\newcommand{\ManualVersion}{1.7}
+\newcommand{\DocumentedTestudoVersion}{0.1.11}
+\newcommand{\DocumentedTestudoBuild}{12}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.1.10. The release expands full-pane creation and editing for People, Themes, Organizations and Groups; extends Parent Task relationship inheritance to child Notes and Activities as well as Sub-tasks; adds explicit historical Completed date, time and time-zone editing for Tasks; and introduces native Markdown rendering for Work descriptions and structural Notes. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
+This edition is aligned with Testudo 0.1.11. The release introduces deadline-driven Task ordering in the middle column and recursive Sub-task hierarchy, changes Task \menu{Contains} to a newest-first chronological sequence, makes Organization and Group Related Work explicit to the selected entity, improves structural Notes editing, and replaces the generic Work relationship Entity dropdown with Testudo's native People, Groups and Organizations selector. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
 }
 
 \manualwarning{Early-release software}{
@@ -196,7 +196,7 @@ git pull --ff-only
 Replace the previous copy in \filepath{/Applications} with the newly built application.
 
 \manualtip{Try it: verify the installed version}{
-Build and install Testudo, then confirm that the application identifies itself as 0.1.7 build 8. If you maintain a development checkout, also inspect \filepath{Scripts/version.sh} and confirm that it contains the same version and build number.
+Build and install Testudo, then confirm that the application identifies itself as \DocumentedTestudoVersion\ build \DocumentedTestudoBuild. If you maintain a development checkout, also inspect \filepath{Scripts/version.sh} and confirm that it contains the same version and build number.
 }
 
 % ============================================================
@@ -386,7 +386,7 @@ In a disposable Environment, create or inspect a second membership. Confirm that
 
 \section{Sidebar}
 
-The left sidebar is the global navigation layer. In 0.1.7 it contains:
+The left sidebar is the global navigation layer. The current sidebar contains:
 \begin{itemize}
     \item New Entry;
     \item Today;
@@ -407,6 +407,8 @@ The left sidebar is the global navigation layer. In 0.1.7 it contains:
 \section{Middle column}
 
 The middle column shows the collection selected in the sidebar: a Task list, Archive tree, calendar, Theme list, entity list or other contextual collection.
+
+Task-oriented middle-column views prioritise Tasks with deadlines. Earlier deadlines appear first, followed by Tasks without deadlines. In \menu{All Tasks}, the same rule applies recursively among Sub-task siblings. Active \menu{Today} work uses the same deadline priority where Task ordering is relevant.
 
 \section{Detail pane}
 
@@ -478,6 +480,8 @@ Inside a Task detail page, the \menu{Contains} area can create:
 \end{itemize}
 
 Activities created this way are still Work-log objects, not Calendar Events.
+
+The \menu{Contains} list is shown newest first. Activities are positioned by their \term{Occurred} time when one is available; Tasks and Notes use their Created time. Deadline does not control this sequence because \menu{Contains} represents chronology rather than priority.
 
 \manualtip{Try it: build a small hierarchy}{
 Create a top-level Task called \emph{Prepare field campaign}. Add a sub-task called \emph{Check instruments}, a Note with background information and an Activity recording a completed phone call. Then add a deeper sub-task under \emph{Check instruments}. Navigate up and down the hierarchy and confirm that each item retains its own detail page.
@@ -749,7 +753,7 @@ Create a Person with a preferred name and ORCID, affiliate the Person with an Or
 
 Organizations model institutional structure such as universities, institutes, departments, companies or observatories. Organizations can themselves be contained in other Organizations.
 
-The editor can expose fields such as full name, short name, website, email, phone, address, city, postal code, country, tags, symbol, dates and notes.
+The editor can expose fields such as full name, short name, website, email, phone, address, city, postal code, country, tags, symbol, dates and notes. Long-form Notes use a larger, clearly bounded writing surface so that editable text is visually distinct from the surrounding form.
 
 \section{Groups}
 
@@ -757,7 +761,7 @@ Groups model teams, laboratories, committees, collaborations and working groups.
 
 \section{Affiliated People}
 
-Organization and Group editors can manage affiliated People. Related Work can aggregate relevant work from descendant structures while suppressing duplicates.
+Organization and Group editors can manage affiliated People. Their Related Work pane is deliberately explicit: a Work item appears only when it has a relationship to the exact selected Organization or Group. Work is not included merely because it belongs to affiliated People, descendant Groups, descendant Organizations or another structural relation. A relationship copied onto a child Work item is stored on that child and therefore continues to count as a direct relationship.
 
 \manualtip{Try it: build a small structure}{
 Create an Organization called \emph{Institute}, a child Organization called \emph{Department}, and a Group called \emph{Lab} inside the Department. Affiliate a Person with the Lab. Relate a Task to the Lab and verify Related Work from the relevant structural views.
@@ -780,6 +784,8 @@ Available roles are:
 \end{itemize}
 
 Each relationship points to a Person, Group or Organization.
+
+In the Work editor, relationship entities are selected through the same native Testudo selector used elsewhere in the application. The selector separates People, Groups and Organizations and supports the existing searchable entity-selection workflow rather than presenting one generic Entity dropdown.
 
 \section{Inheritance by child items}
 

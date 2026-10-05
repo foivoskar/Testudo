@@ -1958,16 +1958,55 @@ struct PersonEditView: View {
                                         \.notes
                                     )
                             )
+                            .font(
+                                .body
+                            )
+                            .foregroundColor(
+                                .black
+                            )
+                            .scrollContentBackground(
+                                .hidden
+                            )
+                            .padding(
+                                .horizontal,
+                                10
+                            )
+                            .padding(
+                                .vertical,
+                                8
+                            )
                             .frame(
-                                minHeight: 120
+                                maxWidth:
+                                    .infinity,
+                                minHeight:
+                                    170,
+                                alignment:
+                                    .topLeading
+                            )
+                            .background(
+                                Color.white,
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            10,
+                                        style:
+                                            .continuous
+                                    )
                             )
                             .overlay {
                                 RoundedRectangle(
-                                    cornerRadius: 6
+                                    cornerRadius:
+                                        10,
+                                    style:
+                                        .continuous
                                 )
                                 .stroke(
-                                    Color.secondary
-                                        .opacity(0.2)
+                                    Color.black
+                                        .opacity(
+                                            0.14
+                                        ),
+                                    lineWidth:
+                                        1
                                 )
                             }
                         }

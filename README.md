@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.1.10 · build 11 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.1.11 · build 12 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,43 +38,48 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.1.10
-Build 11
+Testudo 0.1.11
+Build 12
 ```
 
-### What changed in 0.1.10
+### What changed in 0.1.11
 
-Testudo 0.1.10 expands the full-pane editing workflow, improves historical Task data, extends relationship inheritance, and introduces native Markdown rendering.
+Testudo 0.1.11 refines Task prioritisation, chronological child Work, relationship scope and structural editing.
 
-#### Full-pane creation and editing
+#### Deadline-driven Task ordering
 
-People, Themes, Organizations and Groups now use the right-hand detail pane for creation and whole-object editing instead of popup sheets.
+Task-oriented middle-column views now prioritise Tasks with deadlines.
 
-New Sub-themes use the same full-pane Theme editor, with their Parent Theme preselected.
+Earlier deadlines appear above later deadlines, while Tasks without deadlines follow dated Tasks. The same rule applies recursively to Sub-task siblings.
 
-#### Relationship inheritance
+All Tasks uses this ordering throughout the expandable Task hierarchy, and Today applies it to active In Progress work.
 
-A child Work item now receives inheritable relationships from its immediate Parent Task whether the child is a Sub-task, Note or Activity.
+#### Newest-first Contains chronology
 
-Inherited relationships remain independent editable copies on the child.
+The Contains section of a Task is now a single newest-first chronological sequence.
 
-#### Historical completion dates
+Activities use their Occurred time when available. Tasks and Notes use their Created time. This ordering is intentionally independent from Task deadline ordering.
 
-Completed Tasks can now store an explicit Completed date, time and time zone.
+#### Explicit Related Work for Organizations and Groups
 
-This allows historical Tasks to retain their actual completion time instead of using only the moment they were entered into Testudo.
+Organization and Group Related Work now shows Work related directly to the exact selected entity.
 
-The lifecycle history keeps the canonical completion event aligned with that date while preserving earlier completion cycles.
+It no longer aggregates Work merely because that Work belongs to affiliated People, descendant Groups, descendant Organizations or other structurally related entities.
 
-#### Markdown rendering
+A relationship that has actually been copied onto a child Work item remains a real relationship of that child and therefore remains visible.
 
-Task, Note and Activity descriptions now render Markdown in their detail view while continuing to store the original raw Markdown text.
+#### Clearer structural Notes editors
 
-The renderer supports headings, emphasis, links, block quotes, horizontal rules, ordered and unordered lists, checkboxes, fenced code blocks with copy support, and Markdown tables.
+People, Themes, Organizations and Groups now use a larger, clearly bounded Notes writing surface with improved spacing and contrast.
 
-Person, Theme, Organization and Group Notes use the same Markdown renderer.
+#### Native Work relationship selection
 
-No Work Environment data migration is required because the underlying stored fields remain ordinary strings.
+The Work creation and editing interface now uses Testudo's native People, Groups and Organizations selector for relationship entities instead of a generic Entity dropdown.
+
+The relationship Role remains a compact role selector.
+
+No Work Environment data migration is required for this release.
+
 
 ---
 
@@ -154,7 +159,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.1.10-macOS-arm64.dmg
+dist/Testudo-0.1.11-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -726,11 +731,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.6 documents Testudo 0.1.10 (build 11)**.
+The bundled **Testudo User Manual 1.7 documents Testudo 0.1.11 (build 12)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.1.10 (build 11)** application state.
+This README and the User Manual reflect the current **Testudo 0.1.11 (build 12)** application state.
 
 ---
 
