@@ -856,7 +856,7 @@ struct WorkListView: View {
     private var allTasks:
         [WorkItem]
     {
-        store.data.workItems
+        store.activeWorkItems
             .filter {
                 $0.kind == .task
             }
@@ -1047,7 +1047,7 @@ struct WorkListView: View {
     {
         switch mode {
         case .all:
-            return store.data.workItems
+            return store.activeWorkItems
                 .filter {
                     $0.kind == .task
                 }

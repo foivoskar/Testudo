@@ -63,6 +63,8 @@ struct TestudoApp:
                         .command
                 )
             }
+
+            TestudoFileExportCommands()
         }
 
 

@@ -446,6 +446,10 @@ struct ContentView: View {
         false
 
     @State
+    private var showingDetailExport =
+        false
+
+    @State
     private var detailBackStack:
         [DetailNavigationEntry] = []
 
@@ -773,6 +777,46 @@ struct ContentView: View {
                 )
             }
         )
+        .focusedSceneValue(
+            \.testudoDetailExportAction,
+            detailExportAction
+        )
+        .sheet(
+            isPresented:
+                $showingDetailExport
+        ) {
+            if
+                let target =
+                    currentPDFExportTarget
+            {
+                TestudoDetailExportSheet(
+                    maximumDepth:
+                        currentExportMaximumDepth
+                ) {
+                    expansionDepth in
+
+                    let exportTarget =
+                        target
+
+                    showingDetailExport =
+                        false
+
+                    DispatchQueue
+                        .main
+                        .async {
+                            TestudoSemanticPDFExporter
+                                .export(
+                                    target:
+                                        exportTarget,
+                                    store:
+                                        store,
+                                    expansionDepth:
+                                        expansionDepth
+                                )
+                        }
+                }
+            }
+        }
         .onChange(
             of: selectedWorkItemID
         ) {
@@ -928,6 +972,119 @@ struct ContentView: View {
         }
     }
 
+    private var detailExportAction:
+        TestudoDetailExportAction?
+    {
+        guard
+            currentPDFExportTarget
+                != nil
+        else {
+            return nil
+        }
+
+        return
+            TestudoDetailExportAction {
+                showingDetailExport =
+                    true
+            }
+    }
+
+
+    private var currentPDFExportTarget:
+        TestudoPDFExportTarget?
+    {
+        guard
+            let entry =
+                visibleDetailNavigationEntry
+        else {
+            return nil
+        }
+
+        switch entry {
+        case
+            .work(
+                _,
+                let id
+            ):
+            return
+                .work(
+                    id
+                )
+
+        case
+            .theme(
+                let id
+            ):
+            return
+                .theme(
+                    id
+                )
+
+        case
+            .organization(
+                let id
+            ):
+            return
+                .organization(
+                    id
+                )
+
+        case
+            .group(
+                let id
+            ):
+            return
+                .group(
+                    id
+                )
+
+        case
+            .person(
+                let id
+            ):
+            return
+                .person(
+                    id
+                )
+
+        case
+            .calendarEvent(
+                let id
+            ):
+            return
+                .calendarEvent(
+                    id
+                )
+
+        case
+            .calendarDay(
+                let date
+            ):
+            return
+                .day(
+                    date
+                )
+
+        case .workCreation,
+             .calendarEventCreation:
+            return nil
+        }
+    }
+
+
+    private var currentExportMaximumDepth:
+        Int
+    {
+        TestudoSemanticPDFExporter
+            .maximumDepth(
+                for:
+                    currentPDFExportTarget,
+                store:
+                    store
+            )
+    }
+
+
     private var middleColumnTopPadding:
         CGFloat
     {
@@ -1018,6 +1175,14 @@ struct ContentView: View {
         )
         .tag(
             item
+        )
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded {
+                    if item == .calendar {
+                        presentSelectedCalendarDay()
+                    }
+                }
         )
         .padding(
             .vertical,
@@ -1373,6 +1538,24 @@ struct ContentView: View {
         registerDetailNavigation(
             entry
         )
+    }
+
+
+    private func presentSelectedCalendarDay() {
+        workCreationRequest =
+            nil
+
+        calendarEventCreationRequest =
+            nil
+
+        selectedWorkItemID =
+            nil
+
+        selectedCalendarEventID =
+            nil
+
+        selection =
+            .calendar
     }
 
 

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.2.1 · build 14 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.2.2 · build 15 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -38,27 +38,39 @@ The application is local-first. It does not require a Testudo cloud service.
 The current version is:
 
 ```text
-Testudo 0.2.1
-Build 14
+Testudo 0.2.2
+Build 15
 ```
 
-### What changed in 0.2.1
+### What changed in 0.2.2
 
-Testudo 0.2.1 refines Day History and introduces native printing for the active detail content.
+Testudo 0.2.2 refines active Work navigation and introduces the first Beta version of document export.
 
-#### Day History count
+#### Active All Tasks
 
-The Day History heading now shows a small secondary count representing the number of Work-history entries recorded for the selected day.
+Closed top-level Tasks and the Work contained inside their archived subtree are no longer shown in the active All Tasks collection.
 
-The count is derived from the same Day History collection shown immediately below it, so lifecycle events and other displayed Work-history entries are counted individually.
+Closed Work remains available through Archive and retains its actual workflow status and history.
 
-#### Detail-pane printing
+#### Calendar detail destination
 
-Press Command-P or choose Print… to open the native macOS Print dialog for the current right-hand detail content.
+Choosing Calendar now presents the currently selected Day in the right-hand detail pane.
 
-Scrollable detail views are captured across their complete length and automatically paginated across as many printed pages as required rather than being limited to the currently visible viewport.
+The initial selected date is Today. When another date has been selected, Testudo preserves that date when returning to the Calendar rather than unnecessarily resetting the Calendar workflow.
 
-Printed detail content uses a 90 percent scale while retaining the normal system print-margin behaviour.
+#### Export — Beta
+
+File → Export… introduces an early Beta document-export workflow.
+
+The current exporter produces PDF documents from semantic Testudo data rather than screenshots of the interface. PDF text is therefore selectable and remains sharp when scaled.
+
+For Tasks, the exporter can optionally include nested Work recursively. When nested Work is enabled, the user can select the expansion depth up to the actual maximum depth of the selected Task subtree.
+
+The exported document currently reproduces important parts of Testudo's detail visual language, including titles, SF Symbols, metadata, Work status, Theme context and structured detail rows.
+
+The detailed application Work Log is intentionally excluded from exported documents.
+
+Export remains a Beta feature. Document layout and visual fidelity do not yet reproduce every element of every Testudo detail pane exactly and will continue to evolve in later releases.
 
 No Work Environment schema migration is required for this release.
 
@@ -140,7 +152,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.2.1-macOS-arm64.dmg
+dist/Testudo-0.2.2-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -730,7 +742,7 @@ The bundled **Testudo User Manual 1.9 documents Testudo 0.2.1 (build 14)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.2.1 (build 14)** application state.
+This README reflects the current **Testudo 0.2.2 (build 15)** application state. The bundled **Testudo User Manual 1.9** currently documents Testudo 0.2.1 (build 14); documentation for the new Beta Export workflow will be expanded in a later manual revision.
 
 ---
 
