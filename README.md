@@ -738,11 +738,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 1.9 documents Testudo 0.2.1 (build 14)**.
+The bundled **Testudo User Manual 2.0 documents Testudo 0.2.2 (build 15)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README reflects the current **Testudo 0.2.2 (build 15)** application state. The bundled **Testudo User Manual 1.9** currently documents Testudo 0.2.1 (build 14); documentation for the new Beta Export workflow will be expanded in a later manual revision.
+This README and the User Manual reflect the current **Testudo 0.2.2 (build 15)** application state.
 
 ---
 

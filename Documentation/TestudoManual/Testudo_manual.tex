@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{1.9}
-\newcommand{\DocumentedTestudoVersion}{0.2.1}
-\newcommand{\DocumentedTestudoBuild}{14}
+\newcommand{\ManualVersion}{2.0}
+\newcommand{\DocumentedTestudoVersion}{0.2.2}
+\newcommand{\DocumentedTestudoBuild}{15}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.2.1. The release adds an entry count to Day History and introduces native Command-P printing of the current right-hand detail content. Long scrollable detail views are captured across their complete length and paginated automatically, with printed content rendered at 90 percent scale. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
+This edition is aligned with Testudo 0.2.2. The release refines active Work navigation so Closed Task trees remain outside \menu{All Tasks}, makes the Calendar sidebar present the currently selected Day in the detail pane, and introduces the first Beta version of semantic PDF export through \menu{File > Export...}. Exported Work can optionally include nested child items to a user-selected depth up to the actual maximum depth of the selected Task subtree. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
 }
 
 \manualwarning{Early-release software}{
@@ -408,7 +408,7 @@ The left sidebar is the global navigation layer. The current sidebar contains:
 
 The middle column shows the collection selected in the sidebar: a Task list, Archive tree, calendar, Theme list, entity list or other contextual collection.
 
-Task-oriented middle-column views prioritise Tasks with deadlines. Earlier deadlines appear first, followed by Tasks without deadlines. In \menu{All Tasks}, the same rule applies recursively among Sub-task siblings. Active \menu{Today} work uses the same deadline priority where Task ordering is relevant.
+Task-oriented middle-column views prioritise Tasks with deadlines. Earlier deadlines appear first, followed by Tasks without deadlines. In \menu{All Tasks}, the same rule applies recursively among Sub-task siblings. \menu{All Tasks} represents active Work only: once a terminal top-level Task is Closed, that Task and its complete descendant tree remain available through Archive but no longer appear in \menu{All Tasks}. Active \menu{Today} work uses the same deadline priority where Task ordering is relevant.
 
 \section{Detail pane}
 
@@ -446,6 +446,38 @@ Printed detail content uses a 90 percent scale. Testudo otherwise retains the no
 
 \manualtip{Try it: print a long detail view}{
 Open a Task or Day whose detail content requires substantial scrolling and press Command-P. Confirm that the native Print dialog opens, that the sidebar and middle column are absent, and that the complete detail content continues across multiple pages rather than stopping at the visible viewport.
+}
+
+\section{Exporting detail content --- Beta}
+
+Choose \menu{File > Export...} while a supported detail destination is open.
+
+The current Export implementation is a Beta feature. Its first output format is PDF.
+
+Unlike detail-pane printing, PDF Export is generated semantically from Testudo data rather than by capturing the visible interface as an image. Text in the exported PDF therefore remains real selectable text and stays sharp when the document is enlarged.
+
+The exporter reproduces important parts of Testudo's detail visual language, including:
+\begin{itemize}
+    \item the main title and object type;
+    \item relevant SF Symbols and status symbols;
+    \item Theme and status context shown below Work titles;
+    \item structured label/value detail rows;
+    \item related and contained Work where applicable;
+    \item lifecycle History fields.
+\end{itemize}
+
+The detailed Work Log is intentionally not included in exported Work documents.
+
+For a Task that contains child Work, Export can optionally include nested items recursively. Enable \button{Include nested items} and choose the desired depth.
+
+Depth 1 includes direct children. Larger values continue through deeper descendants. The maximum selectable value is calculated dynamically from the deepest branch that actually exists beneath the selected Task, so choosing \button{Full depth} includes the complete available subtree.
+
+\manualwarning{Beta export fidelity}{
+Export is functional but its document layout is still under development. It does not yet reproduce every visual detail of every Testudo pane exactly. The semantic structure, typography, symbols and supported metadata will continue to be refined in later releases.
+}
+
+\manualtip{Try it: export nested Work}{
+Open a Task containing at least two levels of child Work. Choose \menu{File > Export...}, enable nested items and select \button{Full depth}. Open the resulting PDF and confirm that the root Task and descendants are included as real selectable text and that no application scrollbars or Work Log section appear in the document.
 }
 
 % ============================================================
@@ -940,7 +972,9 @@ The Calendar combines several scheduling concepts:
 
 The month view includes navigation for previous/next month and \button{Today}. Day summaries distinguish Events, Deadlines and Reminders.
 
-Selecting a date opens that date as a first-class Day workspace in the right-hand detail pane.
+The Calendar has a selected Day at all times. When Calendar is opened for the first time, the selected Day defaults to Today. Selecting another date changes that selection, and returning to Calendar preserves the selected date rather than unnecessarily resetting it to Today.
+
+Selecting Calendar in the sidebar presents the currently selected Day as a first-class Day workspace in the right-hand detail pane.
 
 \section{Day workspace}
 
@@ -1408,7 +1442,7 @@ Create a local Calendar Event, link it to the Task and Theme, and set a location
 Expected result: Calendar distinguishes Event, Reminder and Deadline while still allowing navigation to the related Work.
 
 \manualtip{Verification complete}{
-If all ten steps behave as described, you have exercised the core 0.1.7 data model, Task lifecycle, Archive semantics, three-column navigation, semantic relationships, Today, Calendar and persistence-facing workflows.
+If all ten steps behave as described, you have exercised the current core Testudo Work model, Task lifecycle, Archive semantics, three-column navigation, semantic relationships, Today, Calendar and persistence-facing workflows.
 }
 
 % ============================================================
@@ -1584,9 +1618,13 @@ Use this checklist after installing a new Testudo build:
     \item Archive preserves the actual Completed/Discontinued status.
     \item Reopen returns the subtree to active views.
     \item Back/Forward restores all three columns, including Archive destinations.
+    \item Closed Task trees remain absent from active \menu{All Tasks}.
     \item Day History shows a count matching the entries displayed for the selected day.
     \item Command-P opens native printing for the right-hand detail content and long detail views paginate across multiple pages.
+    \item \menu{File > Export...} creates a Beta semantic PDF from a supported detail destination.
+    \item Nested Task export offers depth values only up to the real maximum depth of the selected subtree.
     \item Today reflects current-day Work lifecycle activity.
+    \item Calendar opens the currently selected Day in the detail pane and initially defaults to Today.
     \item Calendar shows Events, deadlines and reminders.
     \item External calendar events remain read-only except for Testudo relationships.
     \item Person/Theme/Organization/Group Related Work navigation works.
