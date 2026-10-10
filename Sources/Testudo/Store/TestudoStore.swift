@@ -2603,6 +2603,28 @@ final class TestudoStore: ObservableObject {
 
 
     private func save() {
+        if fileURL.lastPathComponent == "EnvironmentData.json" {
+            guard let environmentID = activeEnvironmentID else {
+                print(
+                    "Testudo: Environment save blocked: missing Environment ID."
+                )
+                return
+            }
+
+            do {
+                try EnvironmentSnapshotWritePreflight.verify(
+                    databaseURL: fileURL,
+                    expectedEnvironmentID: environmentID
+                )
+            } catch {
+                print(
+                    "Testudo: Environment save blocked:",
+                    error
+                )
+                return
+            }
+        }
+
         do {
             let encoded =
                 try EnvironmentJSONCodec.encode(data)
