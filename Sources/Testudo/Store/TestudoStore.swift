@@ -42,11 +42,13 @@ final class TestudoStore: ObservableObject {
     let applicationFileURL:
         URL
 
+    @Published
+    private(set)
+    var startupBlockedReason: String? = nil
+
+    private var applicationRegistryIsTrusted: Bool = true
+
     init() {
-
-        TestudoLegacyMigration
-            .migrateIfNeeded()
-
         let fileManager = FileManager.default
 
         let baseDirectory =
@@ -55,237 +57,232 @@ final class TestudoStore: ObservableObject {
                 in: .userDomainMask
             ).first
             ?? fileManager.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support")
+                .appendingPathComponent(
+                    "Library/Application Support"
+                )
 
         let directory =
-            baseDirectory
-                .appendingPathComponent(
-                    "Testudo",
-                    isDirectory: true
-                )
-
-        do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
+            baseDirectory.appendingPathComponent(
+                "Testudo",
+                isDirectory: true
             )
-        } catch {
-            print(
-                "Testudo: could not create storage directory:",
-                error
-            )
-        }
 
-        fileURL =
-            directory
-                .appendingPathComponent("TestudoData.json")
+        fileURL = directory.appendingPathComponent(
+            "TestudoData.json"
+        )
 
         applicationFileURL =
-            directory
-                .appendingPathComponent(
-                    "ApplicationData.json"
-                )
+            directory.appendingPathComponent(
+                "ApplicationData.json"
+            )
 
-        if
-            let storedApplicationData =
-                try? Data(
-                    contentsOf:
-                        applicationFileURL
+        applicationData = ApplicationData()
+        data = TestudoData()
+
+        // Historical product-name migration and schema
+        // migrations are deliberately deferred until a
+        // validated, backed-up migration workflow exists.
+
+        if fileManager.fileExists(
+            atPath: applicationFileURL.path
+        ) {
+            guard
+                let raw = try? Data(
+                    contentsOf: applicationFileURL
                 ),
-            let decodedApplicationData =
-                Self.decodeApplicationData(
-                    storedApplicationData
+                let decoded = Self.decodeApplicationData(raw)
+            else {
+                applicationRegistryIsTrusted = false
+
+                startupBlockedReason =
+                    "The application registry could not be read. Existing data will not be replaced."
+
+                print(
+                    "Testudo: startup blocked:",
+                    startupBlockedReason ?? ""
                 )
-        {
-            applicationData =
-                decodedApplicationData
-        } else {
-            applicationData =
-                ApplicationData()
+                return
+            }
+
+            applicationData = decoded
         }
 
+        applicationSessionIsOpen =
+            applicationData.localUserProfile != nil
+            && applicationData.applicationCredential != nil
+            && !applicationData.applicationIsLoggedOut
 
-        // Swift requires every stored property to be
-        // initialized before `self` can be used.
-        //
-        // This temporary value is replaced immediately below
-        // when the active Environment database is decoded.
-        data =
-            TestudoData()
+        environmentSessionIsOpen = false
 
-
-        // ----------------------------------------------------
-        // Resolve the database belonging to the active
-        // Work Environment.
-        //
-        // Existing installations still have the historical
-        // TestudoData.json at the application root. The first
-        // Environment migration copies it into:
-        //
-        //   Testudo/
-        //     Environments/
-        //       <environment UUID>/
-        //         EnvironmentData.json
-        //
-        // The historical file is intentionally retained as
-        // a migration backup.
-        // ----------------------------------------------------
-
-        let legacyDataFileURL =
-            fileURL
-
-        if
-            let activeEnvironmentID =
-                applicationData
-                    .activeEnvironmentID,
-            applicationData
-                .workEnvironments
-                .contains(
-                    where: {
-                        $0.id
-                            == activeEnvironmentID
-                    }
-                )
+        if let environmentID =
+            applicationData.activeEnvironmentID
         {
-            let environmentsDirectory =
-                directory
-                    .appendingPathComponent(
-                        "Environments",
-                        isDirectory:
-                            true
+            guard
+                let environment =
+                    applicationData.workEnvironments.first(
+                        where: { $0.id == environmentID }
                     )
+            else {
+                startupBlockedReason =
+                    "The active Environment is missing from the application registry."
 
-            let activeEnvironmentDirectory =
-                environmentsDirectory
-                    .appendingPathComponent(
-                        activeEnvironmentID
-                            .uuidString,
-                        isDirectory:
-                            true
+                print(
+                    "Testudo: startup blocked:",
+                    startupBlockedReason ?? ""
+                )
+                return
+            }
+
+            if let storageURL =
+                resolvedStorageURL(for: environment)
+            {
+                fileURL = storageURL.appendingPathComponent(
+                    "EnvironmentData.json"
+                )
+            } else {
+                fileURL =
+                    managedEnvironmentDirectoryURL(
+                        for: environmentID
                     )
-
-            let environmentDataFileURL =
-                activeEnvironmentDirectory
                     .appendingPathComponent(
                         "EnvironmentData.json"
                     )
-
-            do {
-                try fileManager.createDirectory(
-                    at:
-                        activeEnvironmentDirectory,
-                    withIntermediateDirectories:
-                        true
-                )
-
-                if
-                    !fileManager.fileExists(
-                        atPath:
-                            environmentDataFileURL
-                                .path
-                    )
-                {
-                    if
-                        fileManager.fileExists(
-                            atPath:
-                                legacyDataFileURL
-                                    .path
-                        )
-                    {
-                        try fileManager.copyItem(
-                            at:
-                                legacyDataFileURL,
-                            to:
-                                environmentDataFileURL
-                        )
-
-                        print(
-                            "Testudo: migrated legacy database to Environment:",
-                            environmentDataFileURL.path
-                        )
-                    }
-                }
-
-                if
-                    fileManager.fileExists(
-                        atPath:
-                            environmentDataFileURL
-                                .path
-                    )
-                {
-                    fileURL =
-                        environmentDataFileURL
-                }
-
-            } catch {
-                print(
-                    "Testudo: could not prepare Environment database:",
-                    error
-                )
-
-                // Keep using the historical database rather
-                // than risk starting with an empty dataset.
-                fileURL =
-                    legacyDataFileURL
             }
         }
 
+        if
+            applicationData.activeEnvironmentID == nil,
+            !applicationData.workEnvironments.isEmpty
+        {
+            print(
+                "Testudo: registered Environments are available; waiting for explicit selection."
+            )
+            return
+        }
+
+        let disposition: EnvironmentStartupDisposition
 
         do {
-            try Self
-                .migrateEnvironmentIdentityToSchema8IfNeeded(
-                    at:
-                        fileURL
-                )
-        } catch {
-            fatalError(
-                "Environment schema migration failed: \(error.localizedDescription)"
+            disposition = try EnvironmentStartupGate.inspect(
+                databaseURL: fileURL,
+                expectedEnvironmentID:
+                    applicationData.activeEnvironmentID
             )
+        } catch {
+            startupBlockedReason =
+                "The Environment could not be verified: " +
+                error.localizedDescription
+
+            print(
+                "Testudo: startup blocked:",
+                startupBlockedReason ?? ""
+            )
+            return
         }
 
-        if
-            let storedData = try? Data(contentsOf: fileURL),
-            let decoded = Self.decode(storedData)
-        {
+        switch disposition {
+        case .newLocalInstallation:
+            guard
+                applicationData.activeEnvironmentID == nil,
+                applicationData.workEnvironments.isEmpty
+            else {
+                startupBlockedReason =
+                    "Existing Environments were found, but no active database is available."
+
+                print(
+                    "Testudo: startup blocked:",
+                    startupBlockedReason ?? ""
+                )
+                return
+            }
+
+        case .blocked(let status):
+            startupBlockedReason =
+                "The Environment uses an unsupported or unavailable storage format: " +
+                String(describing: status)
+
+            print(
+                "Testudo: startup blocked:",
+                startupBlockedReason ?? ""
+            )
+            return
+
+        case .readableLegacyRoot,
+             .readableLegacyEnvironment:
+
+            guard
+                let raw = try? Data(
+                    contentsOf: fileURL
+                )
+            else {
+                startupBlockedReason =
+                    "The existing Environment database could not be read."
+
+                print(
+                    "Testudo: startup blocked:",
+                    startupBlockedReason ?? ""
+                )
+                return
+            }
+
+            if case .readableLegacyRoot = disposition {
+                guard
+                    let object =
+                        try? JSONSerialization.jsonObject(
+                            with: raw
+                        ) as? [String: Any],
+                    let schema = object["schemaVersion"] as? Int,
+                    schema == 8
+                else {
+                    startupBlockedReason =
+                        "The legacy root database requires an explicit migration."
+
+                    print(
+                        "Testudo: startup blocked:",
+                        startupBlockedReason ?? ""
+                    )
+                    return
+                }
+
+                let reservedKeys = [
+                    "syncFormatVersion",
+                    "formatVersion",
+                    "minimumReaderVersion",
+                    "minimumWriterVersion",
+                    "syncProtocol"
+                ]
+
+                guard !reservedKeys.contains(
+                    where: { object[$0] != nil }
+                ) else {
+                    startupBlockedReason =
+                        "The legacy root database contains unsupported format metadata."
+
+                    print(
+                        "Testudo: startup blocked:",
+                        startupBlockedReason ?? ""
+                    )
+                    return
+                }
+            }
+
+            guard let decoded = Self.decode(raw) else {
+                startupBlockedReason =
+                    "The Environment database could not be decoded. Existing data will not be replaced."
+
+                print(
+                    "Testudo: startup blocked:",
+                    startupBlockedReason ?? ""
+                )
+                return
+            }
+
             data = decoded
-        } else {
-            data = TestudoData()
         }
 
-        ensureAllPeopleHaveProfiles()
-
-        // Phase 2A:
-        // extract application-owned state from the legacy
-        // combined database into ApplicationData.json.
-
-        configureActiveEnvironmentStorageIfNeeded()
-
-        // Phase 2C:
-        // move the machine-local identity link out of the
-        // portable Environment database.
-
-        ensureEnvironmentManifestIfNeeded()
-
-        removeApplicationMetadataFromEnvironmentDatabaseIfNeeded()
-
-        // Application launch no longer restores a global login.
-        //
-        // Legacy credentials remain temporarily inside old
-        // Environment databases only for Environment entry.
-        migrateKnownEnvironmentManifestsIfNeeded()
-
-        environmentSessionIsOpen =
-            false
-
-        applicationSessionIsOpen =
-            applicationData
-                .localUserProfile
-                != nil
-            && applicationData
-                .applicationCredential
-                != nil
-            && !applicationData
-                .applicationIsLoggedOut
+        print(
+            "Testudo: startup verification completed without automatic Environment migration."
+        )
     }
 
     // ========================================================
@@ -968,6 +965,13 @@ final class TestudoStore: ObservableObject {
             String?
     ) {
 
+        guard applicationRegistryIsTrusted else {
+            return (
+                nil,
+                "The existing application registry could not be decoded. Registration is blocked to protect its contents."
+            )
+        }
+
         let packageURL =
             packageURL
                 .standardizedFileURL
@@ -1051,8 +1055,14 @@ final class TestudoStore: ObservableObject {
         }
 
         switch compatibilityStatus {
-        case .legacyReady, .legacyDatabaseMigrationRequired:
+        case .legacyReady:
             break
+
+        case .legacyDatabaseMigrationRequired:
+            return (
+                nil,
+                "This Work Environment requires an explicit legacy database migration before registration."
+            )
 
         case .journalEngineUnavailable:
             return (
@@ -1068,18 +1078,7 @@ final class TestudoStore: ObservableObject {
         }
 
 
-        do {
-            try Self
-                .migrateEnvironmentIdentityToSchema8IfNeeded(
-                    at:
-                        dataURL
-                )
-        } catch {
-            return (
-                nil,
-                "The Environment database could not be migrated: \(error.localizedDescription)"
-            )
-        }
+
 
 
         let manifestDecoder =
@@ -1250,7 +1249,6 @@ final class TestudoStore: ObservableObject {
 
         saveApplicationData()
 
-        migrateKnownEnvironmentManifestsIfNeeded()
 
 
         return (
@@ -2272,50 +2270,35 @@ final class TestudoStore: ObservableObject {
         }
 
 
-        if targetURL.lastPathComponent == "EnvironmentData.json" {
+        guard
+            targetURL.lastPathComponent == "EnvironmentData.json"
+        else {
+            return "Unsupported Environment database location."
+        }
 
-            let packageURL =
-                targetURL.deletingLastPathComponent()
-
-            let manifestURL =
-                packageURL.appendingPathComponent(
-                    "EnvironmentManifest.json"
+        do {
+            let compatibility =
+                try EnvironmentCompatibilityFileGuard.inspect(
+                    at: targetURL.deletingLastPathComponent(),
+                    expectedEnvironmentID: environmentID
                 )
 
-            let isPackage =
-                packageURL.pathExtension
-                    .caseInsensitiveCompare("testudoenv")
-                    == .orderedSame
+            switch compatibility {
+            case .legacyReady:
+                break
 
-            if isPackage ||
-                FileManager.default.fileExists(
-                    atPath: manifestURL.path
-                )
-            {
-                do {
-                    let compatibility =
-                        try EnvironmentCompatibilityFileGuard.inspect(
-                            at: packageURL,
-                            expectedEnvironmentID: environmentID
-                        )
+            case .legacyDatabaseMigrationRequired:
+                return "This Environment requires an explicit legacy database migration."
 
-                    switch compatibility {
-                    case .legacyReady:
-                        break
+            case .journalEngineUnavailable:
+                return "This Environment requires the Change Journal engine, which is not yet enabled."
 
-                    case .legacyDatabaseMigrationRequired:
-                        return "This Environment requires a legacy database migration before it can be opened."
-
-                    case .journalEngineUnavailable:
-                        return "This Environment requires the Change Journal engine, which is not yet enabled."
-
-                    case .unsupported:
-                        return "This Environment uses an unsupported storage format."
-                    }
-                } catch {
-                    return "The Work Environment format could not be inspected: \(error.localizedDescription)"
-                }
+            case .unsupported:
+                return "This Environment uses an unsupported storage format."
             }
+
+        } catch {
+            return "The Work Environment format could not be inspected: \(error.localizedDescription)"
         }
 
 
@@ -2350,6 +2333,8 @@ final class TestudoStore: ObservableObject {
         data =
             decoded
 
+        startupBlockedReason = nil
+
 
         applicationData
             .activeEnvironmentID =
@@ -2377,11 +2362,8 @@ final class TestudoStore: ObservableObject {
         saveApplicationData()
 
 
-        ensureAllPeopleHaveProfiles()
 
-        ensureEnvironmentManifestIfNeeded()
 
-        removeApplicationMetadataFromEnvironmentDatabaseIfNeeded()
 
 
         return nil
@@ -2570,6 +2552,13 @@ final class TestudoStore: ObservableObject {
 
 
     private func saveApplicationData() {
+        guard applicationRegistryIsTrusted else {
+            print(
+                "Testudo: application registry save blocked because the existing registry could not be decoded."
+            )
+            return
+        }
+
         let encoder =
             JSONEncoder()
 
@@ -2587,6 +2576,11 @@ final class TestudoStore: ObservableObject {
                     applicationData
                 )
 
+            try FileManager.default.createDirectory(
+                at: applicationFileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+
             try encoded.write(
                 to:
                     applicationFileURL,
@@ -2603,6 +2597,24 @@ final class TestudoStore: ObservableObject {
 
 
     private func save() {
+        guard startupBlockedReason == nil else {
+            print(
+                "Testudo: save blocked by startup protection:",
+                startupBlockedReason ?? ""
+            )
+            return
+        }
+
+        if
+            fileURL.lastPathComponent == "TestudoData.json",
+            !applicationData.workEnvironments.isEmpty
+        {
+            print(
+                "Testudo: root snapshot save blocked while registered Environments exist."
+            )
+            return
+        }
+
         if fileURL.lastPathComponent == "EnvironmentData.json" {
             guard let environmentID = activeEnvironmentID else {
                 print(
@@ -2628,6 +2640,13 @@ final class TestudoStore: ObservableObject {
         do {
             let encoded =
                 try EnvironmentJSONCodec.encode(data)
+
+            if fileURL.lastPathComponent == "TestudoData.json" {
+                try FileManager.default.createDirectory(
+                    at: fileURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+            }
 
             try encoded.write(
                 to: fileURL,
@@ -9799,6 +9818,11 @@ extension TestudoStore {
         _ credentialStore:
             EnvironmentCredentialStore
     ) -> String? {
+        guard startupBlockedReason == nil else {
+            return
+                "Environment credential changes are blocked because startup verification failed."
+        }
+
         guard
             let url =
                 environmentCredentialStoreURL
