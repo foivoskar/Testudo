@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Combine
+import TestudoCore
 
 @MainActor
 final class TestudoStore: ObservableObject {
@@ -2518,18 +2519,9 @@ final class TestudoStore: ObservableObject {
 
 
     private func save() {
-        let encoder = JSONEncoder()
-
-        encoder.outputFormatting = [
-            .prettyPrinted,
-            .sortedKeys
-        ]
-
-        encoder.dateEncodingStrategy = .iso8601
-
         do {
             let encoded =
-                try encoder.encode(data)
+                try EnvironmentJSONCodec.encode(data)
 
             try encoded.write(
                 to: fileURL,
