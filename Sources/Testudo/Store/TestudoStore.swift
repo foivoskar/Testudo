@@ -1035,6 +1035,39 @@ final class TestudoStore: ObservableObject {
         }
 
 
+        let compatibilityStatus:
+            EnvironmentCompatibilityStatus
+
+        do {
+            compatibilityStatus =
+                try EnvironmentCompatibilityFileGuard.inspect(
+                    at: packageURL
+                )
+        } catch {
+            return (
+                nil,
+                "The Work Environment format could not be inspected: \(error.localizedDescription)"
+            )
+        }
+
+        switch compatibilityStatus {
+        case .legacyReady, .legacyDatabaseMigrationRequired:
+            break
+
+        case .journalEngineUnavailable:
+            return (
+                nil,
+                "This Work Environment uses Change Journal storage, which is not yet supported by this development build."
+            )
+
+        case .unsupported:
+            return (
+                nil,
+                "This Work Environment uses an unsupported storage format."
+            )
+        }
+
+
         do {
             try Self
                 .migrateEnvironmentIdentityToSchema8IfNeeded(
@@ -2236,6 +2269,53 @@ final class TestudoStore: ObservableObject {
         else {
             return
                 "The Work Environment database could not be found."
+        }
+
+
+        if targetURL.lastPathComponent == "EnvironmentData.json" {
+
+            let packageURL =
+                targetURL.deletingLastPathComponent()
+
+            let manifestURL =
+                packageURL.appendingPathComponent(
+                    "EnvironmentManifest.json"
+                )
+
+            let isPackage =
+                packageURL.pathExtension
+                    .caseInsensitiveCompare("testudoenv")
+                    == .orderedSame
+
+            if isPackage ||
+                FileManager.default.fileExists(
+                    atPath: manifestURL.path
+                )
+            {
+                do {
+                    let compatibility =
+                        try EnvironmentCompatibilityFileGuard.inspect(
+                            at: packageURL,
+                            expectedEnvironmentID: environmentID
+                        )
+
+                    switch compatibility {
+                    case .legacyReady:
+                        break
+
+                    case .legacyDatabaseMigrationRequired:
+                        return "This Environment requires a legacy database migration before it can be opened."
+
+                    case .journalEngineUnavailable:
+                        return "This Environment requires the Change Journal engine, which is not yet enabled."
+
+                    case .unsupported:
+                        return "This Environment uses an unsupported storage format."
+                    }
+                } catch {
+                    return "The Work Environment format could not be inspected: \(error.localizedDescription)"
+                }
+            }
         }
 
 
