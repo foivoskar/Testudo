@@ -11,13 +11,27 @@ let package = Package(
         .executable(
             name: "Testudo",
             targets: ["Testudo"]
+        ),
+        .library(
+            name: "TestudoCore",
+            targets: ["TestudoCore"]
         )
     ],
     targets: [
+        .target(
+            name: "TestudoCore",
+            path: "Sources/TestudoCore"
+        ),
         .executableTarget(
             name: "Testudo",
+            dependencies: ["TestudoCore"],
             path: "Sources/Testudo",
             exclude: ["Resources"]
+        ),
+        .testTarget(
+            name: "TestudoCoreTests",
+            dependencies: ["TestudoCore"],
+            path: "Tests/TestudoCoreTests"
         )
     ]
 )
