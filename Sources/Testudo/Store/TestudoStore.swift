@@ -396,67 +396,71 @@ final class TestudoStore: ObservableObject {
 
     private func ensureEnvironmentManifestIfNeeded() {
         guard
-            let environment =
-                activeWorkEnvironment,
-            fileURL.lastPathComponent
-                == "EnvironmentData.json"
+            let environment = activeWorkEnvironment,
+            fileURL.lastPathComponent == "EnvironmentData.json"
         else {
             return
         }
 
+        let packageURL = fileURL.deletingLastPathComponent()
 
-        let manifestURL =
-            fileURL
-                .deletingLastPathComponent()
-                .appendingPathComponent(
-                    "EnvironmentManifest.json"
+        let manifestURL = packageURL.appendingPathComponent(
+            "EnvironmentManifest.json"
+        )
+
+        if FileManager.default.fileExists(
+            atPath: manifestURL.path
+        ) {
+            do {
+                let providerData =
+                    try EnvironmentJSONCodec.encode(
+                        environment.identityProvider
+                    )
+
+                _ = try EnvironmentManifestFileStore
+                    .updateExistingLegacyManifest(
+                        at: manifestURL,
+                        expectedEnvironmentID: environment.id,
+                        identityProviderData: providerData,
+                        updatedAt: Date()
+                    )
+            } catch {
+                print(
+                    "Testudo: existing manifest not modified:",
+                    error
                 )
+            }
 
+            return
+        }
 
-        let manifest =
-            EnvironmentManifest(
-                schemaVersion:
-                    1,
-                environmentID:
-                    environment.id,
-                name:
-                    environment.name,
-                createdAt:
-                    environment.createdAt,
-                updatedAt:
-                    environment.updatedAt
+        if packageURL.pathExtension.lowercased() == "testudoenv" {
+            print(
+                "Testudo: package manifest missing; automatic reconstruction refused."
             )
+            return
+        }
 
-
-        let encoder =
-            JSONEncoder()
-
-        encoder.outputFormatting = [
-            .prettyPrinted,
-            .sortedKeys
-        ]
-
-        encoder.dateEncodingStrategy =
-            .iso8601
-
+        let manifest = EnvironmentManifest(
+            schemaVersion: 2,
+            environmentID: environment.id,
+            name: environment.name,
+            identityProvider: environment.identityProvider,
+            createdAt: environment.createdAt,
+            updatedAt: environment.updatedAt
+        )
 
         do {
             let encoded =
-                try encoder.encode(
-                    manifest
-                )
+                try EnvironmentJSONCodec.encode(manifest)
 
-            // Rewrite as well as create, so the manifest follows
-            // future Environment renames.
             try encoded.write(
-                to:
-                    manifestURL,
-                options:
-                    .atomic
+                to: manifestURL,
+                options: .atomic
             )
         } catch {
             print(
-                "Testudo: could not write Environment manifest:",
+                "Testudo: could not create legacy manifest:",
                 error
             )
         }
@@ -9911,123 +9915,44 @@ extension TestudoStore {
 
     private func migrateActiveEnvironmentManifestIdentityIfNeeded() {
         guard
-            fileURL.lastPathComponent
-                == "EnvironmentData.json",
-            let environmentID =
-                applicationData.activeEnvironmentID,
-            let environment =
-                applicationData
-                    .workEnvironments
-                    .first(
-                        where: {
-                            $0.id
-                                == environmentID
-                        }
-                    )
+            fileURL.lastPathComponent == "EnvironmentData.json",
+            let environmentID = applicationData.activeEnvironmentID,
+            let environment = applicationData.workEnvironments.first(
+                where: { $0.id == environmentID }
+            )
         else {
             return
         }
 
-
         let manifestURL =
-            fileURL
-                .deletingLastPathComponent()
+            fileURL.deletingLastPathComponent()
                 .appendingPathComponent(
                     "EnvironmentManifest.json"
                 )
 
+        guard FileManager.default.fileExists(
+            atPath: manifestURL.path
+        ) else {
+            return
+        }
 
-        guard
-            FileManager.default
-                .fileExists(
-                    atPath:
-                        manifestURL.path
+        do {
+            let providerData =
+                try EnvironmentJSONCodec.encode(
+                    environment.identityProvider
                 )
-        else {
-            return
-        }
 
-
-        let decoder =
-            JSONDecoder()
-
-        decoder.dateDecodingStrategy =
-            .iso8601
-
-
-        guard
-            let raw =
-                try? Data(
-                    contentsOf:
-                        manifestURL
-                ),
-            var manifest =
-                try? decoder.decode(
-                    EnvironmentManifest.self,
-                    from:
-                        raw
-                ),
-            manifest.environmentID
-                == environmentID
-        else {
-            return
-        }
-
-
-        var changed =
-            false
-
-
-        if manifest.schemaVersion < 2 {
-            manifest.schemaVersion =
-                2
-
-            changed =
-                true
-        }
-
-
-        if manifest.identityProvider == nil {
-            manifest.identityProvider =
-                environment.identityProvider
-
-            manifest.updatedAt =
-                Date()
-
-            changed =
-                true
-        }
-
-
-        guard changed else {
-            return
-        }
-
-
-        let encoder =
-            JSONEncoder()
-
-        encoder.outputFormatting =
-            [
-                .prettyPrinted,
-                .sortedKeys
-            ]
-
-        encoder.dateEncodingStrategy =
-            .iso8601
-
-
-        if
-            let encoded =
-                try? encoder.encode(
-                    manifest
+            _ = try EnvironmentManifestFileStore
+                .updateExistingLegacyManifest(
+                    at: manifestURL,
+                    expectedEnvironmentID: environmentID,
+                    identityProviderData: providerData,
+                    updatedAt: Date()
                 )
-        {
-            try? encoded.write(
-                to:
-                    manifestURL,
-                options:
-                    .atomic
+        } catch {
+            print(
+                "Testudo: active manifest migration skipped:",
+                error
             )
         }
     }
@@ -10046,129 +9971,51 @@ extension TestudoStore {
 extension TestudoStore {
 
     private func migrateKnownEnvironmentManifestsIfNeeded() {
-        let decoder =
-            JSONDecoder()
-
-        decoder.dateDecodingStrategy =
-            .iso8601
-
-
-        let encoder =
-            JSONEncoder()
-
-        encoder.outputFormatting =
-            [
-                .prettyPrinted,
-                .sortedKeys
-            ]
-
-        encoder.dateEncodingStrategy =
-            .iso8601
-
-
-        for environment in
-            applicationData
-                .workEnvironments
-        {
+        for environment in applicationData.workEnvironments {
             guard
-                let rawPath =
-                    environment
-                        .storage?
-                        .path?
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        ),
+                let rawPath = environment.storage?.path?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ),
                 !rawPath.isEmpty
             else {
                 continue
             }
 
-
             let manifestURL =
                 URL(
-                    fileURLWithPath:
-                        rawPath,
-                    isDirectory:
-                        true
+                    fileURLWithPath: rawPath,
+                    isDirectory: true
                 )
                 .appendingPathComponent(
                     "EnvironmentManifest.json"
                 )
 
-
-            guard
-                FileManager.default
-                    .fileExists(
-                        atPath:
-                            manifestURL.path
-                    ),
-                let raw =
-                    try? Data(
-                        contentsOf:
-                            manifestURL
-                    ),
-                var manifest =
-                    try? decoder.decode(
-                        EnvironmentManifest.self,
-                        from:
-                            raw
-                    ),
-                manifest.environmentID
-                    == environment.id
-            else {
+            guard FileManager.default.fileExists(
+                atPath: manifestURL.path
+            ) else {
                 continue
             }
 
-
-            var changed =
-                false
-
-
-            if manifest.schemaVersion < 2 {
-                manifest.schemaVersion =
-                    2
-
-                changed =
-                    true
-            }
-
-
-            if manifest.identityProvider == nil {
-                manifest.identityProvider =
-                    environment
-                        .identityProvider
-
-                changed =
-                    true
-            }
-
-
-            guard changed else {
-                continue
-            }
-
-
-            manifest.updatedAt =
-                Date()
-
-
-            guard
-                let encoded =
-                    try? encoder.encode(
-                        manifest
+            do {
+                let providerData =
+                    try EnvironmentJSONCodec.encode(
+                        environment.identityProvider
                     )
-            else {
-                continue
+
+                _ = try EnvironmentManifestFileStore
+                    .updateExistingLegacyManifest(
+                        at: manifestURL,
+                        expectedEnvironmentID: environment.id,
+                        identityProviderData: providerData,
+                        updatedAt: Date()
+                    )
+            } catch {
+                print(
+                    "Testudo: known manifest migration skipped:",
+                    error
+                )
             }
-
-
-            try? encoded.write(
-                to:
-                    manifestURL,
-                options:
-                    .atomic
-            )
         }
     }
 }
