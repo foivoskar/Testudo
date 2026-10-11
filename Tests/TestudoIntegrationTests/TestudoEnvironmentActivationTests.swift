@@ -934,4 +934,188 @@ final class TestudoEnvironmentActivationTests: XCTestCase {
 
         XCTAssertTrue(result.registryUnchanged)
     }
+
+    func testRegistryWriteFailureCancelsEnvironmentSwitch() async throws {
+        let root = try temporaryRoot()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let first = try makePackage(
+            in: root,
+            name: "RegistrySource"
+        )
+
+        let second = try makePackage(
+            in: root,
+            name: "RegistryDestination"
+        )
+
+        let registryURL = try writeRegistry(
+            in: root,
+            environments: [
+                first.environment,
+                second.environment
+            ]
+        )
+
+        try await MainActor.run { () throws -> Void in
+            let store = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            guard store.startupBlockedReason == nil else {
+                throw NSError(
+                    domain: "TestudoRegistryIntegrationTests",
+                    code: 101,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Synthetic Store startup was blocked."
+                    ]
+                )
+            }
+
+            guard store.activateEnvironment(
+                id: first.id
+            ) == nil else {
+                throw NSError(
+                    domain: "TestudoRegistryIntegrationTests",
+                    code: 102,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Initial Environment activation failed."
+                    ]
+                )
+            }
+
+            guard let themeID = store.createTheme(
+                name: "Registry rollback fixture",
+                parentThemeID: nil
+            ) else {
+                throw NSError(
+                    domain: "TestudoRegistryIntegrationTests",
+                    code: 103,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Could not create the synthetic Theme."
+                    ]
+                )
+            }
+
+            let registryBefore = try Data(
+                contentsOf: registryURL
+            )
+
+            let firstDatabaseBefore = try Data(
+                contentsOf: first.databaseURL
+            )
+
+            let secondDatabaseBefore = try Data(
+                contentsOf: second.databaseURL
+            )
+
+            let firstManifestBefore = try Data(
+                contentsOf: first.manifestURL
+            )
+
+            let secondManifestBefore = try Data(
+                contentsOf: second.manifestURL
+            )
+
+            try FileManager.default.setAttributes(
+                [
+                    .posixPermissions: NSNumber(
+                        value: 0o555
+                    )
+                ],
+                ofItemAtPath: root.path
+            )
+
+            defer {
+                try? FileManager.default.setAttributes(
+                    [
+                        .posixPermissions: NSNumber(
+                            value: 0o700
+                        )
+                    ],
+                    ofItemAtPath: root.path
+                )
+            }
+
+            let attributes = try FileManager.default
+                .attributesOfItem(
+                    atPath: root.path
+                )
+
+            guard
+                let permissions =
+                    attributes[.posixPermissions] as? NSNumber,
+                permissions.intValue & 0o222 == 0
+            else {
+                throw NSError(
+                    domain: "TestudoRegistryIntegrationTests",
+                    code: 104,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Registry write restriction was not applied."
+                    ]
+                )
+            }
+
+            let error = store.activateEnvironment(
+                id: second.id
+            )
+
+            XCTAssertNotNil(error)
+
+            XCTAssertTrue(
+                error?.contains(
+                    "Switching was cancelled"
+                ) ?? false
+            )
+
+            XCTAssertEqual(
+                store.applicationData.activeEnvironmentID,
+                first.id
+            )
+
+            XCTAssertEqual(
+                store.fileURL,
+                first.databaseURL
+            )
+
+            XCTAssertTrue(
+                store.data.themes.contains {
+                    $0.id == themeID
+                    && $0.name == "Registry rollback fixture"
+                }
+            )
+
+            XCTAssertEqual(
+                try Data(contentsOf: registryURL),
+                registryBefore
+            )
+
+            XCTAssertEqual(
+                try Data(contentsOf: first.databaseURL),
+                firstDatabaseBefore
+            )
+
+            XCTAssertEqual(
+                try Data(contentsOf: second.databaseURL),
+                secondDatabaseBefore
+            )
+
+            XCTAssertEqual(
+                try Data(contentsOf: first.manifestURL),
+                firstManifestBefore
+            )
+
+            XCTAssertEqual(
+                try Data(contentsOf: second.manifestURL),
+                secondManifestBefore
+            )
+        }
+    }
 }

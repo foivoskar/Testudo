@@ -2330,6 +2330,11 @@ final class TestudoStore: ObservableObject {
         }
 
 
+        let previousFileURL = fileURL
+        let previousData = data
+        let previousApplicationData = applicationData
+        let previousStartupBlockedReason = startupBlockedReason
+
         fileURL =
             targetURL
 
@@ -2362,7 +2367,14 @@ final class TestudoStore: ObservableObject {
         }
 
 
-        saveApplicationData()
+        guard saveApplicationData() else {
+            fileURL = previousFileURL
+            data = previousData
+            applicationData = previousApplicationData
+            startupBlockedReason = previousStartupBlockedReason
+
+            return "The Work Environment selection could not be saved. Switching was cancelled to preserve the current selection."
+        }
 
 
 
@@ -2554,12 +2566,13 @@ final class TestudoStore: ObservableObject {
     }
 
 
-    private func saveApplicationData() {
+    @discardableResult
+    private func saveApplicationData() -> Bool {
         guard applicationRegistryIsTrusted else {
             print(
                 "Testudo: application registry save blocked because the existing registry could not be decoded."
             )
-            return
+            return false
         }
 
         let encoder =
@@ -2590,11 +2603,15 @@ final class TestudoStore: ObservableObject {
                 options:
                     .atomic
             )
+            return true
+
         } catch {
             print(
                 "Testudo: could not save application data:",
                 error
             )
+
+            return false
         }
     }
 
