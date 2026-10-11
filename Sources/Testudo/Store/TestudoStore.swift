@@ -9854,6 +9854,100 @@ extension TestudoStore {
                 "The Environment credential store is unavailable."
         }
 
+        guard
+            let environmentID = activeEnvironmentID,
+            credentialStore.environmentID == environmentID
+        else {
+            return
+                "The credential store does not match the active Work Environment."
+        }
+
+        guard
+            (1...2).contains(
+                credentialStore.schemaVersion
+            )
+        else {
+            return
+                "The credential store uses an unsupported schema."
+        }
+
+        do {
+            try EnvironmentSnapshotWritePreflight.verify(
+                databaseURL: fileURL,
+                expectedEnvironmentID: environmentID
+            )
+        } catch {
+            return
+                "Environment credential changes are blocked because the Work Environment format or identity could not be verified."
+        }
+
+        if !FileManager.default.fileExists(
+            atPath: url.path
+        ) {
+            return
+                "The Environment credential file is missing. Credential changes were blocked to prevent accidental credential loss."
+        }
+
+
+        if FileManager.default.fileExists(
+            atPath: url.path
+        ) {
+            let existingStore:
+                EnvironmentCredentialStore
+
+            do {
+                let existingBytes =
+                    try Data(
+                        contentsOf: url
+                    )
+
+                existingStore =
+                    try JSONDecoder().decode(
+                        EnvironmentCredentialStore.self,
+                        from: existingBytes
+                    )
+
+            } catch {
+                return
+                    "Existing Environment credentials could not be read safely. The file was preserved."
+            }
+
+            guard
+                existingStore.environmentID
+                    == environmentID,
+                (1...2).contains(
+                    existingStore.schemaVersion
+                )
+            else {
+                return
+                    "Existing Environment credentials have an incompatible identity or schema. The file was preserved."
+            }
+
+            let existingIDs =
+                Set(
+                    existingStore.credentials.map(
+                        \.membershipID
+                    )
+                )
+
+            let updatedIDs =
+                Set(
+                    credentialStore.credentials.map(
+                        \.membershipID
+                    )
+                )
+
+            guard
+                existingIDs.isSubset(
+                    of: updatedIDs
+                )
+            else {
+                return
+                    "Credential update would remove existing memberships. The file was preserved."
+            }
+        }
+
+
         do {
             let encoder =
                 JSONEncoder()
@@ -9930,6 +10024,11 @@ extension TestudoStore {
         newPassword:
             String
     ) -> String? {
+        guard environmentSessionIsOpen else {
+            return
+                "An open Work Environment session is required to change Environment membership passwords."
+        }
+
         guard
             currentEnvironmentUserIsAdministrator
         else {
@@ -10197,664 +10296,6 @@ extension TestudoStore {
                     && $0.personEntityID
                         == personEntityID
                 }
-    }
-}
-
-
-// ============================================================
-// MARK: - Environment schema 7 -> 8 identity migration
-//
-// Schema 8 permanently removes the legacy users array and the
-// legacy account audit UUIDs.
-//
-// The migration operates on raw JSON before TestudoData is decoded,
-// so the legacy Swift account model no longer needs to exist.
-// ============================================================
-
-extension TestudoStore {
-
-    private static func migrateEnvironmentIdentityToSchema8IfNeeded(
-        at fileURL:
-            URL
-    ) throws {
-
-        guard
-            fileURL.lastPathComponent
-                == "EnvironmentData.json",
-            FileManager.default
-                .fileExists(
-                    atPath:
-                        fileURL.path
-                )
-        else {
-            return
-        }
-
-
-        let raw =
-            try Data(
-                contentsOf:
-                    fileURL
-            )
-
-
-        guard
-            var root =
-                try JSONSerialization
-                    .jsonObject(
-                        with:
-                            raw
-                    )
-                    as? [String: Any]
-        else {
-            return
-        }
-
-
-        let schemaVersion =
-            (
-                root[
-                    "schemaVersion"
-                ]
-                as? NSNumber
-            )?
-            .intValue
-            ?? 1
-
-
-        guard schemaVersion < 8 else {
-            return
-        }
-
-
-        guard schemaVersion >= 7 else {
-            throw NSError(
-                domain:
-                    "Testudo.SchemaMigration",
-                code:
-                    8,
-                userInfo:
-                    [
-                        NSLocalizedDescriptionKey:
-                            "This Environment predates schema 7 and must first be migrated by an earlier Testudo build."
-                    ]
-            )
-        }
-
-
-        let memberships =
-            root[
-                "environmentMemberships"
-            ]
-            as? [[String: Any]]
-            ?? []
-
-
-        let legacyUsers =
-            root[
-                "users"
-            ]
-            as? [[String: Any]]
-            ?? []
-
-
-        var membershipByIdentifier:
-            [String: String] = [:]
-
-        var membershipByPerson:
-            [String: String] = [:]
-
-
-        for membership in memberships {
-
-            guard
-                let membershipID =
-                    membership["id"]
-                    as? String
-            else {
-                continue
-            }
-
-
-            if
-                let identifier =
-                    membership[
-                        "directoryUserIdentifier"
-                    ]
-                    as? String
-            {
-                let key =
-                    identifier
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .lowercased()
-
-                if !key.isEmpty {
-                    membershipByIdentifier[
-                        key
-                    ] =
-                        membershipID
-                }
-            }
-
-
-            if
-                let personID =
-                    membership[
-                        "personEntityID"
-                    ]
-                    as? String
-            {
-                membershipByPerson[
-                    personID
-                ] =
-                    membershipID
-            }
-        }
-
-
-        var legacyUserToMembership:
-            [String: String] = [:]
-
-
-        for legacyUser in legacyUsers {
-
-            guard
-                let legacyUserID =
-                    legacyUser["id"]
-                    as? String
-            else {
-                continue
-            }
-
-
-            let username =
-                (
-                    legacyUser[
-                        "username"
-                    ]
-                    as? String
-                    ?? ""
-                )
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .lowercased()
-
-
-            let personID =
-                legacyUser[
-                    "personEntityID"
-                ]
-                as? String
-
-
-            let membershipID =
-                membershipByIdentifier[
-                    username
-                ]
-                ?? (
-                    personID.flatMap {
-                        membershipByPerson[
-                            $0
-                        ]
-                    }
-                )
-
-
-            guard let membershipID else {
-                throw NSError(
-                    domain:
-                        "Testudo.SchemaMigration",
-                    code:
-                        81,
-                    userInfo:
-                        [
-                            NSLocalizedDescriptionKey:
-                                "A legacy Environment user cannot be mapped to an Environment membership."
-                        ]
-                )
-            }
-
-
-            legacyUserToMembership[
-                legacyUserID
-            ] =
-                membershipID
-        }
-
-
-        func membershipID(
-            forLegacyUserID legacyUserID:
-                String?
-        ) throws -> String? {
-
-            guard
-                let legacyUserID
-            else {
-                return nil
-            }
-
-
-            guard
-                let membershipID =
-                    legacyUserToMembership[
-                        legacyUserID
-                    ]
-            else {
-                throw NSError(
-                    domain:
-                        "Testudo.SchemaMigration",
-                    code:
-                        82,
-                    userInfo:
-                        [
-                            NSLocalizedDescriptionKey:
-                                "A historical user identity cannot be mapped to an Environment membership."
-                        ]
-                )
-            }
-
-
-            return membershipID
-        }
-
-
-        // ----------------------------------------------------
-        // WorkItem audit migration
-        // ----------------------------------------------------
-
-        var workItems =
-            root[
-                "workItems"
-            ]
-            as? [[String: Any]]
-            ?? []
-
-
-        for index in workItems.indices {
-
-            let createdLegacyID =
-                workItems[index][
-                    "createdByUserID"
-                ]
-                as? String
-
-            let updatedLegacyID =
-                workItems[index][
-                    "updatedByUserID"
-                ]
-                as? String
-
-
-            if
-                workItems[index][
-                    "createdByMembershipID"
-                ]
-                == nil,
-                let migrated =
-                    try membershipID(
-                        forLegacyUserID:
-                            createdLegacyID
-                    )
-            {
-                workItems[index][
-                    "createdByMembershipID"
-                ] =
-                    migrated
-            }
-
-
-            if
-                workItems[index][
-                    "updatedByMembershipID"
-                ]
-                == nil,
-                let migrated =
-                    try membershipID(
-                        forLegacyUserID:
-                            updatedLegacyID
-                    )
-            {
-                workItems[index][
-                    "updatedByMembershipID"
-                ] =
-                    migrated
-            }
-
-
-            workItems[index]
-                .removeValue(
-                    forKey:
-                        "createdByUserID"
-                )
-
-            workItems[index]
-                .removeValue(
-                    forKey:
-                        "updatedByUserID"
-                )
-        }
-
-
-        root[
-            "workItems"
-        ] =
-            workItems
-
-
-        // ----------------------------------------------------
-        // History audit migration
-        // ----------------------------------------------------
-
-        var historyEvents =
-            root[
-                "historyEvents"
-            ]
-            as? [[String: Any]]
-            ?? []
-
-
-        for index in historyEvents.indices {
-
-            let legacyID =
-                historyEvents[index][
-                    "actorUserID"
-                ]
-                as? String
-
-
-            if
-                historyEvents[index][
-                    "actorMembershipID"
-                ]
-                == nil,
-                let migrated =
-                    try membershipID(
-                        forLegacyUserID:
-                            legacyID
-                    )
-            {
-                historyEvents[index][
-                    "actorMembershipID"
-                ] =
-                    migrated
-            }
-
-
-            historyEvents[index]
-                .removeValue(
-                    forKey:
-                        "actorUserID"
-                )
-        }
-
-
-        root[
-            "historyEvents"
-        ] =
-            historyEvents
-
-
-        // ----------------------------------------------------
-        // Credential migration
-        //
-        // Existing Environment credentials always win.
-        // Missing credentials can still be copied from schema-7
-        // user hashes before the legacy users array disappears.
-        // ----------------------------------------------------
-
-        if !legacyUsers.isEmpty {
-
-            let credentialURL =
-                fileURL
-                    .deletingLastPathComponent()
-                    .appendingPathComponent(
-                        "EnvironmentCredentials.json"
-                    )
-
-
-            let environmentID =
-                memberships
-                    .compactMap {
-                        $0[
-                            "environmentID"
-                        ]
-                        as? String
-                    }
-                    .first
-
-
-            if let environmentID {
-
-                var credentialRoot:
-                    [String: Any]
-
-
-                if
-                    FileManager.default
-                        .fileExists(
-                            atPath:
-                                credentialURL.path
-                        ),
-                    let credentialRaw =
-                        try? Data(
-                            contentsOf:
-                                credentialURL
-                        ),
-                    let decoded =
-                        try? JSONSerialization
-                            .jsonObject(
-                                with:
-                                    credentialRaw
-                            )
-                            as? [String: Any]
-                {
-                    credentialRoot =
-                        decoded
-
-                } else {
-                    credentialRoot =
-                        [
-                            "schemaVersion":
-                                1,
-                            "environmentID":
-                                environmentID,
-                            "credentials":
-                                []
-                        ]
-                }
-
-
-                var credentials =
-                    credentialRoot[
-                        "credentials"
-                    ]
-                    as? [[String: Any]]
-                    ?? []
-
-
-                var existingMembershipIDs =
-                    Set(
-                        credentials
-                            .compactMap {
-                                $0[
-                                    "membershipID"
-                                ]
-                                as? String
-                            }
-                    )
-
-
-                for legacyUser in legacyUsers {
-
-                    guard
-                        let legacyUserID =
-                            legacyUser["id"]
-                            as? String,
-                        let membershipID =
-                            legacyUserToMembership[
-                                legacyUserID
-                            ],
-                        !existingMembershipIDs
-                            .contains(
-                                membershipID
-                            )
-                    else {
-                        continue
-                    }
-
-
-                    guard
-                        let salt =
-                            legacyUser[
-                                "passwordSaltBase64"
-                            ]
-                            as? String,
-                        let hash =
-                            legacyUser[
-                                "passwordHashBase64"
-                            ]
-                            as? String,
-                        let iterations =
-                            legacyUser[
-                                "passwordIterations"
-                            ]
-                            as? NSNumber
-                    else {
-                        throw NSError(
-                            domain:
-                                "Testudo.SchemaMigration",
-                            code:
-                                83,
-                            userInfo:
-                                [
-                                    NSLocalizedDescriptionKey:
-                                        "A legacy credential is incomplete and cannot be migrated safely."
-                                ]
-                        )
-                    }
-
-
-                    let now =
-                        Date()
-                            .timeIntervalSinceReferenceDate
-
-
-                    credentials.append(
-                        [
-                            "membershipID":
-                                membershipID,
-                            "passwordSaltBase64":
-                                salt,
-                            "passwordHashBase64":
-                                hash,
-                            "passwordIterations":
-                                iterations,
-                            "createdAt":
-                                (
-                                    legacyUser[
-                                        "createdAt"
-                                    ]
-                                    as? NSNumber
-                                )
-                                ?? NSNumber(
-                                    value:
-                                        now
-                                ),
-                            "updatedAt":
-                                NSNumber(
-                                    value:
-                                        now
-                                )
-                        ]
-                    )
-
-
-                    existingMembershipIDs
-                        .insert(
-                            membershipID
-                        )
-                }
-
-
-                credentialRoot[
-                    "schemaVersion"
-                ] =
-                    1
-
-                credentialRoot[
-                    "environmentID"
-                ] =
-                    environmentID
-
-                credentialRoot[
-                    "credentials"
-                ] =
-                    credentials
-
-
-                let encodedCredentials =
-                    try JSONSerialization
-                        .data(
-                            withJSONObject:
-                                credentialRoot,
-                            options:
-                                [
-                                    .prettyPrinted,
-                                    .sortedKeys
-                                ]
-                        )
-
-
-                try encodedCredentials
-                    .write(
-                        to:
-                            credentialURL,
-                        options:
-                            .atomic
-                    )
-            }
-        }
-
-
-        // ----------------------------------------------------
-        // Schema 8 no longer persists legacy users.
-        // ----------------------------------------------------
-
-        root.removeValue(
-            forKey:
-                "users"
-        )
-
-        root[
-            "schemaVersion"
-        ] =
-            8
-
-
-        let migrated =
-            try JSONSerialization
-                .data(
-                    withJSONObject:
-                        root,
-                    options:
-                        [
-                            .prettyPrinted,
-                            .sortedKeys
-                        ]
-                )
-
-
-        try migrated.write(
-            to:
-                fileURL,
-            options:
-                .atomic
-        )
     }
 }
 
