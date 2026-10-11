@@ -32,6 +32,11 @@ let package = Package(
             name: "TestudoCoreTests",
             dependencies: ["TestudoCore"],
             path: "Tests/TestudoCoreTests"
+        ),
+        .testTarget(
+            name: "TestudoIntegrationTests",
+            dependencies: ["Testudo"],
+            path: "Tests/TestudoIntegrationTests"
         )
     ]
 )

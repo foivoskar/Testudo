@@ -48,7 +48,7 @@ final class TestudoStore: ObservableObject {
 
     private var applicationRegistryIsTrusted: Bool = true
 
-    init() {
+    init(storageDirectoryURL: URL? = nil) {
         let fileManager = FileManager.default
 
         let baseDirectory =
@@ -62,7 +62,8 @@ final class TestudoStore: ObservableObject {
                 )
 
         let directory =
-            baseDirectory.appendingPathComponent(
+            storageDirectoryURL?.standardizedFileURL
+            ?? baseDirectory.appendingPathComponent(
                 "Testudo",
                 isDirectory: true
             )
