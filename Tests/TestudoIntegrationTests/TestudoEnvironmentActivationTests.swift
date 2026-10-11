@@ -580,4 +580,358 @@ final class TestudoEnvironmentActivationTests: XCTestCase {
             packageBefore.1
         )
     }
+
+    func testFailedSavePreventsEnvironmentSwitchAndPreservesMemory() async throws {
+        let root = try temporaryRoot()
+
+        defer {
+            try? FileManager.default.removeItem(
+                at: root
+            )
+        }
+
+        let first = try makePackage(
+            in: root,
+            name: "UnsavedChanges"
+        )
+
+        let second = try makePackage(
+            in: root,
+            name: "SwitchDestination"
+        )
+
+        let date = Date(
+            timeIntervalSince1970: 1_700_000_000
+        )
+
+        let member = EnvironmentMembership(
+            environmentID: first.id,
+            localUserProfileID: nil,
+            personEntityID: nil,
+            directoryUserIdentifier: "fixture-user",
+            firstName: "Integration",
+            lastName: "Fixture",
+            role: .administrator,
+            isActive: true,
+            createdAt: date,
+            lastAccessAt: nil
+        )
+
+        var database = TestudoData()
+        database.environmentMemberships = [member]
+
+        try writeJSON(
+            database,
+            to: first.databaseURL
+        )
+
+        let credential = EnvironmentCredential(
+            membershipID: member.id,
+            passwordSaltBase64: "synthetic-salt",
+            passwordHashBase64: "synthetic-hash",
+            passwordIterations: 1,
+            createdAt: date,
+            updatedAt: date
+        )
+
+        let credentialStore = EnvironmentCredentialStore(
+            environmentID: first.id,
+            credentials: [credential]
+        )
+
+        let credentialsURL =
+            first.packageURL.appendingPathComponent(
+                "EnvironmentCredentials.json"
+            )
+
+        let credentialEncoder = JSONEncoder()
+
+        credentialEncoder.outputFormatting = [
+            .sortedKeys
+        ]
+
+        let encodedCredentials =
+            try credentialEncoder.encode(
+                credentialStore
+            )
+
+        try encodedCredentials.write(
+            to: credentialsURL,
+            options: .atomic
+        )
+
+        let decodedCredentials =
+            try JSONDecoder().decode(
+                EnvironmentCredentialStore.self,
+                from: Data(contentsOf: credentialsURL)
+            )
+
+        XCTAssertEqual(
+            decodedCredentials.environmentID,
+            first.id
+        )
+
+        XCTAssertEqual(
+            decodedCredentials.credentials.count,
+            1
+        )
+
+        XCTAssertEqual(
+            decodedCredentials.credentials.first?.membershipID,
+            member.id
+        )
+
+        var registry = ApplicationData()
+
+        registry.workEnvironments = [
+            first.environment,
+            second.environment
+        ]
+
+        registry.environmentAccesses = [
+            EnvironmentAccess(
+                environmentID: first.id,
+                membershipID: member.id,
+                staySignedIn: true,
+                lastOpenedAt: nil
+            )
+        ]
+
+        let registryURL =
+            root.appendingPathComponent(
+                "ApplicationData.json"
+            )
+
+        try writeJSON(
+            registry,
+            to: registryURL
+        )
+
+        let result = try await MainActor.run { () throws -> (
+            switchError: String?,
+            activeID: UUID?,
+            selectedFileURL: URL,
+            sessionOpen: Bool,
+            unsavedChangePreserved: Bool,
+            firstDatabaseUnchanged: Bool,
+            secondDatabaseUnchanged: Bool,
+            firstManifestUnchanged: Bool,
+            secondManifestUnchanged: Bool,
+            registryUnchanged: Bool
+        ) in
+            let store = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            guard store.startupBlockedReason == nil else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 10,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "The synthetic Store failed startup verification."
+                    ]
+                )
+            }
+
+            let openResult = store.openWorkEnvironment(
+                id: first.id
+            )
+
+            guard case .opened = openResult else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 11,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "The synthetic remembered session did not open."
+                    ]
+                )
+            }
+
+            guard store.environmentSessionIsOpen else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 12,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "The Environment session is not open."
+                    ]
+                )
+            }
+
+            guard let themeID = store.createTheme(
+                name: "Persisted draft",
+                parentThemeID: nil
+            ) else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 13,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Could not create the initial synthetic Theme."
+                    ]
+                )
+            }
+
+            let firstDatabaseBefore = try Data(
+                contentsOf: first.databaseURL
+            )
+
+            let secondDatabaseBefore = try Data(
+                contentsOf: second.databaseURL
+            )
+
+            let firstManifestBefore = try Data(
+                contentsOf: first.manifestURL
+            )
+
+            let secondManifestBefore = try Data(
+                contentsOf: second.manifestURL
+            )
+
+            let registryBefore = try Data(
+                contentsOf: registryURL
+            )
+
+            try FileManager.default.setAttributes(
+                [
+                    .posixPermissions: NSNumber(
+                        value: 0o555
+                    )
+                ],
+                ofItemAtPath: first.packageURL.path
+            )
+
+            defer {
+                try? FileManager.default.setAttributes(
+                    [
+                        .posixPermissions: NSNumber(
+                            value: 0o700
+                        )
+                    ],
+                    ofItemAtPath: first.packageURL.path
+                )
+            }
+
+            let attributes = try FileManager.default
+                .attributesOfItem(
+                    atPath: first.packageURL.path
+                )
+
+            guard
+                let permissions = attributes[
+                    .posixPermissions
+                ] as? NSNumber,
+                permissions.intValue & 0o222 == 0
+            else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 15,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "The synthetic package is not read-only."
+                    ]
+                )
+            }
+
+            guard let unsavedThemeID = store.createTheme(
+                name: "Unsaved theme during switch",
+                parentThemeID: nil
+            ) else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 16,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Could not create the unsaved synthetic Theme."
+                    ]
+                )
+            }
+
+            let failedWriteDiskBytes = try Data(
+                contentsOf: first.databaseURL
+            )
+
+            guard failedWriteDiskBytes == firstDatabaseBefore else {
+                throw NSError(
+                    domain: "TestudoActivationTests",
+                    code: 17,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "The filesystem allowed the write. Failure injection was ineffective."
+                    ]
+                )
+            }
+
+            let switchError = store.activateEnvironment(
+                id: second.id
+            )
+
+            let unsavedChangePreserved =
+                store.data.themes.contains {
+                    $0.id == unsavedThemeID
+                    && $0.name == "Unsaved theme during switch"
+                }
+                && store.data.themes.contains {
+                    $0.id == themeID
+                    && $0.name == "Persisted draft"
+                }
+
+            return (
+                switchError: switchError,
+                activeID:
+                    store.applicationData.activeEnvironmentID,
+                selectedFileURL: store.fileURL,
+                sessionOpen: store.environmentSessionIsOpen,
+                unsavedChangePreserved:
+                    unsavedChangePreserved,
+                firstDatabaseUnchanged:
+                    try Data(contentsOf: first.databaseURL)
+                    == firstDatabaseBefore,
+                secondDatabaseUnchanged:
+                    try Data(contentsOf: second.databaseURL)
+                    == secondDatabaseBefore,
+                firstManifestUnchanged:
+                    try Data(contentsOf: first.manifestURL)
+                    == firstManifestBefore,
+                secondManifestUnchanged:
+                    try Data(contentsOf: second.manifestURL)
+                    == secondManifestBefore,
+                registryUnchanged:
+                    try Data(contentsOf: registryURL)
+                    == registryBefore
+            )
+        }
+
+        XCTAssertNotNil(result.switchError)
+
+        XCTAssertTrue(
+            result.switchError?.contains(
+                "Switching was cancelled"
+            ) ?? false
+        )
+
+        XCTAssertEqual(
+            result.activeID,
+            first.id
+        )
+
+        XCTAssertEqual(
+            result.selectedFileURL,
+            first.databaseURL
+        )
+
+        XCTAssertTrue(result.sessionOpen)
+
+        XCTAssertTrue(result.unsavedChangePreserved)
+
+        XCTAssertTrue(result.firstDatabaseUnchanged)
+        XCTAssertTrue(result.secondDatabaseUnchanged)
+
+        XCTAssertTrue(result.firstManifestUnchanged)
+        XCTAssertTrue(result.secondManifestUnchanged)
+
+        XCTAssertTrue(result.registryUnchanged)
+    }
 }

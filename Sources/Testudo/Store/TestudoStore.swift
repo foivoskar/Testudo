@@ -2324,7 +2324,9 @@ final class TestudoStore: ObservableObject {
         // A Work Environment may have been removed from this
         // installation while its package remains safely on disk.
         if environmentSessionIsOpen {
-            save()
+            guard save() else {
+                return "The current Work Environment could not be saved. Switching was cancelled to protect unsaved changes."
+            }
         }
 
 
@@ -2597,13 +2599,14 @@ final class TestudoStore: ObservableObject {
     }
 
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         guard startupBlockedReason == nil else {
             print(
                 "Testudo: save blocked by startup protection:",
                 startupBlockedReason ?? ""
             )
-            return
+            return false
         }
 
         if
@@ -2613,7 +2616,7 @@ final class TestudoStore: ObservableObject {
             print(
                 "Testudo: root snapshot save blocked while registered Environments exist."
             )
-            return
+            return false
         }
 
         if fileURL.lastPathComponent == "EnvironmentData.json" {
@@ -2621,7 +2624,7 @@ final class TestudoStore: ObservableObject {
                 print(
                     "Testudo: Environment save blocked: missing Environment ID."
                 )
-                return
+                return false
             }
 
             do {
@@ -2634,7 +2637,7 @@ final class TestudoStore: ObservableObject {
                     "Testudo: Environment save blocked:",
                     error
                 )
-                return
+                return false
             }
         }
 
@@ -2653,11 +2656,13 @@ final class TestudoStore: ObservableObject {
                 to: fileURL,
                 options: .atomic
             )
+            return true
         } catch {
             print(
                 "Testudo: could not save data:",
                 error
             )
+            return false
         }
     }
 
