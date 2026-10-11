@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{2.0}
-\newcommand{\DocumentedTestudoVersion}{0.2.2}
-\newcommand{\DocumentedTestudoBuild}{15}
+\newcommand{\ManualVersion}{2.1}
+\newcommand{\DocumentedTestudoVersion}{0.3.0}
+\newcommand{\DocumentedTestudoBuild}{16}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition is aligned with Testudo 0.2.2. The release refines active Work navigation so Closed Task trees remain outside \menu{All Tasks}, makes the Calendar sidebar present the currently selected Day in the detail pane, and introduces the first Beta version of semantic PDF export through \menu{File > Export...}. Exported Work can optionally include nested child items to a user-selected depth up to the actual maximum depth of the selected Task subtree. Existing \fileext{.testudoenv} data remains compatible because these changes do not require a new storage representation.
+This edition documents Testudo 0.3.0 (build 16). The release adds explicit Work Environment format and identity verification, safer startup and Environment switching, protected snapshot writes, conservative manifest handling and additional credential-file safeguards. It does not introduce simultaneous multi-device editing or automatic synchronization conflict resolution. Legacy Environment database schema 7 is not migrated automatically.
 }
 
 \manualwarning{Early-release software}{
@@ -181,7 +181,7 @@ cd Testudo
 
 The resulting DMG is written under \filepath{dist/}. For this release the expected name is normally:
 \begin{lstlisting}
-dist/Testudo-0.2.1-macOS-arm64.dmg
+dist/Testudo-0.3.0-macOS-arm64.dmg
 \end{lstlisting}
 
 \section{Updating}
@@ -1205,6 +1205,53 @@ Before upgrading an important real Environment, create a fresh Demo and perform 
 
 The \fileext{.testudoenv} package is the principal portable unit. It contains the Environment's manifest, data, credentials and optional icon.
 
+
+\section{Storage compatibility in Testudo 0.3.0}
+
+Testudo 0.3.0 introduces explicit compatibility verification before supported Environment data is opened or written.
+
+The verification checks the available Environment format information, database representation and Environment identity. It rejects unsupported formats, incompatible schema versions, inconsistent identities and malformed data rather than attempting to repair them silently.
+
+The normal legacy snapshot storage engine supports compatible schema 8 databases. Database schema 7 requires a separate migration procedure and is not migrated automatically.
+
+A future database schema is not automatically downgraded. Journal-based storage also requires a different storage engine and cannot be treated as a legacy snapshot database.
+
+Supported older manifest metadata can be updated conservatively when verification permits. A missing manifest is not silently reconstructed from unverified data.
+
+\manualwarning{Do not force an incompatible Environment open}{
+If an Environment is reported as incompatible, preserve its complete original package and an independent backup. Do not manually change its schema number or remove files to bypass compatibility checks. A necessary migration should be performed separately with a verified procedure.
+}
+
+\section{Safer startup and Environment switching}
+
+Startup verification avoids automatically rewriting an Environment database.
+
+When registering or activating an Environment, Testudo validates the relevant format and identity before accepting it.
+
+When switching between Environments, the application protects the current selection and in-memory state if saving pending data or updating the application registry fails.
+
+A failed switch should therefore be investigated rather than bypassed by manually replacing registry or Environment files.
+
+\section{Environment credential-file safety}
+
+Each Work Environment maintains its own credential file, separate from the installation-level Testudo password.
+
+Before a normal Environment credential update, Testudo verifies that the Environment database can be written safely and that the credential data belongs to the active Environment.
+
+An existing credential file must be readable and use a supported schema. The update must also preserve existing credential membership identities.
+
+A missing credential file is not silently recreated by the normal password writer. Corrupt or incompatible credentials are preserved instead of being replaced with an empty set.
+
+The first Administrator is initialized through the dedicated Environment creation workflow.
+
+\section{Administrator session requirement}
+
+An Environment Administrator must have an open Environment session to perform Administrator password changes.
+
+Closing the Environment session removes this authorization even when the Environment remains selected and its remembered access information has not been deleted.
+
+Password recovery is a separate workflow requiring its own verification.
+
 \section{Cloud-synchronised folders}
 
 An Environment can live in Dropbox, iCloud Drive, OneDrive or another filesystem provider visible to macOS. Testudo still works on the package as a file package.
@@ -1303,6 +1350,27 @@ For long-running work, short Activities documenting important events provide a m
 % ============================================================
 \chapter{Troubleshooting}
 
+\section{An Environment requires migration}
+
+If Testudo reports that an Environment uses an older database schema, do not edit the schema version manually.
+
+Testudo 0.3.0 does not automatically convert schema 7 Environment databases to schema 8. Preserve the original package and a backup, then use an explicitly verified migration process before opening it with the newer application.
+
+\section{Credentials are missing or incompatible}
+
+If a password update reports missing, corrupt, incompatible or mismatched Environment credentials, stop attempting to reset passwords.
+
+Preserve the complete Environment package. Check that the correct Environment was selected and investigate the credential file before attempting recovery.
+
+The ordinary password writer deliberately refuses to recreate a missing credential file or overwrite unreadable credentials.
+
+\section{An Administrator cannot change a password}
+
+Make sure the correct Work Environment is active and that you have opened an authenticated Environment session.
+
+An Administrator membership alone is not sufficient when the Environment session has been closed.
+
+
 \section{The installer says the source checkout has local changes}
 
 The automatic installer deliberately refuses to overwrite local work. Inspect the checkout:
@@ -1361,7 +1429,7 @@ This is expected. A Closed top-level Task and its subtree are removed from activ
 % ============================================================
 \chapter{Guided End-to-End Verification Lab}
 
-This chapter provides a complete hands-on test that exercises the most important 0.1.7 behaviours in one disposable Environment.
+This chapter provides a complete hands-on test of the core Work model and interface in one disposable Environment.
 
 \section{Step 1: create the Environment}
 
@@ -1491,8 +1559,8 @@ Scripts/version.sh
 
 \filepath{Scripts/version.sh} is the build scripts' central version source. For this manual:
 \begin{lstlisting}
-TESTUDO_VERSION="0.1.10"
-TESTUDO_BUILD_NUMBER="11"
+TESTUDO_VERSION="0.3.0"
+TESTUDO_BUILD_NUMBER="16"
 \end{lstlisting}
 
 \section{Task status persistence compatibility}

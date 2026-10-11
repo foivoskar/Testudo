@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.2.2 · build 15 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.3.0 · build 16 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -35,44 +35,58 @@ The application is local-first. It does not require a Testudo cloud service.
 
 ## Current release
 
-The current version is:
+The current public version is **Testudo 0.3.0 (build 16)**.
 
-```text
-Testudo 0.2.2
-Build 15
-```
+### What changed in 0.3.0
 
-### What changed in 0.2.2
+Testudo 0.3.0 strengthens Work Environment storage safety and establishes a more explicit foundation for format compatibility.
 
-Testudo 0.2.2 refines active Work navigation and introduces the first Beta version of document export.
+The release introduces a separate TestudoCore module for Environment format inspection, compatibility decisions, JSON encoding and decoding, manifest handling, startup validation, and snapshot-write preflight checks.
 
-#### Active All Tasks
+### Safer Environment activation
 
-Closed top-level Tasks and the Work contained inside their archived subtree are no longer shown in the active All Tasks collection.
+Before opening or switching Work Environments, Testudo verifies the relevant storage format and Environment identity.
 
-Closed Work remains available through Archive and retains its actual workflow status and history.
+The application rejects unsupported formats and incompatible or damaged data rather than silently replacing or rewriting them.
 
-#### Calendar detail destination
+Environment switching also protects the currently active Environment when saving its pending changes or updating the local registry fails.
 
-Choosing Calendar now presents the currently selected Day in the right-hand detail pane.
+### Credential Store protection
 
-The initial selected date is Today. When another date has been selected, Testudo preserves that date when returning to the Calendar rather than unnecessarily resetting the Calendar workflow.
+Environment credential changes now include additional safeguards:
 
-#### Export — Beta
+- existing credential files must be readable and compatible;
+- the stored Environment identity must match the active Environment;
+- unsupported credential schemas are rejected;
+- existing memberships cannot silently disappear during a credential update;
+- a missing credential file is not silently recreated by the normal password writer;
+- Administrator password changes require an open Environment session.
 
-File → Export… introduces an early Beta document-export workflow.
+The normal creation of an Environment and its initial Administrator remains supported.
 
-The current exporter produces PDF documents from semantic Testudo data rather than screenshots of the interface. PDF text is therefore selectable and remains sharp when scaled.
+### Compatibility and migration policy
 
-For Tasks, the exporter can optionally include nested Work recursively. When nested Work is enabled, the user can select the expansion depth up to the actual maximum depth of the selected Task subtree.
+Testudo 0.3.0 does not automatically migrate legacy Environment databases from schema 7 to schema 8.
 
-The exported document currently reproduces important parts of Testudo's detail visual language, including titles, SF Symbols, metadata, Work status, Theme context and structured detail rows.
+Existing compatible schema 8 Environments remain supported, subject to the normal compatibility checks.
 
-The detailed application Work Log is intentionally excluded from exported documents.
+The obsolete automatic schema 7-to-8 migration implementation has been removed. Environments requiring migration must be handled separately, with appropriate backups and an explicitly verified migration procedure.
 
-Export remains a Beta feature. Document layout and visual fidelity do not yet reproduce every element of every Testudo detail pane exactly and will continue to evolve in later releases.
+Journal-based Environment storage requires a different storage engine and is not enabled by this release.
 
-No Work Environment schema migration is required for this release.
+### Verification
+
+The 0.3.0 development baseline passed 95 automated tests: 69 TestudoCore tests and 26 integration tests.
+
+The integration coverage includes Environment startup, registration, activation, switching, failure recovery and credential-file safety.
+
+### Synchronization limitations
+
+Portable Work Environments can still be stored in folders synchronized by Dropbox, iCloud Drive, OneDrive or other filesystem providers.
+
+This release does not introduce simultaneous multi-device editing, automatic conflict resolution or a synchronization server.
+
+Avoid editing the same Environment concurrently on multiple Macs, and keep independent backups.
 
 ---
 
@@ -152,7 +166,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.2.2-macOS-arm64.dmg
+dist/Testudo-0.3.0-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -738,11 +752,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 2.0 documents Testudo 0.2.2 (build 15)**.
+The bundled **Testudo User Manual 2.1 documents Testudo 0.3.0 (build 16)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.2.2 (build 15)** application state.
+This README and the User Manual reflect the current **Testudo 0.3.0 (build 16)** application state.
 
 ---
 
