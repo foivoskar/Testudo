@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{2.1}
-\newcommand{\DocumentedTestudoVersion}{0.3.0}
-\newcommand{\DocumentedTestudoBuild}{16}
+\newcommand{\ManualVersion}{2.2}
+\newcommand{\DocumentedTestudoVersion}{0.3.1}
+\newcommand{\DocumentedTestudoBuild}{17}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition documents Testudo 0.3.0 (build 16). The release adds explicit Work Environment format and identity verification, safer startup and Environment switching, protected snapshot writes, conservative manifest handling and additional credential-file safeguards. It does not introduce simultaneous multi-device editing or automatic synchronization conflict resolution. Legacy Environment database schema 7 is not migrated automatically.
+This edition documents Testudo 0.3.1 (build 17). The release introduces optional, time-zone-aware Planned Start for Tasks, inherited availability constraints for Subtasks, Calendar and Today integration, and historical change tracking. Environments using Planned Start transition to database schema 9. Older Testudo versions cannot open schema 9 Environments. Schema 8 remains supported; schema 7 requires explicit migration. Simultaneous multi-device editing and automatic conflict resolution are not supported.
 }
 
 \manualwarning{Early-release software}{
@@ -181,7 +181,7 @@ cd Testudo
 
 The resulting DMG is written under \filepath{dist/}. For this release the expected name is normally:
 \begin{lstlisting}
-dist/Testudo-0.3.0-macOS-arm64.dmg
+dist/Testudo-0.3.1-macOS-arm64.dmg
 \end{lstlisting}
 
 \section{Updating}
@@ -867,6 +867,54 @@ Open a Person or Theme that has several related Work items. Select a related Tas
 % ============================================================
 % CHAPTER 19
 % ============================================================
+\chapter{Planned Start}
+
+\section{Purpose}
+
+Planned Start is an optional date and time specifying when a Task
+is intended to become actionable. It is independent of Deadline,
+workflow status and the actual Started timestamp.
+
+A Task with a future Planned Start can remain To Do. Reaching the
+planned date does not automatically change its status.
+
+\section{Subtasks}
+
+A Subtask inherits the availability constraints of its Parent Task
+and all ancestor Tasks.
+
+The effective Planned Start is the latest applicable date and time
+in that hierarchy.
+
+Tasks already In Progress or actually started remain available.
+
+\section{Today and Calendar}
+
+Today distinguishes work that is already actionable from work with
+future Planned Starts.
+
+Calendar and Day workspace display explicit Planned Start occurrences.
+A Subtask inheriting only its Parent's Planned Start does not create
+an independent Calendar occurrence.
+
+\section{History}
+
+Creating, changing or removing Planned Start records a distinct
+historical event. This does not represent an actual Task start.
+
+\section{Compatibility}
+
+When Planned Start data is first saved, the Work Environment database
+transitions from schema 8 to schema 9.
+
+This transition is retained even if Planned Start is later removed.
+
+Testudo 0.3.0 cannot open schema 9 Environments.
+
+Before using Planned Start in an Environment shared between Macs,
+update all relevant Testudo installations and preserve an independent
+backup of the Environment.
+
 \chapter{Today}
 
 \section{Today is a work summary, not only a schedule}
@@ -1559,8 +1607,8 @@ Scripts/version.sh
 
 \filepath{Scripts/version.sh} is the build scripts' central version source. For this manual:
 \begin{lstlisting}
-TESTUDO_VERSION="0.3.0"
-TESTUDO_BUILD_NUMBER="16"
+TESTUDO_VERSION="0.3.1"
+TESTUDO_BUILD_NUMBER="17"
 \end{lstlisting}
 
 \section{Task status persistence compatibility}

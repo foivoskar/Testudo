@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.3.0 · build 16 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.3.1 · build 17 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -30,6 +30,29 @@ It combines:
 Testudo is designed particularly for research, scientific software, laboratories, technical operations, academic collaboration, infrastructure, committees, long-running projects and other professional work where both **structure** and **history** matter.
 
 The application is local-first. It does not require a Testudo cloud service.
+
+---
+
+## Testudo 0.3.1 (build 17) — Local release candidate
+
+This version introduces optional, timezone-aware Planned Start for Tasks.
+
+Planned Start is distinct from the actual Started timestamp, Deadline,
+and workflow status. Subtasks inherit availability constraints from
+their Parent Tasks.
+
+The feature is integrated into the existing editor, Today, Calendar,
+Day workspace, Task details and History.
+
+The implementation passed 110 automated tests and manual UI checks.
+
+**Important compatibility notice:** Work Environments using Planned
+Start are upgraded to database schema 9. Testudo 0.3.0 cannot open
+schema 9 Environments. Update all Macs using the same Environment
+before introducing Planned Start data.
+
+The public release remains 0.3.0 until this release candidate is
+published.
 
 ---
 
@@ -90,7 +113,7 @@ Avoid editing the same Environment concurrently on multiple Macs, and keep indep
 
 ---
 
-## Planned Start (in development — unreleased)
+## Planned Start (0.3.1 release candidate)
 
 The `feature/planned-start` branch introduces an optional, time-zone-aware
 Planned Start for Tasks. This is development functionality and is not
@@ -779,7 +802,7 @@ The bundled **Testudo User Manual 2.1 documents Testudo 0.3.0 (build 16)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual reflect the current **Testudo 0.3.0 (build 16)** application state.
+This README includes the Testudo 0.3.1 release candidate. The User Manual source has been updated for version 0.3.1 (build 17).
 
 ---
 
