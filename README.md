@@ -90,6 +90,29 @@ Avoid editing the same Environment concurrently on multiple Macs, and keep indep
 
 ---
 
+## Planned Start (in development — unreleased)
+
+The `feature/planned-start` branch introduces an optional, time-zone-aware
+Planned Start for Tasks. This is development functionality and is not
+included in the current public Testudo 0.3.0 release.
+
+Planned Start specifies when work is intended to become actionable.
+It is independent of the actual Started timestamp and does not
+automatically change Task status.
+
+The feature integrates with Task editing, History, Today, the
+Day workspace and Calendar.
+
+**Compatibility:** Environments using Planned Start transition from
+database schema 8 to schema 9. Testudo 0.3.0 cannot open schema 9
+Environments. Update every Mac using a shared Environment before
+introducing Planned Start data.
+
+See [Planned Start development documentation](Documentation/PlannedStart.md)
+for behavior, compatibility restrictions and verification.
+
+---
+
 ## Requirements
 
 The current source targets:
