@@ -1,9 +1,8 @@
 Planned Start is an optional date and time associated with a Task.
 It specifies when that Task is intended to become available for work.
 
-This document describes the feature currently implemented on the
-`feature/planned-start` development branch. It is not part of the
-public Testudo 0.3.0 (build 16) release.
+This document describes the Planned Start feature introduced in
+Testudo 0.3.1 (build 17).
 
 ## Functional model
 
@@ -108,13 +107,13 @@ Planned Start is removed.
 The public Testudo 0.3.0 release supports compatible schema 8
 Work Environments.
 
-The development version supports schemas 8 and 9.
+Testudo 0.3.1 supports schemas 8 and 9.
 
 An existing schema 8 Environment stays at schema 8 until
 Planned Start information is saved.
 
 When Planned Start data or Planned Start History is present,
-the development version saves the Environment using schema 9.
+Testudo 0.3.1 saves the Environment using schema 9.
 
 Once upgraded, the Environment remains at schema 9 even if
 the current Planned Start is later cleared.
@@ -187,10 +186,7 @@ manual UI acceptance test before release.
 
 ## Release status
 
-This feature remains unreleased.
+Planned Start was introduced in Testudo 0.3.1 (build 17).
 
-No change to the public version or build number is implied
-by this documentation.
-
-A production release requires final review, a safe UI
-acceptance test and explicit release preparation.
+The release is distributed through the source-first local
+installation workflow. No prebuilt executable is published.

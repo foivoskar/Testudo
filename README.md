@@ -33,7 +33,7 @@ The application is local-first. It does not require a Testudo cloud service.
 
 ---
 
-## Testudo 0.3.1 (build 17) — Local release candidate
+## Current release — Testudo 0.3.1 (build 17)
 
 This version introduces optional, timezone-aware Planned Start for Tasks.
 
@@ -51,14 +51,13 @@ Start are upgraded to database schema 9. Testudo 0.3.0 cannot open
 schema 9 Environments. Update all Macs using the same Environment
 before introducing Planned Start data.
 
-The public release remains 0.3.0 until this release candidate is
-published.
+Testudo 0.3.1 is the current public release.
 
 ---
 
-## Current release
+## Previous release — Testudo 0.3.0 (build 16)
 
-The current public version is **Testudo 0.3.0 (build 16)**.
+The previous release established the Environment compatibility safeguards described below.
 
 ### What changed in 0.3.0
 
@@ -113,11 +112,10 @@ Avoid editing the same Environment concurrently on multiple Macs, and keep indep
 
 ---
 
-## Planned Start (0.3.1 release candidate)
+## Planned Start (0.3.1)
 
-The `feature/planned-start` branch introduces an optional, time-zone-aware
-Planned Start for Tasks. This is development functionality and is not
-included in the current public Testudo 0.3.0 release.
+Testudo 0.3.1 introduces an optional, time-zone-aware
+Planned Start for Tasks.
 
 Planned Start specifies when work is intended to become actionable.
 It is independent of the actual Started timestamp and does not
@@ -802,7 +800,7 @@ The bundled **Testudo User Manual 2.1 documents Testudo 0.3.0 (build 16)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README includes the Testudo 0.3.1 release candidate. The User Manual source has been updated for version 0.3.1 (build 17).
+This README and the User Manual source document Testudo 0.3.1 (build 17).
 
 ---
 
