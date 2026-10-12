@@ -19,6 +19,9 @@ struct DayWorkspaceView: View {
     private var isAppLogExpanded =
         false
 
+    @State
+    private var observedNow = Date()
+
 
     private var calendar: Calendar {
         Calendar.autoupdatingCurrent
@@ -46,8 +49,16 @@ struct DayWorkspaceView: View {
 
     private var todayStart: Date {
         calendar.startOfDay(
-            for: Date()
+            for: observedNow
         )
+    }
+
+    private var workAvailabilityInstant: Date {
+        if dayStart == todayStart {
+            return observedNow
+        }
+
+        return dayEnd.addingTimeInterval(-0.001)
     }
 
 
@@ -73,6 +84,15 @@ struct DayWorkspaceView: View {
                         "Schedule"
                     ) {
                         schedule
+                    }
+
+                    dayDivider
+
+                    daySection(
+                        "Planned Starts",
+                        count: plannedStartTasks.count
+                    ) {
+                        plannedStarts
                     }
 
                     dayDivider
@@ -126,6 +146,15 @@ struct DayWorkspaceView: View {
                     alignment: .center
                 )
             }
+        }
+        .onReceive(
+            Timer.publish(
+                every: 15,
+                on: .main,
+                in: .common
+            ).autoconnect()
+        ) { instant in
+            observedNow = instant
         }
     }
 
@@ -281,6 +310,62 @@ struct DayWorkspaceView: View {
     }
 
 
+    private var plannedStartTasks: [WorkItem] {
+        store.data.workItems
+            .filter { item in
+                guard
+                    item.kind == .task,
+                    let plannedStart =
+                        item.plannedStartAt
+                else {
+                    return false
+                }
+
+                return calendar.isDate(
+                    plannedStart,
+                    inSameDayAs: date
+                )
+            }
+            .sorted {
+                ($0.plannedStartAt ?? .distantFuture)
+                <
+                ($1.plannedStartAt ?? .distantFuture)
+            }
+    }
+
+    @ViewBuilder
+    private var plannedStarts: some View {
+        if plannedStartTasks.isEmpty {
+            emptyText(
+                "No Tasks are planned to start on this day."
+            )
+        } else {
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                ForEach(plannedStartTasks) { task in
+                    Button {
+                        selectWork(task.id)
+                    } label: {
+                        WorkGuideRow(
+                            item: task,
+                            context:
+                                "Planned Start · "
+                                + TestudoTime.displayTime(
+                                    task.plannedStartAt
+                                        ?? date,
+                                    sourceTimeZoneID:
+                                        task.plannedStartTimeZoneID
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     private struct PlannedWorkstream:
         Identifiable
     {
@@ -301,6 +386,15 @@ struct DayWorkspaceView: View {
                     item.status == .todo
                     || item.status == .inProgress,
                     item.createdAt < dayEnd
+                else {
+                    return false
+                }
+
+                guard
+                    store.isTaskAvailableForWork(
+                        item,
+                        at: workAvailabilityInstant
+                    )
                 else {
                     return false
                 }
@@ -2654,6 +2748,9 @@ struct DayWorkspaceView: View {
         case .scheduled:
             return "Scheduled"
 
+        case .plannedStartChanged:
+            return "Planned Start changed"
+
         case .started:
             return "Started"
 
@@ -2701,6 +2798,9 @@ struct DayWorkspaceView: View {
 
         case .scheduled:
             return "calendar"
+
+        case .plannedStartChanged:
+            return "calendar.badge.plus"
 
         case .started:
             return "play.circle"

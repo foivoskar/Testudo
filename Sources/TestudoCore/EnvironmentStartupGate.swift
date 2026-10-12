@@ -42,7 +42,7 @@ public enum EnvironmentStartupGate {
                         with: raw
                     ) as? [String: Any],
                 let schema = object["schemaVersion"] as? Int,
-                (1...8).contains(schema)
+                (1...9).contains(schema)
             else {
                 return .blocked(.unsupported)
             }

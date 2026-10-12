@@ -16,12 +16,15 @@ struct TodayDashboardView: View {
     @Binding
     var selection: UUID?
 
+    @State
+    private var observedNow = Date()
+
     private var calendar: Calendar {
         Calendar.autoupdatingCurrent
     }
 
     private var now: Date {
-        Date()
+        observedNow
     }
 
     private var startOfToday: Date {
@@ -120,6 +123,15 @@ struct TodayDashboardView: View {
         .background(
             TestudoStyle.contentBackground
         )
+        .onReceive(
+            Timer.publish(
+                every: 15,
+                on: .main,
+                in: .common
+            ).autoconnect()
+        ) { instant in
+            observedNow = instant
+        }
     }
 
     @ViewBuilder
@@ -178,6 +190,32 @@ struct TodayDashboardView: View {
             .filter { item in
                 if
                     item.kind == .task,
+                    item.status == .todo,
+                    item.startedAt == nil,
+                    let plannedStart = store.effectivePlannedStart(
+                        for: item
+                    ),
+                    plannedStart < startOfToday,
+                    store.isTaskAvailableForWork(
+                        item,
+                        at: now
+                    )
+                {
+                    return true
+                }
+
+                if
+                    item.kind == .task,
+                    !store.isTaskAvailableForWork(
+                        item,
+                        at: now
+                    )
+                {
+                    return false
+                }
+
+                if
+                    item.kind == .task,
                     (
                         item.status == .todo
                         || item.status == .inProgress
@@ -219,6 +257,31 @@ struct TodayDashboardView: View {
                     )
                 else {
                     return false
+                }
+
+                if
+                    item.kind == .task,
+                    !store.isTaskAvailableForWork(
+                        item,
+                        at: now
+                    )
+                {
+                    return false
+                }
+
+                if
+                    item.kind == .task,
+                    (
+                        item.status == .todo
+                        || item.status == .inProgress
+                    ),
+                    let plannedStart =
+                        store.effectivePlannedStart(
+                            for: item
+                        ),
+                    isToday(plannedStart)
+                {
+                    return true
                 }
 
                 if
@@ -334,6 +397,21 @@ struct TodayDashboardView: View {
                     )
                 else {
                     return false
+                }
+
+                if
+                    item.kind == .task,
+                    (
+                        item.status == .todo
+                        || item.status == .inProgress
+                    ),
+                    let plannedStart = store.effectivePlannedStart(
+                        for: item
+                    ),
+                    plannedStart >= startOfTomorrow,
+                    plannedStart < endOfUpcomingWindow
+                {
+                    return true
                 }
 
                 if
@@ -530,6 +608,16 @@ struct TodayDashboardView: View {
         }
 
         if
+            item.kind == .task,
+            let plannedStart =
+                store.effectivePlannedStart(
+                    for: item
+                )
+        {
+            return plannedStart
+        }
+
+        if
             let reminder =
                 item.reminderAt
         {
@@ -564,6 +652,64 @@ struct TodayDashboardView: View {
         for item: WorkItem,
         section: String
     ) -> String? {
+        if
+            item.kind == .task,
+            let plannedStart = store.effectivePlannedStart(
+                for: item
+            )
+        {
+            if
+                section == "Needs Attention",
+                item.startedAt == nil,
+                plannedStart < startOfToday,
+                (
+                    item.deadlineAt == nil
+                    || item.deadlineAt! >= startOfToday
+                )
+            {
+                let days = calendar.dateComponents(
+                    [.day],
+                    from: calendar.startOfDay(
+                        for: plannedStart
+                    ),
+                    to: startOfToday
+                ).day ?? 0
+
+                return days == 1
+                    ? "Start overdue · 1 day"
+                    : "Start overdue · \(days) days"
+            }
+
+            if
+                section == "Today",
+                isToday(plannedStart)
+            {
+                return "Planned Start · "
+                    + TestudoTime.displayTime(
+                        plannedStart,
+                        sourceTimeZoneID:
+                            item.plannedStartAt == plannedStart
+                            ? item.plannedStartTimeZoneID
+                            : nil
+                    )
+            }
+
+            if
+                section == "Upcoming",
+                plannedStart >= startOfTomorrow,
+                plannedStart < endOfUpcomingWindow
+            {
+                return "Starts "
+                    + TestudoTime.displayDateTime(
+                        plannedStart,
+                        sourceTimeZoneID:
+                            item.plannedStartAt == plannedStart
+                            ? item.plannedStartTimeZoneID
+                            : nil
+                    )
+            }
+        }
+
         if
             item.kind == .task,
             let deadline =
@@ -2003,6 +2149,23 @@ struct WorkItemDetailView: View {
                             item.status?
                                 .displayName
                             ?? "To Do"
+                    )
+
+                    ReadOnlyInspectorRow(
+                        label:
+                            "Planned Start",
+                        value:
+                            item.plannedStartAt
+                                .map {
+                                    TestudoTime.displayDateTime(
+                                        $0,
+                                        sourceTimeZoneID:
+                                            item.plannedStartTimeZoneID
+                                    )
+                                }
+                            ?? "None",
+                        dateDestination:
+                            item.plannedStartAt
                     )
 
                     ReadOnlyInspectorRow(
@@ -5186,6 +5349,11 @@ struct WorkItemDetailView: View {
                 event.text
                 ?? "\(title) scheduled"
 
+        case .plannedStartChanged:
+            return
+                event.text
+                ?? "\(title) planned start changed"
+
         case .started:
             return
                 event.text
@@ -5242,6 +5410,25 @@ struct WorkItemDetailView: View {
             return event.newValue
         }
 
+        if event.kind == .plannedStartChanged {
+            guard
+                let value = event.newValue,
+                let date = ISO8601DateFormatter().date(
+                    from: value
+                )
+            else {
+                return "Planned Start removed"
+            }
+
+            return
+                "Planned Start: "
+                + TestudoTime.displayDateTime(
+                    date,
+                    sourceTimeZoneID:
+                        event.valueTimeZoneID
+                )
+        }
+
         if
             event.kind == .scheduled,
             let newValue =
@@ -5278,6 +5465,9 @@ struct WorkItemDetailView: View {
 
         case .scheduled:
             return "calendar.badge.clock"
+
+        case .plannedStartChanged:
+            return "calendar.badge.plus"
 
         case .started:
             return "play.circle"
@@ -5702,6 +5892,10 @@ struct WorkItemDetailView: View {
                 : nil,
             scheduledAt:
                 nil,
+            plannedStartAt:
+                item.kind == .task
+                ? item.plannedStartAt
+                : nil,
             loggedAt:
                 item.kind == .activity
                 ? (
@@ -5718,6 +5912,10 @@ struct WorkItemDetailView: View {
                 reminderWasEdited
                 ? reminderTimeZoneID
                 : item.reminderTimeZoneID,
+            plannedStartTimeZoneID:
+                item.kind == .task
+                ? item.plannedStartTimeZoneID
+                : nil,
             loggedTimeZoneID:
                 loggedAtWasEdited
                 ? loggedTimeZoneID

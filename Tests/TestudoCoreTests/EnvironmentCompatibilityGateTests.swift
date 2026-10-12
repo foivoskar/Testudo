@@ -91,6 +91,20 @@ final class EnvironmentCompatibilityGateTests:
         )
     }
 
+    func testPlannedStartSchemaNineIsSupported() throws {
+        XCTAssertEqual(
+            try inspect(databaseSchema: 9),
+            .legacyReady
+        )
+    }
+
+    func testSchemaTenIsRejected() throws {
+        XCTAssertEqual(
+            try inspect(databaseSchema: 10),
+            .unsupported
+        )
+    }
+
     func testFutureDatabaseSchemaIsBlocked() throws {
         XCTAssertEqual(
             try inspect(databaseSchema: 99),

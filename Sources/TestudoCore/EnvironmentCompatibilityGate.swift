@@ -61,7 +61,7 @@ public enum EnvironmentCompatibilityGate {
             return .unsupported
         }
 
-        guard (7...8).contains(
+        guard (7...9).contains(
             database.schemaVersion
         ) else {
             return .unsupported

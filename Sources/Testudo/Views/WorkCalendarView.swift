@@ -575,6 +575,16 @@ struct WorkCalendarView: View {
                         spacing: 3
                     ) {
                         if
+                            summary.plannedStarts
+                                > 0
+                        {
+                            Image(
+                                systemName:
+                                    "play.circle"
+                            )
+                        }
+
+                        if
                             summary.deadlines
                                 > 0
                         {
@@ -704,6 +714,12 @@ struct WorkCalendarView: View {
             }
 
             agendaSection(
+                title: "Planned Starts",
+                occurrences:
+                    plannedStartOccurrences
+            )
+
+            agendaSection(
                 title: "Deadlines",
                 occurrences:
                     deadlineOccurrences
@@ -778,6 +794,15 @@ struct WorkCalendarView: View {
         occurrences(
             on: selectedDate
         )
+    }
+
+    private var plannedStartOccurrences:
+        [CalendarOccurrence]
+    {
+        selectedDayOccurrences
+            .filter {
+                $0.kind == .plannedStart
+            }
     }
 
     private var deadlineOccurrences:
@@ -941,6 +966,24 @@ struct WorkCalendarView: View {
         {
             if
                 item.kind == .task,
+                let plannedStart =
+                    item.plannedStartAt,
+                calendar.isDate(
+                    plannedStart,
+                    inSameDayAs: date
+                )
+            {
+                result.append(
+                    CalendarOccurrence(
+                        item: item,
+                        kind: .plannedStart,
+                        date: plannedStart
+                    )
+                )
+            }
+
+            if
+                item.kind == .task,
                 let deadline =
                     item.deadlineAt,
                 calendar.isDate(
@@ -999,6 +1042,10 @@ struct WorkCalendarView: View {
             )
 
         return CalendarDaySummary(
+            plannedStarts:
+                items.filter {
+                    $0.kind == .plannedStart
+                }.count,
             deadlines:
                 items.filter {
                     $0.kind == .deadline
@@ -1198,12 +1245,14 @@ struct WorkCalendarView: View {
 }
 
 private struct CalendarDaySummary {
+    let plannedStarts: Int
     let deadlines: Int
     let reminders: Int
     let events: Int
 
     var total: Int {
-        deadlines
+        plannedStarts
+        + deadlines
         + reminders
         + events
     }
@@ -1215,15 +1264,18 @@ private struct CalendarOccurrence:
     enum Kind:
         String
     {
+        case plannedStart
         case deadline
         case reminder
 
         var sortOrder: Int {
             switch self {
-            case .deadline:
+            case .plannedStart:
                 return 0
-            case .reminder:
+            case .deadline:
                 return 1
+            case .reminder:
+                return 2
             }
         }
     }
@@ -1245,6 +1297,15 @@ private struct CalendarOccurrence:
 
     var context: String {
         switch kind {
+        case .plannedStart:
+            return
+                "Planned Start "
+                + TestudoTime.displayTime(
+                    date,
+                    sourceTimeZoneID:
+                        item.plannedStartTimeZoneID
+                )
+
         case .deadline:
             if
                 date.formatted(

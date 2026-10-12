@@ -233,7 +233,7 @@ final class TestudoStore: ObservableObject {
                             with: raw
                         ) as? [String: Any],
                     let schema = object["schemaVersion"] as? Int,
-                    schema == 8
+                    (8...9).contains(schema)
                 else {
                     startupBlockedReason =
                         "The legacy root database requires an explicit migration."
@@ -2659,8 +2659,24 @@ final class TestudoStore: ObservableObject {
         }
 
         do {
+            var snapshot = data
+
+            let containsPlannedStart =
+                snapshot.workItems.contains {
+                    $0.plannedStartAt != nil
+                    || $0.plannedStartTimeZoneID != nil
+                }
+                || snapshot.historyEvents.contains {
+                    $0.kind == .plannedStartChanged
+                }
+
+            if containsPlannedStart {
+                snapshot.schemaVersion =
+                    max(snapshot.schemaVersion, 9)
+            }
+
             let encoded =
-                try EnvironmentJSONCodec.encode(data)
+                try EnvironmentJSONCodec.encode(snapshot)
 
             if fileURL.lastPathComponent == "TestudoData.json" {
                 try FileManager.default.createDirectory(
@@ -2673,6 +2689,10 @@ final class TestudoStore: ObservableObject {
                 to: fileURL,
                 options: .atomic
             )
+
+            data.schemaVersion =
+                snapshot.schemaVersion
+
             return true
         } catch {
             print(
@@ -4487,9 +4507,11 @@ extension TestudoStore {
         deadlineAt: Date?,
         reminderAt: Date?,
         scheduledAt: Date?,
+        plannedStartAt: Date?,
         loggedAt: Date? = nil,
         deadlineTimeZoneID: String? = nil,
         reminderTimeZoneID: String? = nil,
+        plannedStartTimeZoneID: String? = nil,
         loggedTimeZoneID: String? = nil
     ) -> String? {
         guard
@@ -4506,6 +4528,16 @@ extension TestudoStore {
         if status == .closed {
             return
                 "Closed is an archive lifecycle state, not a Task status."
+        }
+
+        if
+            data.workItems[index].kind == .task,
+            let plannedStartAt,
+            let deadlineAt,
+            plannedStartAt > deadlineAt
+        {
+            return
+                "Planned Start cannot be after Deadline."
         }
 
         if
@@ -4601,6 +4633,8 @@ extension TestudoStore {
             }
         }
 
+        let previousData = data
+
         let now = Date()
 
         let currentTimeZoneID =
@@ -4614,6 +4648,14 @@ extension TestudoStore {
         let oldDeadline =
             data.workItems[index]
                 .deadlineAt
+
+        let oldPlannedStart =
+            data.workItems[index]
+                .plannedStartAt
+
+        let oldPlannedStartTimeZoneID =
+            data.workItems[index]
+                .plannedStartTimeZoneID
 
         let hadStarted =
             data.workItems[index]
@@ -4649,6 +4691,24 @@ extension TestudoStore {
 
             data.workItems[index].status =
                 newStatus
+
+            data.workItems[index]
+                .plannedStartAt =
+                plannedStartAt
+
+            data.workItems[index]
+                .plannedStartTimeZoneID =
+                plannedStartAt == nil
+                ? nil
+                : (
+                    TestudoTime
+                        .validTimeZoneIdentifier(
+                            plannedStartTimeZoneID
+                        )
+                    ?? data.workItems[index]
+                        .plannedStartTimeZoneID
+                    ?? currentTimeZoneID
+                )
 
             data.workItems[index]
                 .deadlineAt =
@@ -4778,6 +4838,14 @@ extension TestudoStore {
                 nil
 
             data.workItems[index]
+                .plannedStartAt =
+                nil
+
+            data.workItems[index]
+                .plannedStartTimeZoneID =
+                nil
+
+            data.workItems[index]
                 .deadlineAt =
                 nil
 
@@ -4805,6 +4873,14 @@ extension TestudoStore {
 
         case .activity:
             data.workItems[index].status =
+                nil
+
+            data.workItems[index]
+                .plannedStartAt =
+                nil
+
+            data.workItems[index]
+                .plannedStartTimeZoneID =
                 nil
 
             data.workItems[index]
@@ -4847,6 +4923,44 @@ extension TestudoStore {
                 taskHistoryTitle(
                     updatedTask
                 )
+
+            if
+                oldPlannedStart
+                    != updatedTask.plannedStartAt
+                || (
+                    updatedTask.plannedStartAt != nil
+                    && oldPlannedStartTimeZoneID
+                        != updatedTask.plannedStartTimeZoneID
+                )
+            {
+                appendTaskLifecycleHistory(
+                    workItemID:
+                        updatedTask.id,
+                    kind:
+                        .plannedStartChanged,
+                    timestamp:
+                        now,
+                    text:
+                        updatedTask.plannedStartAt == nil
+                        ? "\(historyTitle) planned start removed"
+                        : (
+                            oldPlannedStart == nil
+                            ? "\(historyTitle) planned start set"
+                            : "\(historyTitle) planned start changed"
+                        ),
+                    previousValue:
+                        oldPlannedStart.map {
+                            TestudoTime.utcString($0)
+                        },
+                    newValue:
+                        updatedTask.plannedStartAt.map {
+                            TestudoTime.utcString($0)
+                        },
+                    valueTimeZoneID:
+                        updatedTask.plannedStartTimeZoneID
+                        ?? oldPlannedStartTimeZoneID
+                )
+            }
 
             if
                 oldDeadline
@@ -4979,7 +5093,12 @@ extension TestudoStore {
             .updatedByMembershipID =
             currentEnvironmentMembership?.id
 
-        save()
+        guard save() else {
+            data = previousData
+
+            return
+                "Could not save Task changes. Existing data was preserved."
+        }
 
         return nil
     }
@@ -9298,6 +9417,73 @@ extension TestudoStore {
     }
 
 
+    func effectivePlannedStart(
+        for item: WorkItem
+    ) -> Date? {
+        guard item.kind == .task else {
+            return nil
+        }
+
+        var effective = item.plannedStartAt
+        var parentID = item.parentWorkItemID
+        var visited: Set<UUID> = [item.id]
+
+        while let id = parentID {
+            guard visited.insert(id).inserted else {
+                break
+            }
+
+            guard
+                let parent = workItem(id: id),
+                parent.kind == .task
+            else {
+                break
+            }
+
+            if let parentStart = parent.plannedStartAt {
+                effective = effective.map {
+                    max($0, parentStart)
+                } ?? parentStart
+            }
+
+            parentID = parent.parentWorkItemID
+        }
+
+        return effective
+    }
+
+    func isTaskAvailableForWork(
+        _ item: WorkItem,
+        at instant: Date
+    ) -> Bool {
+        guard
+            item.kind == .task,
+            (
+                item.status == .todo
+                || item.status == .inProgress
+            ),
+            !isArchivedWorkItem(item)
+        else {
+            return false
+        }
+
+        if
+            item.status == .inProgress
+            || item.startedAt != nil
+        {
+            return true
+        }
+
+        guard
+            let plannedStart =
+                effectivePlannedStart(for: item)
+        else {
+            return true
+        }
+
+        return instant >= plannedStart
+    }
+
     var activeWorkItems:
         [WorkItem]
     {
@@ -10496,7 +10682,10 @@ extension TestudoStore {
                 activeEnvironmentID
                     == environmentID
             {
-                save()
+                guard save() else {
+                    return
+                        "The current Work Environment could not be saved. Copying was cancelled."
+                }
             }
 
 

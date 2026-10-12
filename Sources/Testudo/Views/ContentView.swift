@@ -3767,6 +3767,9 @@ private struct TimelineView: View {
             return "Status changed"
         case .scheduled:
             return "Scheduled"
+
+        case .plannedStartChanged:
+            return "Planned Start changed"
         case .started:
             return "Started"
         case .completed:
@@ -3802,6 +3805,9 @@ private struct TimelineView: View {
             return "arrow.triangle.2.circlepath"
         case .scheduled:
             return "calendar"
+
+        case .plannedStartChanged:
+            return "calendar.badge.plus"
         case .started:
             return "play.circle"
         case .completed:

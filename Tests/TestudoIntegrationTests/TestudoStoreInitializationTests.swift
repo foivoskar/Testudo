@@ -204,7 +204,7 @@ final class TestudoStoreInitializationTests: XCTestCase {
             )
 
         let futureDatabase = Data(
-            "{\"schemaVersion\":9}".utf8
+            "{\"schemaVersion\":10}".utf8
         )
 
         try futureDatabase.write(

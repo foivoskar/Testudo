@@ -168,6 +168,236 @@ final class TestudoEnvironmentActivationTests: XCTestCase {
         )
     }
 
+    func testPlannedStartUpgradesRealPackageFixture() async throws {
+        let root = try temporaryRoot()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let fixture = try makePackage(
+            in: root,
+            name: "PlannedStartUpgrade"
+        )
+
+        _ = try writeRegistry(
+            in: root,
+            environments: [fixture.environment]
+        )
+
+        let originalManifest = try Data(
+            contentsOf: fixture.manifestURL
+        )
+
+        let failure = await MainActor.run { () -> String? in
+            let store = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            if let error = store.activateEnvironment(
+                id: fixture.id
+            ) {
+                return error
+            }
+
+            guard
+                store.data.schemaVersion == 8,
+                let taskID = store.createWorkItem(
+                    themeID: nil,
+                    parentWorkItemID: nil,
+                    kind: .task,
+                    title: "Schema Upgrade Task",
+                    body: "",
+                    deadlineAt: nil
+                )
+            else {
+                return "Could not create schema 8 test Task."
+            }
+
+            guard let plannedStart = ISO8601DateFormatter()
+                .date(from: "2026-11-02T08:30:00Z")
+            else {
+                return "Could not construct Planned Start date."
+            }
+
+            let error = store.updateWorkItemDetails(
+                itemID: taskID,
+                title: "Schema Upgrade Task",
+                body: "",
+                themeID: nil,
+                parentWorkItemID: nil,
+                status: .todo,
+                deadlineAt: nil,
+                reminderAt: nil,
+                scheduledAt: nil,
+                plannedStartAt: plannedStart,
+                plannedStartTimeZoneID: "Europe/Paris"
+            )
+
+            if let error {
+                return error
+            }
+
+            guard store.data.schemaVersion == 9 else {
+                return "In-memory schema was not upgraded."
+            }
+
+            guard
+                let raw = try? Data(
+                    contentsOf: fixture.databaseURL
+                ),
+                let object = try?
+                    JSONSerialization.jsonObject(
+                        with: raw
+                    ) as? [String: Any],
+                object["schemaVersion"] as? Int == 9
+            else {
+                return "Package database was not upgraded."
+            }
+
+            let reopened = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            guard
+                reopened.startupBlockedReason == nil,
+                reopened.data.schemaVersion == 9,
+                reopened.workItem(id: taskID)?
+                    .plannedStartAt == plannedStart,
+                reopened.workItem(id: taskID)?
+                    .plannedStartTimeZoneID == "Europe/Paris",
+                reopened.data.historyEvents.contains(
+                    where: {
+                        $0.workItemID == taskID
+                        && $0.kind == .plannedStartChanged
+                    }
+                )
+            else {
+                return "Schema 9 package reload failed."
+            }
+
+            return nil
+        }
+
+        XCTAssertNil(failure, failure ?? "")
+
+        XCTAssertEqual(
+            try Data(contentsOf: fixture.manifestURL),
+            originalManifest
+        )
+    }
+
+    func testFailedPlannedStartSaveRestoresTask() async throws {
+        let root = try temporaryRoot()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let fixture = try makePackage(
+            in: root,
+            name: "PlannedStartSaveFailure"
+        )
+
+        _ = try writeRegistry(
+            in: root,
+            environments: [fixture.environment]
+        )
+
+        let failure = await MainActor.run { () -> String? in
+            let store = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            if let error = store.activateEnvironment(
+                id: fixture.id
+            ) {
+                return error
+            }
+
+            guard let taskID = store.createWorkItem(
+                themeID: nil,
+                parentWorkItemID: nil,
+                kind: .task,
+                title: "Protected Task",
+                body: "",
+                deadlineAt: nil
+            ) else {
+                return "Could not create test Task."
+            }
+
+            guard let before = try? Data(
+                contentsOf: fixture.databaseURL
+            ) else {
+                return "Could not read original test database."
+            }
+
+            do {
+                try FileManager.default.removeItem(
+                    at: fixture.manifestURL
+                )
+            } catch {
+                return "Could not simulate manifest failure."
+            }
+
+            guard let plannedStart = ISO8601DateFormatter()
+                .date(from: "2026-11-02T08:30:00Z")
+            else {
+                return "Could not construct Planned Start date."
+            }
+
+            let error = store.updateWorkItemDetails(
+                itemID: taskID,
+                title: "Modified Task",
+                body: "This edit must be rolled back.",
+                themeID: nil,
+                parentWorkItemID: nil,
+                status: .todo,
+                deadlineAt: nil,
+                reminderAt: nil,
+                scheduledAt: nil,
+                plannedStartAt: plannedStart,
+                plannedStartTimeZoneID: "Europe/Paris"
+            )
+
+            guard
+                error == "Could not save Task changes. Existing data was preserved."
+            else {
+                return "Failed save did not return an error."
+            }
+
+            guard
+                let task = store.workItem(id: taskID),
+                task.title == "Protected Task",
+                task.body.isEmpty,
+                task.plannedStartAt == nil,
+                task.plannedStartTimeZoneID == nil,
+                store.data.schemaVersion == 8,
+                !store.data.historyEvents.contains(
+                    where: {
+                        $0.workItemID == taskID
+                        && $0.kind == .plannedStartChanged
+                    }
+                )
+            else {
+                return "Failed save did not restore in-memory data."
+            }
+
+            guard
+                let after = try? Data(
+                    contentsOf: fixture.databaseURL
+                ),
+                before == after
+            else {
+                return "Failed save modified the package database."
+            }
+
+            return nil
+        }
+
+        XCTAssertNil(failure, failure ?? "")
+    }
+
     func testValidActivationPreservesEnvironmentFiles() async throws {
         let root = try temporaryRoot()
 
@@ -578,6 +808,115 @@ final class TestudoEnvironmentActivationTests: XCTestCase {
         XCTAssertEqual(
             packageAfter.1,
             packageBefore.1
+        )
+    }
+
+    func testFailedSavePreventsPackageCopy() async throws {
+        let root = try temporaryRoot()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let fixture = try makePackage(
+            in: root,
+            name: "FailedPackageCopy"
+        )
+
+        _ = try writeRegistry(
+            in: root,
+            environments: [fixture.environment]
+        )
+
+        let destination = root.appendingPathComponent(
+            "CopyAfterFailedSave.testudoenv",
+            isDirectory: true
+        )
+
+        let result = await MainActor.run {
+            () -> (String?, URL, String?) in
+
+            let store = TestudoStore(
+                storageDirectoryURL: root
+            )
+
+            if let error = store.activateEnvironment(
+                id: fixture.id
+            ) {
+                return (
+                    error,
+                    store.fileURL,
+                    nil
+                )
+            }
+
+            guard store.createWorkItem(
+                themeID: nil,
+                parentWorkItemID: nil,
+                kind: .task,
+                title: "Protected Package Task",
+                body: "",
+                deadlineAt: nil
+            ) != nil
+            else {
+                return (
+                    "Could not create test Task.",
+                    store.fileURL,
+                    nil
+                )
+            }
+
+            do {
+                try FileManager.default.removeItem(
+                    at: fixture.manifestURL
+                )
+            } catch {
+                return (
+                    "Could not simulate manifest failure.",
+                    store.fileURL,
+                    nil
+                )
+            }
+
+            let error = store.saveWorkEnvironmentAsPackage(
+                id: fixture.id,
+                destinationURL: destination
+            )
+
+            let storagePath = store.applicationData
+                .workEnvironments
+                .first {
+                    $0.id == fixture.id
+                }?
+                .storage?
+                .path
+
+            return (
+                error,
+                store.fileURL,
+                storagePath
+            )
+        }
+
+        XCTAssertEqual(
+            result.0,
+            "The current Work Environment could not be saved. Copying was cancelled."
+        )
+
+        XCTAssertEqual(
+            result.1,
+            fixture.databaseURL
+        )
+
+        XCTAssertEqual(
+            result.2,
+            fixture.packageURL.path
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: destination.path
+            )
         )
     }
 

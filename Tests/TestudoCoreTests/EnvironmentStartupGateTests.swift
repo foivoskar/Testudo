@@ -146,6 +146,42 @@ final class EnvironmentStartupGateTests: XCTestCase {
         )
     }
 
+    func testSchemaNineLocalRootIsReadable() throws {
+        let root = try directory()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let url = try localDatabase(
+            at: root,
+            schema: 9
+        )
+
+        XCTAssertEqual(
+            try inspect(url),
+            .readableLegacyRoot
+        )
+    }
+
+    func testSchemaTenLocalRootIsBlocked() throws {
+        let root = try directory()
+
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let url = try localDatabase(
+            at: root,
+            schema: 10
+        )
+
+        XCTAssertEqual(
+            try inspect(url),
+            .blocked(.unsupported)
+        )
+    }
+
     func testFutureLocalRootIsBlocked() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }

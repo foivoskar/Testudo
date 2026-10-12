@@ -107,6 +107,33 @@ final class EnvironmentSnapshotWritePreflightTests:
         }
     }
 
+    func testSchemaNinePermitsSnapshotWriting() throws {
+        let item = try fixture(databaseSchema: 9)
+
+        defer {
+            try? FileManager.default.removeItem(
+                at: item.root
+            )
+        }
+
+        XCTAssertNoThrow(try verify(item))
+    }
+
+    func testSchemaTenRejectsSnapshotWriting() throws {
+        let item = try fixture(databaseSchema: 10)
+
+        defer {
+            try? FileManager.default.removeItem(
+                at: item.root
+            )
+        }
+
+        assertDenied(
+            item,
+            status: .unsupported
+        )
+    }
+
     func testLegacySchemaEightPermitsWriting() throws {
         let item = try fixture()
 

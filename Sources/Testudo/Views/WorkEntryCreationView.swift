@@ -119,6 +119,22 @@ struct WorkEntryEditorView:
     // --------------------------------------------------------
 
     @State
+    private var hasPlannedStart =
+        false
+
+    @State
+    private var plannedStartAt =
+        Calendar.autoupdatingCurrent.date(
+            byAdding: .day,
+            value: 1,
+            to: Date()
+        ) ?? Date()
+
+    @State
+    private var plannedStartTimeZoneID =
+        TestudoTime.deviceTimeZoneID
+
+    @State
     private var hasStarted =
         false
 
@@ -1083,6 +1099,23 @@ struct WorkEntryEditorView:
                     }
 
                     Toggle(
+                        "Planned Start",
+                        isOn:
+                            $hasPlannedStart
+                    )
+
+                    if hasPlannedStart {
+                        TimeZoneAwareDateEditor(
+                            label:
+                                "Planned Start",
+                            date:
+                                $plannedStartAt,
+                            timeZoneID:
+                                $plannedStartTimeZoneID
+                        )
+                    }
+
+                    Toggle(
                         "Started",
                         isOn:
                             $hasStarted
@@ -1502,6 +1535,21 @@ struct WorkEntryEditorView:
                 item.status
                 ?? .todo
 
+            hasPlannedStart =
+                item.plannedStartAt
+                != nil
+
+            plannedStartAt =
+                item.plannedStartAt
+                ?? Date()
+
+            plannedStartTimeZoneID =
+                TestudoTime
+                    .validTimeZoneIdentifier(
+                        item.plannedStartTimeZoneID
+                    )
+                ?? TestudoTime.deviceTimeZoneID
+
             hasStarted =
                 item.startedAt
                 != nil
@@ -1856,6 +1904,11 @@ struct WorkEntryEditorView:
                         : nil,
                     scheduledAt:
                         nil,
+                    plannedStartAt:
+                        kind == .task
+                        && hasPlannedStart
+                        ? plannedStartAt
+                        : nil,
                     loggedAt:
                         kind == .activity
                         ? occurredAt
@@ -1869,6 +1922,11 @@ struct WorkEntryEditorView:
                         kind == .note
                         && hasReminder
                         ? reminderTimeZoneID
+                        : nil,
+                    plannedStartTimeZoneID:
+                        kind == .task
+                        && hasPlannedStart
+                        ? plannedStartTimeZoneID
                         : nil,
                     loggedTimeZoneID:
                         kind == .activity
@@ -2092,6 +2150,11 @@ struct WorkEntryEditorView:
                         : nil,
                     scheduledAt:
                         nil,
+                    plannedStartAt:
+                        kind == .task
+                        && hasPlannedStart
+                        ? plannedStartAt
+                        : nil,
                     loggedAt:
                         kind == .activity
                         ? occurredAt
@@ -2105,6 +2168,11 @@ struct WorkEntryEditorView:
                         kind == .note
                         && hasReminder
                         ? reminderTimeZoneID
+                        : nil,
+                    plannedStartTimeZoneID:
+                        kind == .task
+                        && hasPlannedStart
+                        ? plannedStartTimeZoneID
                         : nil,
                     loggedTimeZoneID:
                         kind == .activity
@@ -2459,6 +2527,16 @@ struct WorkEntryEditorView:
         {
             return
                 "Enter a title or description."
+        }
+
+        if
+            kind == .task,
+            hasPlannedStart,
+            hasDeadline,
+            plannedStartAt > deadlineAt
+        {
+            return
+                "Planned Start cannot be after Deadline."
         }
 
         if

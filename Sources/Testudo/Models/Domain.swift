@@ -224,6 +224,7 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var updatedAt: Date = Date()
 
     var scheduledAt: Date?
+    var plannedStartAt: Date? = nil
     var deadlineAt: Date?
     var reminderAt: Date? = nil
     var startedAt: Date?
@@ -262,6 +263,7 @@ struct WorkItem: Identifiable, Codable, Hashable {
     var updatedTimeZoneID: String? = nil
 
     var scheduledTimeZoneID: String? = nil
+    var plannedStartTimeZoneID: String? = nil
     var deadlineTimeZoneID: String? = nil
     var reminderTimeZoneID: String? = nil
 
@@ -399,6 +401,7 @@ enum HistoryEventKind: String, Codable, CaseIterable {
     case edited
     case statusChanged
     case scheduled
+    case plannedStartChanged
     case started
     case completed
     case discontinued
