@@ -33,131 +33,16 @@ The application is local-first. It does not require a Testudo cloud service.
 
 ---
 
-## Current release — Testudo 0.3.2 (build 18)
+## Explore Testudo
 
-Testudo 0.3.2 is a maintenance release focused on Task navigation and archive visibility.
+This README describes the application's current functionality. Choose a topic below or consult the [User Manual](Testudo_manual.pdf) for detailed procedures.
 
-### Archived Task visibility
-
-- Closed top-level Tasks and their descendants are excluded from active Task status lists.
-- Archived Tasks are excluded from the All Tasks collection and its count.
-- Parent Task selectors for Tasks, Notes and Activities show active Tasks only.
-- Existing Parent relationships inside archived Task trees remain preserved.
-- Archived Tasks remain accessible in Archive and historical relationship contexts.
-- Reopening a Closed top-level Task restores its descendants to the active workflow using their retained statuses.
-
-### Discontinued Task navigation
-
-- Selecting a Discontinued Task in the middle column now opens its detail page.
-- The detail page exposes the normal metadata, relationships, history and applicable editing and deletion controls.
-- Discontinued remains a Task workflow status, distinct from the Closed archive lifecycle.
-
-### Verification and compatibility
-
-The development build passed 111 automated tests: 75 core tests and 36 integration tests, including a new archived-task visibility regression test.
-
-This release introduces no new Environment database schema and requires no additional data migration. The compatibility rules introduced with Planned Start in Testudo 0.3.1 remain applicable.
-
----
-
-## Previous release — Testudo 0.3.1 (build 17)
-
-This version introduces optional, timezone-aware Planned Start for Tasks.
-
-Planned Start is distinct from the actual Started timestamp, Deadline,
-and workflow status. Subtasks inherit availability constraints from
-their Parent Tasks.
-
-The feature is integrated into the existing editor, Today, Calendar,
-Day workspace, Task details and History.
-
-The implementation passed 110 automated tests and manual UI checks.
-
-**Important compatibility notice:** Work Environments using Planned
-Start are upgraded to database schema 9. Testudo 0.3.0 cannot open
-schema 9 Environments. Update all Macs using the same Environment
-before introducing Planned Start data.
-
-Planned Start remains available in Testudo 0.3.2.
-
----
-
-## Earlier release — Testudo 0.3.0 (build 16)
-
-The previous release established the Environment compatibility safeguards described below.
-
-### What changed in 0.3.0
-
-Testudo 0.3.0 strengthens Work Environment storage safety and establishes a more explicit foundation for format compatibility.
-
-The release introduces a separate TestudoCore module for Environment format inspection, compatibility decisions, JSON encoding and decoding, manifest handling, startup validation, and snapshot-write preflight checks.
-
-### Safer Environment activation
-
-Before opening or switching Work Environments, Testudo verifies the relevant storage format and Environment identity.
-
-The application rejects unsupported formats and incompatible or damaged data rather than silently replacing or rewriting them.
-
-Environment switching also protects the currently active Environment when saving its pending changes or updating the local registry fails.
-
-### Credential Store protection
-
-Environment credential changes now include additional safeguards:
-
-- existing credential files must be readable and compatible;
-- the stored Environment identity must match the active Environment;
-- unsupported credential schemas are rejected;
-- existing memberships cannot silently disappear during a credential update;
-- a missing credential file is not silently recreated by the normal password writer;
-- Administrator password changes require an open Environment session.
-
-The normal creation of an Environment and its initial Administrator remains supported.
-
-### Compatibility and migration policy
-
-Testudo 0.3.0 does not automatically migrate legacy Environment databases from schema 7 to schema 8.
-
-Existing compatible schema 8 Environments remain supported, subject to the normal compatibility checks.
-
-The obsolete automatic schema 7-to-8 migration implementation has been removed. Environments requiring migration must be handled separately, with appropriate backups and an explicitly verified migration procedure.
-
-Journal-based Environment storage requires a different storage engine and is not enabled by this release.
-
-### Verification
-
-The 0.3.0 development baseline passed 95 automated tests: 69 TestudoCore tests and 26 integration tests.
-
-The integration coverage includes Environment startup, registration, activation, switching, failure recovery and credential-file safety.
-
-### Synchronization limitations
-
-Portable Work Environments can still be stored in folders synchronized by Dropbox, iCloud Drive, OneDrive or other filesystem providers.
-
-This release does not introduce simultaneous multi-device editing, automatic conflict resolution or a synchronization server.
-
-Avoid editing the same Environment concurrently on multiple Macs, and keep independent backups.
-
----
-
-## Planned Start (0.3.1)
-
-Testudo 0.3.1 introduces an optional, time-zone-aware
-Planned Start for Tasks.
-
-Planned Start specifies when work is intended to become actionable.
-It is independent of the actual Started timestamp and does not
-automatically change Task status.
-
-The feature integrates with Task editing, History, Today, the
-Day workspace and Calendar.
-
-**Compatibility:** Environments using Planned Start transition from
-database schema 8 to schema 9. Testudo 0.3.0 cannot open schema 9
-Environments. Update every Mac using a shared Environment before
-introducing Planned Start data.
-
-See [Planned Start development documentation](Documentation/PlannedStart.md)
-for behavior, compatibility restrictions and verification.
+- **Get started:** [Requirements](#requirements), [Installation](#installation), [Demo Environment](#demo-environment).
+- **Organize work:** [Work model](#work-model), [Task hierarchy](#task-hierarchy), [Planned Start](#planned-start), [Task lifecycle](#task-lifecycle).
+- **Navigate and plan:** [Interface](#interface), [Today](#today), [Day workspace](#day-workspace), [Calendar](#calendar).
+- **Connect information:** [Themes](#themes), [People, Groups and Organizations](#people-groups-and-organizations), [Work relationships](#work-relationships).
+- **Manage data:** [Work Environments](#work-environments), [Identity and authentication](#identity-and-authentication), [Building from source](#building-from-source).
+- **Release history:** [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -237,7 +122,7 @@ cd Testudo
 The resulting installer is written to `dist/`, for example:
 
 ```text
-dist/Testudo-0.3.0-macOS-arm64.dmg
+dist/Testudo-VERSION-macOS-arm64.dmg
 ```
 
 ### Updating
@@ -304,6 +189,16 @@ A Task may contain:
 Sub-tasks can themselves contain further work, so the hierarchy can continue to arbitrary depth.
 
 The hierarchy is independent from Theme classification, organizational structure and chronology.
+
+---
+
+## Planned Start
+
+Planned Start is an optional, time-zone-aware date and time indicating when a Task is intended to become actionable. It is distinct from the actual Started timestamp, the Deadline and the Task's workflow status.
+
+Subtasks inherit availability constraints from their Parent Tasks and other ancestors. Planned Start is integrated with Task editing, Task details, Today, Calendar, the Day workspace and History. Setting or reaching a Planned Start does not automatically change Task status.
+
+See the [Planned Start documentation](Documentation/PlannedStart.md) for detailed behaviour and examples.
 
 ---
 
@@ -667,6 +562,8 @@ Example.testudoenv/
 
 The icon is optional.
 
+**Environment compatibility:** Environments using Planned Start data use database schema 9 and cannot be opened by Testudo 0.3.0. Update every Mac using a shared Environment before adding Planned Start data. Schema 8 Environments remain supported; schema 7 requires an explicitly verified migration. Keep independent backups before upgrading.
+
 A Work Environment can be stored locally or in a filesystem location synchronized through services such as:
 
 - Dropbox;
@@ -810,6 +707,7 @@ Documentation/TestudoManual/    LaTeX manual source
 Docs/                            project specifications
 install.sh                       source-first installer
 Testudo_manual.pdf               bundled user manual
+CHANGELOG.md                      release history
 ```
 
 ---
@@ -822,12 +720,13 @@ The repository contains:
 - [LaTeX manual source](Documentation/TestudoManual/Testudo_manual.tex)
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
+- [Release history](CHANGELOG.md)
 
 The bundled **Testudo User Manual 2.3 documents Testudo 0.3.2 (build 18)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual source document Testudo 0.3.2 (build 18).
+The README describes current functionality; version-specific changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -839,7 +738,7 @@ The interface and data model may continue to evolve between early versions.
 
 Users should keep independent backups of important `.testudoenv` packages, particularly when moving between versions.
 
-Backward compatibility is considered explicitly. Testudo 0.1.7 introduced migration handling for the pre-0.1.7 representation of Closed Tasks, and that compatibility remains part of the current application.
+Backward compatibility is handled explicitly. Keep independent Environment backups before upgrading or migrating data created with older versions.
 
 ---
 
