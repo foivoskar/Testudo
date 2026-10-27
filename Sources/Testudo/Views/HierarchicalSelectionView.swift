@@ -720,10 +720,17 @@ enum HierarchySelectionData {
         excludingWorkItemIDs:
             Set<UUID> = [],
         themeID:
-            UUID? = nil
+            UUID? = nil,
+        includeArchivedTasks:
+            Bool = true
     ) -> [HierarchySelectionNode] {
+        let sourceTasks =
+            includeArchivedTasks
+            ? store.data.workItems
+            : store.activeWorkItems
+
         let tasks =
-            store.data.workItems
+            sourceTasks
                 .filter {
                     item in
 

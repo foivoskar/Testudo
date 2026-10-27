@@ -2491,7 +2491,7 @@ private struct SectionContentView: View {
 
         case "allTasks":
             let count =
-                store.data.workItems
+                store.activeWorkItems
                     .filter {
                         $0.kind == .task
                     }

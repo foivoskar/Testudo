@@ -8,9 +8,9 @@
     \setmonofont{DejaVu Sans Mono}[Scale=0.82]%
 }
 
-\newcommand{\ManualVersion}{2.2}
-\newcommand{\DocumentedTestudoVersion}{0.3.1}
-\newcommand{\DocumentedTestudoBuild}{17}
+\newcommand{\ManualVersion}{2.3}
+\newcommand{\DocumentedTestudoVersion}{0.3.2}
+\newcommand{\DocumentedTestudoBuild}{18}
 \newcommand{\ManualDate}{October 2026}
 \newcommand{\TestudoIconPath}{../../Sources/Testudo/Resources/testudo_icon_blue.png}
 
@@ -58,7 +58,7 @@ This manual documents the implemented behaviour of \Testudo\ \DocumentedTestudoV
 Each major chapter therefore contains practical procedures and \term{Try it} exercises. These exercises are safe to perform in the Demo Environment or in a disposable Work Environment. They are especially useful when learning the application after an update.
 
 \manualnote{Version covered}{
-This edition documents Testudo 0.3.1 (build 17). The release introduces optional, time-zone-aware Planned Start for Tasks, inherited availability constraints for Subtasks, Calendar and Today integration, and historical change tracking. Environments using Planned Start transition to database schema 9. Older Testudo versions cannot open schema 9 Environments. Schema 8 remains supported; schema 7 requires explicit migration. Simultaneous multi-device editing and automatic conflict resolution are not supported.
+This edition documents Testudo 0.3.2 (build 18). This maintenance release corrects archived Task visibility in active Task lists and Parent Task selection, while preserving the archived hierarchy and historical relationships. It also restores the detail panel for Discontinued Tasks. No additional database schema migration is introduced. Testudo 0.3.1 introduced optional, time-zone-aware Planned Start, inherited availability constraints for Subtasks, Calendar and Today integration, and historical change tracking. Environments using Planned Start transition to database schema 9. Older Testudo versions cannot open schema 9 Environments. Schema 8 remains supported; schema 7 requires explicit migration. Simultaneous multi-device editing and automatic conflict resolution are not supported.
 }
 
 \manualwarning{Early-release software}{
@@ -181,7 +181,7 @@ cd Testudo
 
 The resulting DMG is written under \filepath{dist/}. For this release the expected name is normally:
 \begin{lstlisting}
-dist/Testudo-0.3.1-macOS-arm64.dmg
+dist/Testudo-0.3.2-macOS-arm64.dmg
 \end{lstlisting}
 
 \section{Updating}
@@ -599,7 +599,7 @@ The discontinued time cannot be in the future and cannot be earlier than Started
 
 \section{What remains visible}
 
-The normal detail page shows the Discontinued time, reason and optional outcome. The Task also appears in the \menu{Discontinued} sidebar section while it remains active rather than archived.
+The normal detail page shows the Discontinued time, reason and optional outcome. The Task also appears in the \menu{Discontinued} sidebar section while it remains active rather than archived. Selecting the Task in that section opens its detail page in the right pane, including the normal applicable editing and deletion controls.
 
 A discontinuation lifecycle event is retained in History.
 
@@ -957,7 +957,7 @@ The sidebar exposes dedicated Task filters:
     \item Discontinued.
 \end{itemize}
 
-These lists operate on active Work. Archived Task trees are excluded until reopened.
+These lists operate on active Work. Archived Task trees, including Tasks with unfinished child statuses, are excluded until reopened. Parent Task selectors for Tasks, Notes and Activities also exclude archived Tasks. Existing relationships inside the archived hierarchy remain preserved. Reopening restores the subtree to active views without changing its retained workflow statuses.
 
 \section{Timeline}
 
@@ -1607,8 +1607,8 @@ Scripts/version.sh
 
 \filepath{Scripts/version.sh} is the build scripts' central version source. For this manual:
 \begin{lstlisting}
-TESTUDO_VERSION="0.3.1"
-TESTUDO_BUILD_NUMBER="17"
+TESTUDO_VERSION="0.3.2"
+TESTUDO_BUILD_NUMBER="18"
 \end{lstlisting}
 
 \section{Task status persistence compatibility}

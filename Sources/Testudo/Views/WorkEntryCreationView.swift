@@ -780,13 +780,17 @@ struct WorkEntryEditorView:
                             excludingWorkItemIDs:
                                 excludedParentIDs,
                             themeID:
-                                primaryThemeID
+                                primaryThemeID,
+                            includeArchivedTasks:
+                                false
                         ),
                 initialSelection:
                     Set(
                         currentParent
                             .map {
-                                [$0.id]
+                                store.isArchivedWorkItem($0)
+                                ? []
+                                : [$0.id]
                             }
                         ?? []
                     ),
@@ -796,6 +800,15 @@ struct WorkEntryEditorView:
                     1,
                 onSave: {
                     selection in
+
+                    if let currentParent,
+                       store.isArchivedWorkItem(currentParent) {
+                        if selection.isEmpty {
+                            return nil
+                        }
+
+                        return "Reopen the archived Parent Task before changing this relationship."
+                    }
 
                     parentWorkItemID =
                         selection.first
@@ -1850,6 +1863,18 @@ struct WorkEntryEditorView:
 
 
     private func createNewItem() {
+        if let parentWorkItemID {
+            guard
+                let parent = store.workItem(id: parentWorkItemID),
+                parent.kind == .task,
+                !store.isArchivedWorkItem(parent)
+            else {
+                errorMessage =
+                    "Choose an active Parent Task. Reopen a Closed Task before adding child work."
+                return
+            }
+        }
+
         guard
             let newID =
                 store.createWorkItem(

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>Testudo 0.3.1 · build 17 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
+  <strong>Testudo 0.3.2 · build 18 · macOS 26+ · Apple Silicon · Swift 6+ · MIT</strong>
 </p>
 
 ---
@@ -33,7 +33,34 @@ The application is local-first. It does not require a Testudo cloud service.
 
 ---
 
-## Current release — Testudo 0.3.1 (build 17)
+## Current release — Testudo 0.3.2 (build 18)
+
+Testudo 0.3.2 is a maintenance release focused on Task navigation and archive visibility.
+
+### Archived Task visibility
+
+- Closed top-level Tasks and their descendants are excluded from active Task status lists.
+- Archived Tasks are excluded from the All Tasks collection and its count.
+- Parent Task selectors for Tasks, Notes and Activities show active Tasks only.
+- Existing Parent relationships inside archived Task trees remain preserved.
+- Archived Tasks remain accessible in Archive and historical relationship contexts.
+- Reopening a Closed top-level Task restores its descendants to the active workflow using their retained statuses.
+
+### Discontinued Task navigation
+
+- Selecting a Discontinued Task in the middle column now opens its detail page.
+- The detail page exposes the normal metadata, relationships, history and applicable editing and deletion controls.
+- Discontinued remains a Task workflow status, distinct from the Closed archive lifecycle.
+
+### Verification and compatibility
+
+The development build passed 111 automated tests: 75 core tests and 36 integration tests, including a new archived-task visibility regression test.
+
+This release introduces no new Environment database schema and requires no additional data migration. The compatibility rules introduced with Planned Start in Testudo 0.3.1 remain applicable.
+
+---
+
+## Previous release — Testudo 0.3.1 (build 17)
 
 This version introduces optional, timezone-aware Planned Start for Tasks.
 
@@ -51,11 +78,11 @@ Start are upgraded to database schema 9. Testudo 0.3.0 cannot open
 schema 9 Environments. Update all Macs using the same Environment
 before introducing Planned Start data.
 
-Testudo 0.3.1 is the current public release.
+Planned Start remains available in Testudo 0.3.2.
 
 ---
 
-## Previous release — Testudo 0.3.0 (build 16)
+## Earlier release — Testudo 0.3.0 (build 16)
 
 The previous release established the Environment compatibility safeguards described below.
 
@@ -796,11 +823,11 @@ The repository contains:
 - [LaTeX manual class](Documentation/TestudoManual/testudomanual.cls)
 - [Manual build script](Scripts/build-manual.sh)
 
-The bundled **Testudo User Manual 2.1 documents Testudo 0.3.0 (build 16)**.
+The bundled **Testudo User Manual 2.3 documents Testudo 0.3.2 (build 18)**.
 
 Rebuild the bundled PDF from its LaTeX source with `./Scripts/build-manual.sh`.
 
-This README and the User Manual source document Testudo 0.3.1 (build 17).
+This README and the User Manual source document Testudo 0.3.2 (build 18).
 
 ---
 

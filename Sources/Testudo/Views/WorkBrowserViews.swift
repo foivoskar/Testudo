@@ -1236,17 +1236,7 @@ struct WorkListView: View {
     private func tasks(
         with status: TaskStatus
     ) -> [WorkItem] {
-        store.data.workItems
-            .filter {
-                $0.kind == .task
-                && $0.status == status
-            }
-            .sorted {
-                taskDeadlinePrecedes(
-                    $0,
-                    $1
-                )
-            }
+        store.tasks(with: status)
     }
 
     private func relevantDate(
@@ -2546,13 +2536,17 @@ struct WorkItemDetailView: View {
                         store:
                             store,
                         excludingWorkItemIDs:
-                            excluded
+                            excluded,
+                        includeArchivedTasks:
+                            false
                     ),
             initialSelection:
                 Set(
                     currentParent
                         .map {
-                            [$0.id]
+                            store.isArchivedWorkItem($0)
+                            ? []
+                            : [$0.id]
                         }
                     ?? []
                 ),
@@ -2562,6 +2556,15 @@ struct WorkItemDetailView: View {
                 1,
             onSave: {
                 selection in
+
+                if let currentParent,
+                   store.isArchivedWorkItem(currentParent) {
+                    if selection.isEmpty {
+                        return nil
+                    }
+
+                    return "Reopen the archived Parent Task before changing this relationship."
+                }
 
                 let newParentID =
                     selection.first
@@ -5571,7 +5574,7 @@ struct WorkItemDetailView: View {
             )
             .union([itemID])
 
-        return store.data.workItems
+        return store.activeWorkItems
             .filter {
                 $0.kind == .task
                 && !excluded.contains(
@@ -7721,6 +7724,7 @@ struct WorkDetailRouterView: View {
              .todo,
              .inProgress,
              .completed,
+             .discontinued,
              .archive,
              .timeline:
             return true
@@ -8024,6 +8028,7 @@ struct WorkDetailRouterView: View {
              .todo,
              .inProgress,
              .completed,
+             .discontinued,
              .timeline:
 
             return true
